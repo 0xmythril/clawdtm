@@ -341,12 +341,12 @@ function SkillsContent() {
             </a>
             <span className="text-border">•</span>
             <a
-              href="https://molthub.com"
+              href="https://clawdhub.com"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"
             >
-              Molthub
+              Clawdhub
             </a>
           </div>
         </footer>

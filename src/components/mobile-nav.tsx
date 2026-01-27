@@ -319,23 +319,21 @@ export function MobileNav({
                   </a>
                 </Button>
 
-                {/* Molthub link */}
+                {/* Moltbot Docs link */}
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-3 h-12 text-sm"
                   asChild
                 >
                   <a
-                    href="https://molthub.com"
+                    href="https://docs.molt.bot/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                      <path d="M2 17l10 5 10-5"/>
-                      <path d="M2 12l10 5 10-5"/>
+                      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
                     </svg>
-                    <span className="flex-1 text-left">Molthub</span>
+                    <span className="flex-1 text-left">Moltbot Docs</span>
                     <ExternalLink className="h-4 w-4 text-muted-foreground" />
                   </a>
                 </Button>

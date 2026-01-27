@@ -122,7 +122,7 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
             </Button>
             <Button size="sm" variant="outline" asChild>
               <a
-                href={`https://molthub.com/skills/${skill.slug}`}
+                href={`https://clawdhub.com/skills/${skill.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -205,7 +205,7 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
           </Button>
           <Button size="sm" variant="outline" asChild>
             <a
-              href={`https://molthub.com/skills/${skill.slug}`}
+              href={`https://clawdhub.com/skills/${skill.slug}`}
               target="_blank"
               rel="noopener noreferrer"
             >

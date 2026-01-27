@@ -234,13 +234,13 @@ export function Sidebar({
             <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
           </a>
           <a
-            href="https://molthub.com"
+            href="https://clawdhub.com"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"
           >
             <Sparkles className="h-4 w-4" />
-            Molthub
+            Clawdhub
             <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
           </a>
         </div>

@@ -112,12 +112,12 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
               asChild
             >
               <a
-                href={`https://molthub.com/skills/${skill.slug}`}
+                href={`https://clawdhub.com/skills/${skill.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                View on Molthub
+                View on Clawdhub
               </a>
             </Button>
           </div>
