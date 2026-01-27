@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { query, internalAction, internalMutation, internalQuery } from './_generated/server'
+import { query, action, internalAction, internalMutation, internalQuery } from './_generated/server'
 import { internal } from './_generated/api'
 
 // Environment variable for model (defaults to claude-sonnet-4-20250514)
@@ -323,6 +323,19 @@ export const runCategorizationManually = internalAction({
     console.log('Manual categorization triggered')
     return await ctx.runAction(internal.categorization.categorizeSkillsBatch, {
       limit: args.limit ?? 50,
+    })
+  },
+})
+
+// Public trigger for testing categorization
+export const triggerCategorization = action({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<{ processed: number; succeeded: number; failed: number }> => {
+    console.log('Categorization manually triggered via public action')
+    return await ctx.runAction(internal.categorization.categorizeSkillsBatch, {
+      limit: args.limit ?? 20,
     })
   },
 })
