@@ -37,7 +37,7 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto mx-4 sm:mx-auto w-[calc(100%-2rem)] sm:w-full">
         <DialogHeader className="space-y-3">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Terminal className="h-5 w-5 text-primary" />
@@ -55,25 +55,25 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
               Install Command
             </p>
             <div className="relative">
-              <pre className="bg-muted/50 border border-border rounded-lg p-3 text-sm overflow-x-auto font-mono">
+              <pre className="bg-muted/50 border border-border rounded-lg p-3 text-xs sm:text-sm overflow-x-auto font-mono whitespace-pre-wrap break-all">
                 <code className="text-foreground">{installCommand}</code>
               </pre>
             </div>
           </div>
 
           {/* Skill locations info */}
-          <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-sm space-y-2">
+          <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-xs sm:text-sm space-y-2">
             <p className="text-muted-foreground">
               <strong className="text-foreground">Where skills are installed:</strong>
             </p>
             <ul className="text-muted-foreground text-xs space-y-1 ml-4 list-disc">
-              <li><code className="text-foreground">./skills</code> — current workspace (default)</li>
-              <li><code className="text-foreground">~/.clawdbot/skills</code> — shared across all agents</li>
+              <li><code className="text-foreground break-all">./skills</code> — current workspace (default)</li>
+              <li><code className="text-foreground break-all">~/.clawdbot/skills</code> — shared across all agents</li>
             </ul>
           </div>
 
           {/* Prerequisites note */}
-          <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-sm">
+          <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-xs sm:text-sm">
             <p className="text-muted-foreground">
               <strong className="text-foreground">Prerequisites:</strong> Make sure you have{" "}
               <a

@@ -12,8 +12,8 @@ import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
-  Tag,
   Cpu,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Logo } from "./logo";
+import { GettingStartedModal } from "./getting-started-modal";
 import Link from "next/link";
 
 // Tag color palette
@@ -115,6 +116,14 @@ export function Sidebar({
             <Sparkles className="h-4 w-4" />
             Skills
           </Link>
+          <GettingStartedModal
+            trigger={
+              <button className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full">
+                <HelpCircle className="h-4 w-4" />
+                Getting Started
+              </button>
+            }
+          />
         </nav>
 
         {/* Categories Section */}
@@ -224,7 +233,7 @@ export function Sidebar({
         {/* External Links */}
         <div className="mt-6 space-y-1">
           <a
-            href="https://docs.clawd.bot/"
+            href="https://docs.molt.bot/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"

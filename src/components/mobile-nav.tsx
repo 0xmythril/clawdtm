@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { useTheme } from "next-themes";
 import { Logo } from "./logo";
+import { GettingStartedModal } from "./getting-started-modal";
 
 // Tag color palette
 const TAG_COLORS = [
@@ -62,6 +63,7 @@ export function MobileNav({
   const { theme, setTheme } = useTheme();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"categories" | "tags">("categories");
 
   const topTags = tags.slice(0, 20);
@@ -260,6 +262,19 @@ export function MobileNav({
                   <Logo />
                 </div>
 
+                {/* Getting Started */}
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-12 text-sm"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setGettingStartedOpen(true);
+                  }}
+                >
+                  <HelpCircle className="h-5 w-5" />
+                  <span className="flex-1 text-left">Getting Started</span>
+                </Button>
+
                 {/* Theme toggle - not an external link */}
                 <Button
                   variant="outline"
@@ -358,6 +373,12 @@ export function MobileNav({
 
       {/* Bottom padding for content to not be hidden behind nav */}
       <div className="md:hidden h-16" />
+
+      {/* Getting Started Modal */}
+      <GettingStartedModal
+        open={gettingStartedOpen}
+        onOpenChange={setGettingStartedOpen}
+      />
     </>
   );
 }
