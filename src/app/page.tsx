@@ -1,7 +1,7 @@
 "use client";
 
+import { Suspense, useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
-import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { Sidebar } from "@/components/sidebar";
@@ -16,7 +16,20 @@ import { Logo } from "@/components/logo";
 type SortOption = "downloads" | "stars" | "installs";
 type ViewMode = "card" | "list";
 
-export default function SkillsPage() {
+// Loading fallback for Suspense
+function SkillsLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-muted-foreground">Loading skills...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main page content - separated to wrap in Suspense
+function SkillsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchBarRef = useRef<SearchBarRef>(null);
@@ -218,7 +231,7 @@ export default function SkillsPage() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col min-h-screen">
-{/* Mobile header removed - logo integrated into headline */}
+        {/* Mobile header removed - logo integrated into headline */}
 
         <div className="flex-1 px-4 py-4 md:px-6 lg:px-8">
           {/* Page header */}
@@ -358,5 +371,14 @@ export default function SkillsPage() {
         skill={selectedSkill}
       />
     </div>
+  );
+}
+
+// Main export - wraps content in Suspense for useSearchParams
+export default function SkillsPage() {
+  return (
+    <Suspense fallback={<SkillsLoading />}>
+      <SkillsContent />
+    </Suspense>
   );
 }
