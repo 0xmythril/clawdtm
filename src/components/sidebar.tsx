@@ -100,14 +100,15 @@ export function Sidebar({
   const topTags = tags.slice(0, 15);
 
   return (
-    <aside className="hidden md:flex md:w-60 lg:w-64 flex-col border-r border-border/40 bg-background h-screen sticky top-0">
+    <aside className="hidden md:flex md:w-60 lg:w-64 flex-col border-r border-border/40 bg-background h-screen sticky top-0 overflow-hidden">
       {/* Logo */}
-      <div className="p-4 border-b border-border/40">
+      <div className="p-4 border-b border-border/40 flex-shrink-0">
         <Logo />
       </div>
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      {/* Navigation - scrollable area */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-3 py-4">
         <nav className="space-y-1 mb-6">
           <Link
             href="/"
@@ -253,10 +254,11 @@ export function Sidebar({
             <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
           </a>
         </div>
+        </div>
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-3 border-t border-border/40 space-y-3">
+      <div className="p-3 border-t border-border/40 space-y-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
