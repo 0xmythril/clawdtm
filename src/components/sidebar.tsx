@@ -29,7 +29,6 @@ import {
 import { Logo } from "./logo";
 import { GettingStartedModal } from "./getting-started-modal";
 import Link from "next/link";
-import { useState, useMemo } from "react";
 
 // Tag color palette
 const TAG_COLORS = [
