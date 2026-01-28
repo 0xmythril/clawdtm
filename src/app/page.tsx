@@ -84,7 +84,7 @@ function SkillsContent() {
 
   const searchResult = useQuery(
     api.clawdhubSync.searchCachedSkills,
-    query.trim() ? { query: query.trim(), limit: 50 } : "skip"
+    query.trim() ? { query: query.trim(), limit: 50, sortBy: urlSort } : "skip"
   );
 
   // Accumulate skills for infinite scroll

@@ -519,6 +519,12 @@ export const searchCachedSkills = query({
   args: {
     query: v.string(),
     limit: v.optional(v.number()),
+    sortBy: v.optional(v.union(
+      v.literal('relevance'),
+      v.literal('downloads'),
+      v.literal('stars'),
+      v.literal('installs'),
+    )),
   },
   handler: async (ctx, args) => {
     const searchTerm = args.query.trim().toLowerCase()
@@ -527,6 +533,7 @@ export const searchCachedSkills = query({
     }
     
     const limit = args.limit ?? 30
+    const sortBy = args.sortBy ?? 'relevance'
     
     // Get all skills and filter in memory for comprehensive search
     // This works well for < 10k skills; for larger datasets, use proper search index
@@ -535,7 +542,7 @@ export const searchCachedSkills = query({
     // Filter out hidden skills
     const visibleSkills = allSkills.filter(s => !s.hidden)
     
-    // Score and rank results
+    // Score and filter matching results
     const scored = visibleSkills
       .map(skill => {
         const name = (skill.name ?? skill.displayName ?? skill.slug).toLowerCase()
@@ -565,14 +572,35 @@ export const searchCachedSkills = query({
         // Author match
         if (author.includes(searchTerm)) score += 15
         
-        // Boost by popularity
-        score += Math.min(skill.stars * 2, 20)
-        score += Math.min(skill.downloads / 10, 10)
+        // Only add popularity boost for relevance sorting
+        if (sortBy === 'relevance') {
+          score += Math.min(skill.stars * 2, 20)
+          score += Math.min(skill.downloads / 10, 10)
+        }
         
         return { skill, score }
       })
       .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
+    
+    // Sort based on sortBy parameter
+    let sorted: typeof scored
+    switch (sortBy) {
+      case 'downloads':
+        sorted = scored.sort((a, b) => b.skill.downloads - a.skill.downloads)
+        break
+      case 'stars':
+        sorted = scored.sort((a, b) => b.skill.stars - a.skill.stars)
+        break
+      case 'installs':
+        sorted = scored.sort((a, b) => b.skill.installs - a.skill.installs)
+        break
+      case 'relevance':
+      default:
+        sorted = scored.sort((a, b) => b.score - a.score)
+        break
+    }
+    
+    const results = sorted
       .slice(0, limit)
       .map(({ skill }) => ({
         ...skill,
@@ -581,7 +609,7 @@ export const searchCachedSkills = query({
         author: skill.author ?? skill.authorHandle ?? 'unknown',
       }))
     
-    return { skills: scored }
+    return { skills: results }
   },
 })
 
