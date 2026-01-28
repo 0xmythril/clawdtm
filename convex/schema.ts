@@ -400,6 +400,11 @@ const cachedSkills = defineTable({
   updatedAt: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
   cachedAt: v.optional(v.number()),
+  
+  // Moderation - hide malicious/inappropriate skills
+  hidden: v.optional(v.boolean()),
+  hiddenReason: v.optional(v.string()),
+  hiddenAt: v.optional(v.number()),
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -407,6 +412,7 @@ const cachedSkills = defineTable({
   .index('by_stars', ['stars'])
   .index('by_installs', ['installs'])
   .index('by_last_synced', ['lastSyncedAt'])
+  .index('by_hidden', ['hidden'])
   .searchIndex('search_name_desc', {
     searchField: 'slug',
     filterFields: ['category'],

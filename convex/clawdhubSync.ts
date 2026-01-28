@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { action, internalAction, internalMutation, internalQuery } from './_generated/server'
+import { action, mutation, query, internalAction, internalMutation, internalQuery } from './_generated/server'
 import { internal } from './_generated/api'
 
 const CLAWDHUB_API = 'https://clawdhub.com/api/v1'
@@ -458,8 +458,6 @@ export const fullSyncFromClawdHub = internalAction({
 // Public Queries (for frontend)
 // ============================================
 
-import { query } from './_generated/server'
-
 export const listCachedSkills = query({
   args: {
     limit: v.optional(v.number()),
@@ -534,8 +532,11 @@ export const searchCachedSkills = query({
     // This works well for < 10k skills; for larger datasets, use proper search index
     const allSkills = await ctx.db.query('cachedSkills').collect()
     
+    // Filter out hidden skills
+    const visibleSkills = allSkills.filter(s => !s.hidden)
+    
     // Score and rank results
-    const scored = allSkills
+    const scored = visibleSkills
       .map(skill => {
         const name = (skill.name ?? skill.displayName ?? skill.slug).toLowerCase()
         const slug = skill.slug.toLowerCase()
@@ -592,14 +593,17 @@ export const getSyncStatus = query({
       .withIndex('by_key', (q) => q.eq('key', 'skills'))
       .unique()
     
-    const totalCached = await ctx.db
+    const allCached = await ctx.db
       .query('cachedSkills')
       .collect()
+    
+    const hiddenCount = allCached.filter(s => s.hidden).length
     
     return {
       status: state?.status ?? 'not_initialized',
       totalSynced: state?.totalSynced ?? 0,
-      totalCached: totalCached.length,
+      totalCached: allCached.length - hiddenCount,
+      totalHidden: hiddenCount,
       lastFullSyncAt: state?.lastFullSyncAt,
       lastError: state?.lastError,
     }
@@ -610,7 +614,9 @@ export const getSyncStatus = query({
 export const getCategories = query({
   args: {},
   handler: async (ctx) => {
-    const skills = await ctx.db.query('cachedSkills').collect()
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    // Filter out hidden skills
+    const skills = allSkills.filter(s => !s.hidden)
     
     const categorySet = new Set<string>()
     for (const skill of skills) {
@@ -655,7 +661,9 @@ function isValidTag(tag: string): boolean {
 export const getTags = query({
   args: {},
   handler: async (ctx) => {
-    const skills = await ctx.db.query('cachedSkills').collect()
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    // Filter out hidden skills
+    const skills = allSkills.filter(s => !s.hidden)
     
     const tagCounts: Record<string, number> = {}
     
@@ -713,6 +721,9 @@ export const listCachedSkillsWithFilters = query({
       .query('cachedSkills')
       .order('desc')
       .collect()
+    
+    // Filter out hidden skills first
+    skills = skills.filter(s => !s.hidden)
     
     // Curated featured skills list
     const FEATURED_SLUGS = [
@@ -809,5 +820,78 @@ export const triggerSync = action({
     return await ctx.runAction(internal.clawdhubSync.syncFromClawdHub, {
       maxBatches: 10,
     })
+  },
+})
+
+// ============================================
+// Moderation - Hide/Unhide Skills
+// ============================================
+
+// Hide a skill (prevent it from showing in the UI)
+export const hideSkill = mutation({
+  args: {
+    slug: v.string(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const skill = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_slug', (q) => q.eq('slug', args.slug))
+      .unique()
+    
+    if (!skill) {
+      throw new Error(`Skill not found: ${args.slug}`)
+    }
+    
+    await ctx.db.patch(skill._id, {
+      hidden: true,
+      hiddenReason: args.reason ?? 'Hidden by moderator',
+      hiddenAt: Date.now(),
+    })
+    
+    return { success: true, slug: args.slug }
+  },
+})
+
+// Unhide a skill
+export const unhideSkill = mutation({
+  args: {
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const skill = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_slug', (q) => q.eq('slug', args.slug))
+      .unique()
+    
+    if (!skill) {
+      throw new Error(`Skill not found: ${args.slug}`)
+    }
+    
+    await ctx.db.patch(skill._id, {
+      hidden: false,
+      hiddenReason: undefined,
+      hiddenAt: undefined,
+    })
+    
+    return { success: true, slug: args.slug }
+  },
+})
+
+// List all hidden skills
+export const listHiddenSkills = query({
+  args: {},
+  handler: async (ctx) => {
+    const skills = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_hidden', (q) => q.eq('hidden', true))
+      .collect()
+    
+    return skills.map((s) => ({
+      slug: s.slug,
+      name: s.name ?? s.displayName ?? s.slug,
+      hiddenReason: s.hiddenReason,
+      hiddenAt: s.hiddenAt,
+    }))
   },
 })
