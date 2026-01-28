@@ -91,6 +91,9 @@ function SkillsContent() {
   useEffect(() => {
     if (!cachedResult?.skills) return;
 
+    // Verified skills list (curated/tested)
+    const VERIFIED_SLUGS = new Set(["gog"]);
+
     const newSkills: Skill[] = cachedResult.skills.map((s) => ({
       _id: s._id,
       slug: s.slug,
@@ -102,6 +105,7 @@ function SkillsContent() {
       installs: s.installs,
       category: s.category,
       normalizedTags: s.normalizedTags,
+      isVerified: VERIFIED_SLUGS.has(s.slug),
     }));
 
     if (cursor === 0) {
@@ -115,6 +119,9 @@ function SkillsContent() {
     }
   }, [cachedResult, cursor]);
 
+  // Verified skills list (curated/tested)
+  const VERIFIED_SLUGS = new Set(["gog"]);
+
   // Determine which data to show
   const skills: Skill[] = useMemo(() => {
     if (query.trim() && searchResult?.skills) {
@@ -127,6 +134,7 @@ function SkillsContent() {
         downloads: s.downloads,
         stars: s.stars,
         installs: s.installs,
+        isVerified: VERIFIED_SLUGS.has(s.slug),
       }));
     }
     return allSkills;

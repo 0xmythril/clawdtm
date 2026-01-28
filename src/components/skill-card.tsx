@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Download, Terminal, ExternalLink } from "lucide-react";
+import { Star, Download, Terminal, ExternalLink, BadgeCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +40,7 @@ export type Skill = {
   installs: number;
   category?: string;
   normalizedTags?: string[];
+  isVerified?: boolean;
 };
 
 type SkillCardProps = {
@@ -59,8 +60,11 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-start gap-2 mb-1">
-              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
+              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
                 {skill.name || skill.slug}
+                {skill.isVerified && (
+                  <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                )}
               </h3>
               {skill.category && (
                 <Badge variant="secondary" className="text-xs shrink-0">
@@ -142,8 +146,11 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
         {/* Header: Name + Category */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
+            <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
               {skill.name || skill.slug}
+              {skill.isVerified && (
+                <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
+              )}
             </h3>
             <p className="text-xs text-muted-foreground truncate">
               /{skill.slug} · by {skill.author}
