@@ -241,22 +241,10 @@ function SkillsContent() {
     searchBarRef.current?.focus();
   };
 
-  // Prepare categories for filter
-  const categories = useMemo(() => {
-    if (!categoriesData?.categories) return [];
-    return categoriesData.categories
-      .filter((c) => c && c !== "uncategorized")
-      .map((name) => ({
-        name,
-        count: categoriesData.counts[name] ?? 0,
-      }));
-  }, [categoriesData]);
-
   return (
     <div className="min-h-screen flex">
       {/* Desktop Sidebar */}
       <Sidebar
-        categories={categories}
         tags={tagsData?.tags ?? []}
         activeCategory={urlCategory}
         selectedTags={urlTags}
@@ -395,7 +383,6 @@ function SkillsContent() {
 
       {/* Mobile Bottom Navigation */}
       <MobileNav
-        categories={categories}
         tags={tagsData?.tags ?? []}
         activeCategory={urlCategory}
         selectedTags={urlTags}

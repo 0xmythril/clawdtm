@@ -891,10 +891,21 @@ export const listCachedSkillsWithFilters = query({
       'summarize',        // URL/file summarization
     ]
     
+    // Verified skills list (curated/tested)
+    const VERIFIED_SLUGS = [
+      'gog',              // Google Workspace - tested and verified
+    ]
+    
     // Filter by category
     if (args.category && args.category !== 'all') {
       if (args.category === 'featured') {
         skills = skills.filter(s => FEATURED_SLUGS.includes(s.slug))
+      } else if (args.category === 'verified') {
+        skills = skills.filter(s => VERIFIED_SLUGS.includes(s.slug))
+      } else if (args.category === 'popular') {
+        // Popular = top skills by combined popularity score (downloads + stars + installs)
+        // We'll sort after filtering, but filter to skills with meaningful engagement
+        skills = skills.filter(s => s.downloads > 10 || s.stars > 0 || s.installs > 0)
       } else {
         skills = skills.filter(s => s.category === args.category)
       }
@@ -920,7 +931,14 @@ export const listCachedSkillsWithFilters = query({
     }
     
     // Sort
-    if (args.sortBy === 'downloads') {
+    if (args.category === 'popular') {
+      // Popular category: sort by combined popularity score
+      skills = skills.sort((a, b) => {
+        const scoreA = a.downloads * 0.5 + a.stars * 2 + a.installs * 1.5
+        const scoreB = b.downloads * 0.5 + b.stars * 2 + b.installs * 1.5
+        return scoreB - scoreA
+      })
+    } else if (args.sortBy === 'downloads') {
       skills = skills.sort((a, b) => b.downloads - a.downloads)
     } else if (args.sortBy === 'stars') {
       skills = skills.sort((a, b) => b.stars - a.stars)

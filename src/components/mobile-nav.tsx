@@ -36,11 +36,9 @@ function getTagColor(tag: string): string {
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
 }
 
-type Category = { name: string; count: number };
 type TagData = { tag: string; count: number };
 
 type MobileNavProps = {
-  categories: Category[];
   tags: TagData[];
   activeCategory: string;
   selectedTags: string[];
@@ -50,8 +48,16 @@ type MobileNavProps = {
   onSearchFocus: () => void;
 };
 
+// Fixed categories - same as sidebar
+const FIXED_CATEGORIES = [
+  { name: "all", label: "All", icon: null },
+  { name: "featured", label: "Featured", icon: "⭐" },
+  { name: "verified", label: "Verified", icon: "✓" },
+  { name: "popular", label: "Popular", icon: "🔥" },
+  { name: "productivity", label: "Productivity", icon: null },
+];
+
 export function MobileNav({
-  categories,
   tags,
   activeCategory,
   selectedTags,
@@ -169,20 +175,7 @@ export function MobileNav({
                     >
                       All Skills
                     </button>
-                    <button
-                      onClick={() => {
-                        onCategoryChange("featured");
-                        setFiltersOpen(false);
-                      }}
-                      className={`p-4 rounded-xl text-sm font-medium transition-all text-left ${
-                        activeCategory === "featured"
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted hover:bg-muted/80 text-foreground"
-                      }`}
-                    >
-                      ⭐ Featured
-                    </button>
-                    {categories.map((cat) => (
+                    {FIXED_CATEGORIES.filter(c => c.name !== "all").map((cat) => (
                       <button
                         key={cat.name}
                         onClick={() => {
@@ -195,8 +188,10 @@ export function MobileNav({
                             : "bg-muted hover:bg-muted/80 text-foreground"
                         }`}
                       >
-                        <span className="capitalize block">{cat.name.replace(/-/g, " ")}</span>
-                        <span className="text-xs opacity-70">{cat.count} skills</span>
+                        <span className="flex items-center gap-1.5">
+                          {cat.icon && <span>{cat.icon}</span>}
+                          <span className="capitalize">{cat.label}</span>
+                        </span>
                       </button>
                     ))}
                   </div>

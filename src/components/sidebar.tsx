@@ -20,7 +20,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import {
   Collapsible,
   CollapsibleContent,
@@ -52,11 +51,9 @@ function getTagColor(tag: string): string {
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
 }
 
-type Category = { name: string; count: number };
 type TagData = { tag: string; count: number };
 
 type SidebarProps = {
-  categories: Category[];
   tags: TagData[];
   activeCategory: string;
   selectedTags: string[];
@@ -66,7 +63,6 @@ type SidebarProps = {
 };
 
 export function Sidebar({
-  categories,
   tags,
   activeCategory,
   selectedTags,
@@ -78,7 +74,6 @@ export function Sidebar({
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [categorySearch, setCategorySearch] = useState("");
   const [tagSearch, setTagSearch] = useState("");
 
   useEffect(() => {
@@ -102,17 +97,14 @@ export function Sidebar({
     }
   }, [tagsOpen, mounted]);
 
-  // Filter and limit categories
-  const filteredCategories = useMemo(() => {
-    let filtered = categories;
-    if (categorySearch.trim()) {
-      const searchLower = categorySearch.toLowerCase();
-      filtered = categories.filter((cat) =>
-        cat.name.toLowerCase().includes(searchLower)
-      );
-    }
-    return filtered.slice(0, 20); // Max 20 categories
-  }, [categories, categorySearch]);
+  // Fixed categories - no search needed
+  const fixedCategories = [
+    { name: "all", label: "All", icon: null },
+    { name: "featured", label: "Featured", icon: "⭐" },
+    { name: "verified", label: "Verified", icon: "✓" },
+    { name: "popular", label: "Popular", icon: "🔥" },
+    { name: "productivity", label: "Productivity", icon: null },
+  ];
 
   // Filter and limit tags
   const filteredTags = useMemo(() => {
@@ -169,73 +161,23 @@ export function Sidebar({
               )}
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1.5 mt-1">
-            {/* Category Search */}
-            <div className="px-3 relative">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search categories..."
-                value={categorySearch}
-                onChange={(e) => setCategorySearch(e.target.value)}
-                className="h-7 pl-8 pr-7 text-xs bg-background"
-              />
-              {categorySearch && (
-                <button
-                  onClick={() => setCategorySearch("")}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => onCategoryChange("all")}
-              className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
-                activeCategory === "all"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              }`}
-            >
-              <span>All</span>
-            </button>
-            <button
-              onClick={() => onCategoryChange("featured")}
-              className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
-                activeCategory === "featured"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              }`}
-            >
-              <span>⭐ Featured</span>
-            </button>
-            {filteredCategories.length > 0 ? (
-              filteredCategories.map((cat) => (
-                <button
-                  key={cat.name}
-                  onClick={() => onCategoryChange(cat.name)}
-                  className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    activeCategory === cat.name
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                  }`}
-                >
-                  <span className="capitalize truncate">
-                    {cat.name.replace(/-/g, " ")}
-                  </span>
-                  <span className="text-xs opacity-60 ml-2">{cat.count}</span>
-                </button>
-              ))
-            ) : categorySearch ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                No categories found
-              </div>
-            ) : null}
-            {categories.length > 20 && !categorySearch && (
-              <div className="px-3 py-1 text-xs text-muted-foreground text-center">
-                Showing top 20 of {categories.length}
-              </div>
-            )}
+          <CollapsibleContent className="space-y-0.5 mt-1">
+            {fixedCategories.map((cat) => (
+              <button
+                key={cat.name}
+                onClick={() => onCategoryChange(cat.name)}
+                className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  activeCategory === cat.name
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  {cat.icon && <span>{cat.icon}</span>}
+                  <span className="capitalize">{cat.label}</span>
+                </span>
+              </button>
+            ))}
           </CollapsibleContent>
         </Collapsible>
 
