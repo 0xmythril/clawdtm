@@ -1,10 +1,6 @@
 import { v } from 'convex/values'
-import { query, action, internalAction, internalMutation, internalQuery } from './_generated/server'
+import { internalMutation, internalAction, internalQuery } from './_generated/server'
 import { internal } from './_generated/api'
-
-// Environment variable for model (defaults to claude-3.5-haiku - fast & cost-effective for classification)
-const DEFAULT_MODEL = 'anthropic/claude-3.5-haiku-20241022'
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 // Predefined categories for skills
 const SKILL_CATEGORIES = [
@@ -25,54 +21,151 @@ const SKILL_CATEGORIES = [
 
 type SkillCategory = typeof SKILL_CATEGORIES[number]
 
-// ============================================
-// Internal Queries
-// ============================================
+// Logic-based categorization rules (keyword matching)
+const CATEGORY_KEYWORDS: Record<SkillCategory, string[]> = {
+  'dev-tools': [
+    'code', 'programming', 'developer', 'git', 'github', 'gitlab', 'debug', 'compile', 'build',
+    'swift', 'python', 'javascript', 'typescript', 'rust', 'go', 'java', 'c++', 'c#',
+    'ide', 'editor', 'vscode', 'vim', 'emacs', 'terminal', 'cli', 'sdk', 'api', 'framework',
+    'library', 'package', 'dependency', 'test', 'testing', 'lint', 'format', 'refactor'
+  ],
+  'automation': [
+    'automate', 'workflow', 'schedule', 'cron', 'task', 'job', 'pipeline', 'trigger',
+    'event', 'webhook', 'integration', 'zapier', 'ifttt', 'script', 'batch', 'process'
+  ],
+  'productivity': [
+    'note', 'todo', 'task', 'reminder', 'calendar', 'schedule', 'organize', 'manage',
+    'notion', 'obsidian', 'roam', 'evernote', 'todoist', 'asana', 'trello', 'jira',
+    'time', 'track', 'focus', 'pomodoro', 'productivity', 'efficiency'
+  ],
+  'data': [
+    'data', 'database', 'sql', 'query', 'analyze', 'analysis', 'process', 'transform',
+    'csv', 'json', 'xml', 'excel', 'spreadsheet', 'table', 'chart', 'graph', 'visualize',
+    'etl', 'extract', 'load', 'warehouse', 'bigquery', 'snowflake'
+  ],
+  'web': [
+    'web', 'http', 'https', 'api', 'rest', 'graphql', 'scrape', 'crawl', 'browser',
+    'chrome', 'firefox', 'safari', 'selenium', 'puppeteer', 'playwright', 'fetch',
+    'request', 'response', 'url', 'link', 'html', 'css', 'javascript', 'frontend'
+  ],
+  'ai-ml': [
+    'ai', 'artificial intelligence', 'machine learning', 'ml', 'llm', 'gpt', 'claude',
+    'openai', 'anthropic', 'model', 'neural', 'deep learning', 'nlp', 'natural language',
+    'chatbot', 'assistant', 'generation', 'image generation', 'text generation', 'embedding'
+  ],
+  'devops': [
+    'deploy', 'deployment', 'ci', 'cd', 'ci/cd', 'docker', 'kubernetes', 'k8s',
+    'container', 'infrastructure', 'terraform', 'ansible', 'puppet', 'chef',
+    'aws', 'azure', 'gcp', 'cloud', 'server', 'monitor', 'log', 'metrics'
+  ],
+  'security': [
+    'security', 'auth', 'authentication', 'authorization', 'encrypt', 'decrypt',
+    'password', 'token', 'jwt', 'oauth', 'ssl', 'tls', 'vpn', 'firewall', 'scan',
+    'vulnerability', 'penetration', 'audit', 'compliance'
+  ],
+  'communication': [
+    'email', 'mail', 'gmail', 'outlook', 'message', 'chat', 'slack', 'discord',
+    'teams', 'zoom', 'meet', 'call', 'sms', 'notification', 'alert', 'push',
+    'twitter', 'x', 'social', 'linkedin', 'facebook', 'instagram'
+  ],
+  'file-management': [
+    'file', 'folder', 'directory', 'upload', 'download', 'storage', 'drive',
+    'dropbox', 'onedrive', 's3', 'gcs', 'azure blob', 'backup', 'sync', 'copy',
+    'move', 'delete', 'archive', 'compress', 'zip', 'tar', 'gzip'
+  ],
+  'nix': [
+    'nix', 'nixos', 'nixpkgs', 'flake', 'nix-shell', 'nix-build'
+  ],
+  'utility': [
+    'utility', 'tool', 'helper', 'util', 'convert', 'format', 'parse', 'validate',
+    'hash', 'encode', 'decode', 'random', 'uuid', 'date', 'time', 'string', 'number'
+  ],
+  'other': [] // Catch-all
+}
 
-// Get skills that haven't been categorized yet
-export const getUncategorizedSkills = internalQuery({
-  args: {
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 20
+// Logic-based categorization function
+function categorizeSkillLogic(skill: {
+  name?: string | null
+  displayName?: string | null
+  slug: string
+  description?: string | null
+  summary?: string | null
+  tags?: any
+}): { category: SkillCategory; tags: string[] } {
+  const text = [
+    skill.name,
+    skill.displayName,
+    skill.slug,
+    skill.description,
+    skill.summary,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  // Extract tags if they exist
+  const existingTags: string[] = []
+  if (Array.isArray(skill.tags)) {
+    existingTags.push(...skill.tags.filter((t): t is string => typeof t === 'string'))
+  } else if (skill.tags && typeof skill.tags === 'object') {
+    existingTags.push(...Object.keys(skill.tags))
+  }
+
+  // Score each category based on keyword matches
+  const scores: Record<SkillCategory, number> = {} as Record<SkillCategory, number>
+  
+  for (const category of SKILL_CATEGORIES) {
+    scores[category] = 0
+    const keywords = CATEGORY_KEYWORDS[category]
     
-    // Get ALL cached skills (we need to scan them all to find uncategorized ones)
-    const skills = await ctx.db.query('cachedSkills').collect()
-    
-    // Filter out ones that already have a category assigned by AI
-    const uncategorized = []
-    for (const skill of skills) {
-      // Check if we already have a successful categorization log
-      const existingLog = await ctx.db
-        .query('categorizationLogs')
-        .withIndex('by_skill', q => q.eq('skillId', skill._id))
-        .filter(q => q.eq(q.field('status'), 'success'))
-        .first()
-      
-      if (!existingLog) {
-        uncategorized.push(skill)
-        if (uncategorized.length >= limit) break
+    for (const keyword of keywords) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi')
+      if (regex.test(text)) {
+        scores[category] += 1
       }
     }
     
-    return uncategorized
-  },
-})
+    // Also check tags
+    for (const tag of existingTags) {
+      if (keywords.includes(tag.toLowerCase())) {
+        scores[category] += 2 // Tags are weighted higher
+      }
+    }
+  }
 
-// Get a single skill by ID
-export const getSkillById = internalQuery({
-  args: { id: v.id('cachedSkills') },
-  handler: async (ctx, args) => {
-    return ctx.db.get(args.id)
-  },
-})
+  // Find category with highest score
+  let bestCategory: SkillCategory = 'other'
+  let bestScore = 0
+  
+  for (const [category, score] of Object.entries(scores)) {
+    if (score > bestScore) {
+      bestScore = score
+      bestCategory = category as SkillCategory
+    }
+  }
+
+  // Extract meaningful tags (exclude version tags)
+  const EXCLUDED_TAGS = new Set(['latest', 'stable', 'beta', 'alpha', 'dev', 'main', 'master'])
+  const isVersionTag = (tag: string) => /^v?\d+\.\d+(\.\d+)?(-.*)?$/.test(tag)
+  
+  const tags = existingTags
+    .filter(tag => {
+      const normalized = tag.toLowerCase().trim()
+      if (normalized.length < 2 || normalized.length > 30) return false
+      if (EXCLUDED_TAGS.has(normalized)) return false
+      if (isVersionTag(normalized)) return false
+      return true
+    })
+    .slice(0, 10) // Limit to 10 tags
+
+  return { category: bestCategory, tags }
+}
 
 // ============================================
 // Internal Mutations
 // ============================================
 
-// Update a skill's category and tags
+// Update a skill's category and tags (logic-based)
 export const updateSkillCategorization = internalMutation({
   args: {
     skillId: v.id('cachedSkills'),
@@ -82,190 +175,44 @@ export const updateSkillCategorization = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.skillId, {
       category: args.category,
-      tags: args.tags,
+      tags: args.tags.length > 0 ? args.tags : undefined,
     })
   },
 })
 
-// Log a categorization attempt
-export const logCategorization = internalMutation({
+// Categorize a single skill using logic-based rules
+export const categorizeSkill = internalMutation({
   args: {
     skillId: v.id('cachedSkills'),
-    skillSlug: v.string(),
-    assignedCategory: v.optional(v.string()),
-    assignedTags: v.optional(v.array(v.string())),
-    reasoning: v.string(),
-    model: v.string(),
-    inputTokens: v.optional(v.number()),
-    outputTokens: v.optional(v.number()),
-    durationMs: v.optional(v.number()),
-    status: v.union(v.literal('success'), v.literal('error'), v.literal('skipped')),
-    errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert('categorizationLogs', {
-      skillId: args.skillId,
-      skillSlug: args.skillSlug,
-      assignedCategory: args.assignedCategory,
-      assignedTags: args.assignedTags,
-      reasoning: args.reasoning,
-      model: args.model,
-      inputTokens: args.inputTokens,
-      outputTokens: args.outputTokens,
-      durationMs: args.durationMs,
-      status: args.status,
-      errorMessage: args.errorMessage,
-      createdAt: Date.now(),
-    })
-  },
-})
-
-// ============================================
-// Internal Actions
-// ============================================
-
-interface OpenRouterResponse {
-  id: string
-  choices: {
-    message: {
-      content: string
-    }
-  }[]
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-  }
-}
-
-interface CategorizationResult {
-  category: SkillCategory
-  tags: string[]
-  reasoning: string
-}
-
-// Categorize a single skill using AI
-export const categorizeSkill = internalAction({
-  args: {
-    skillId: v.id('cachedSkills'),
-  },
-  handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
-    const startTime = Date.now()
-    
-    // Get the skill
-    const skill = await ctx.runQuery(internal.categorization.getSkillById, {
-      id: args.skillId,
-    })
-    
+    const skill = await ctx.db.get(args.skillId)
     if (!skill) {
-      return { success: false, error: 'Skill not found' }
+      throw new Error(`Skill not found: ${args.skillId}`)
     }
-    
-    const skillName = skill.name ?? skill.displayName ?? skill.slug
-    const skillDescription = skill.description ?? skill.summary ?? ''
-    
-    // Get API key
-    const apiKey = process.env.OPENROUTER_API_KEY
-    if (!apiKey) {
-      await ctx.runMutation(internal.categorization.logCategorization, {
-        skillId: args.skillId,
-        skillSlug: skill.slug,
-        reasoning: 'OPENROUTER_API_KEY not configured',
-        model: 'none',
-        status: 'skipped',
-        errorMessage: 'API key not configured',
-      })
-      return { success: false, error: 'OPENROUTER_API_KEY not configured' }
+
+    // Skip if already categorized
+    if (skill.category && skill.category !== 'uncategorized') {
+      return { success: true, skipped: true }
     }
-    
-    // Get model from env or use default
-    const model = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL
-    
-    // Build prompt
-    const prompt = buildCategorizationPrompt(skillName, skill.slug, skillDescription)
-    
-    try {
-      const response = await fetch(OPENROUTER_API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://clawdtm.com',
-          'X-Title': 'ClawdTM Skill Categorization',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that categorizes AI agent skills. Respond only with valid JSON.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 500,
-        }),
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`OpenRouter API error: ${response.status} - ${errorText.slice(0, 200)}`)
-      }
-      
-      const data: OpenRouterResponse = await response.json()
-      const content = data.choices[0]?.message?.content
-      
-      if (!content) {
-        throw new Error('No content in API response')
-      }
-      
-      // Parse the JSON response
-      const result = parseCategorizationResponse(content)
-      
-      const durationMs = Date.now() - startTime
-      
-      // Update the skill
-      await ctx.runMutation(internal.categorization.updateSkillCategorization, {
-        skillId: args.skillId,
-        category: result.category,
-        tags: result.tags,
-      })
-      
-      // Log success
-      await ctx.runMutation(internal.categorization.logCategorization, {
-        skillId: args.skillId,
-        skillSlug: skill.slug,
-        assignedCategory: result.category,
-        assignedTags: result.tags,
-        reasoning: result.reasoning,
-        model,
-        inputTokens: data.usage?.prompt_tokens,
-        outputTokens: data.usage?.completion_tokens,
-        durationMs,
-        status: 'success',
-      })
-      
-      return { success: true }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      const durationMs = Date.now() - startTime
-      const model = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL
-      
-      // Log error
-      await ctx.runMutation(internal.categorization.logCategorization, {
-        skillId: args.skillId,
-        skillSlug: skill.slug,
-        reasoning: `Error during categorization: ${errorMessage}`,
-        model,
-        durationMs,
-        status: 'error',
-        errorMessage,
-      })
-      
-      return { success: false, error: errorMessage }
-    }
+
+    // Categorize using logic-based rules
+    const { category, tags } = categorizeSkillLogic({
+      name: skill.name,
+      displayName: skill.displayName,
+      slug: skill.slug,
+      description: skill.description,
+      summary: skill.summary,
+      tags: skill.tags,
+    })
+
+    // Update the skill
+    await ctx.db.patch(args.skillId, {
+      category,
+      tags: tags.length > 0 ? tags : undefined,
+    })
+
+    return { success: true, category, tags }
   },
 })
 
@@ -275,219 +222,60 @@ export const categorizeSkillsBatch = internalAction({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ processed: number; succeeded: number; failed: number }> => {
-    const limit = args.limit ?? 10
+    const limit = args.limit ?? 100
     
     // Get uncategorized skills
-    const skills: Awaited<ReturnType<typeof ctx.runQuery<typeof internal.categorization.getUncategorizedSkills>>> = await ctx.runQuery(internal.categorization.getUncategorizedSkills, {
+    const allSkills = await ctx.runQuery(internal.categorization.getUncategorizedSkills, {
       limit,
     })
     
-    if (skills.length === 0) {
-      console.log('No uncategorized skills found')
+    if (allSkills.length === 0) {
       return { processed: 0, succeeded: 0, failed: 0 }
     }
-    
-    console.log(`Processing ${skills.length} skills for categorization`)
-    
+
     let succeeded = 0
     let failed = 0
-    
-    for (const skill of skills) {
-      const result = await ctx.runAction(internal.categorization.categorizeSkill, {
-        skillId: skill._id,
-      })
-      
-      if (result.success) {
-        succeeded++
-      } else {
+
+    for (const skill of allSkills) {
+      try {
+        const result = await ctx.runMutation(internal.categorization.categorizeSkill, {
+          skillId: skill._id,
+        })
+        if (result.success && !result.skipped) {
+          succeeded++
+        }
+      } catch (err) {
         failed++
-        console.warn(`Failed to categorize ${skill.slug}: ${result.error}`)
+        console.warn(`Failed to categorize ${skill.slug}:`, err)
       }
-      
-      // Add a small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500))
     }
-    
-    console.log(`Categorization complete: ${succeeded} succeeded, ${failed} failed`)
-    
-    // Update cached counts so frontend shows fresh category/tag data
+
+    // Update cached counts after categorization
     if (succeeded > 0) {
       try {
         await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
-        console.log('Updated cached category/tag counts')
       } catch (err) {
         console.warn('Failed to update cached counts:', err)
       }
     }
-    
-    return { processed: skills.length, succeeded, failed }
+
+    return { processed: allSkills.length, succeeded, failed }
   },
 })
 
-// Manual trigger (internal only - not exposed via HTTP)
-export const runCategorizationManually = internalAction({
+// Get uncategorized skills
+export const getUncategorizedSkills = internalQuery({
   args: {
     limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<{ processed: number; succeeded: number; failed: number }> => {
-    console.log('Manual categorization triggered')
-    return await ctx.runAction(internal.categorization.categorizeSkillsBatch, {
-      limit: args.limit ?? 50,
-    })
-  },
-})
-
-// Public trigger for testing categorization
-export const triggerCategorization = action({
-  args: {
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args): Promise<{ processed: number; succeeded: number; failed: number }> => {
-    console.log('Categorization manually triggered via public action')
-    return await ctx.runAction(internal.categorization.categorizeSkillsBatch, {
-      limit: args.limit ?? 20,
-    })
-  },
-})
-
-// ============================================
-// Helper Functions
-// ============================================
-
-function buildCategorizationPrompt(name: string, slug: string, description: string): string {
-  const categoriesList = SKILL_CATEGORIES.join(', ')
-  
-  return `Analyze this AI agent skill and categorize it.
-
-Skill Name: ${name}
-Skill Slug: ${slug}
-Description: ${description || 'No description provided'}
-
-Available categories: ${categoriesList}
-
-Respond with a JSON object containing:
-1. "category": One of the available categories that best fits this skill
-2. "tags": An array of 2-5 relevant tags (lowercase, hyphenated) that describe the skill's functionality
-3. "reasoning": A brief explanation (1-2 sentences) of why you chose this category and these tags
-
-Example response:
-{
-  "category": "automation",
-  "tags": ["workflow", "scheduling", "task-runner"],
-  "reasoning": "This skill automates repetitive tasks with scheduling capabilities, making it primarily an automation tool."
-}
-
-Respond ONLY with valid JSON, no additional text.`
-}
-
-// ============================================
-// Public Queries (for viewing logs)
-// ============================================
-
-// Get recent categorization logs
-export const getCategorizationLogs = query({
-  args: {
-    limit: v.optional(v.number()),
-    status: v.optional(v.union(v.literal('success'), v.literal('error'), v.literal('skipped'))),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50
+    const limit = args.limit ?? 100
     
-    let logs
-    if (args.status) {
-      logs = await ctx.db
-        .query('categorizationLogs')
-        .withIndex('by_status', q => q.eq('status', args.status!))
-        .order('desc')
-        .take(limit)
-    } else {
-      logs = await ctx.db
-        .query('categorizationLogs')
-        .withIndex('by_created')
-        .order('desc')
-        .take(limit)
-    }
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    const uncategorized = allSkills
+      .filter(s => !s.hidden && (!s.category || s.category === 'uncategorized'))
+      .slice(0, limit)
     
-    return logs
+    return uncategorized
   },
 })
-
-// Get categorization stats
-export const getCategorizationStats = query({
-  args: {},
-  handler: async (ctx) => {
-    const allLogs = await ctx.db.query('categorizationLogs').collect()
-    
-    const stats = {
-      total: allLogs.length,
-      success: 0,
-      error: 0,
-      skipped: 0,
-      categoriesCounts: {} as Record<string, number>,
-      lastRun: null as number | null,
-    }
-    
-    for (const log of allLogs) {
-      if (log.status === 'success') stats.success++
-      else if (log.status === 'error') stats.error++
-      else if (log.status === 'skipped') stats.skipped++
-      
-      if (log.assignedCategory) {
-        stats.categoriesCounts[log.assignedCategory] = 
-          (stats.categoriesCounts[log.assignedCategory] ?? 0) + 1
-      }
-      
-      if (!stats.lastRun || log.createdAt > stats.lastRun) {
-        stats.lastRun = log.createdAt
-      }
-    }
-    
-    return stats
-  },
-})
-
-// ============================================
-// Parsing Helpers
-// ============================================
-
-function parseCategorizationResponse(content: string): CategorizationResult {
-  // Try to extract JSON from the response
-  let jsonStr = content.trim()
-  
-  // Handle markdown code blocks
-  if (jsonStr.startsWith('```')) {
-    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (match) {
-      jsonStr = match[1].trim()
-    }
-  }
-  
-  try {
-    const parsed = JSON.parse(jsonStr)
-    
-    // Validate category
-    const category = SKILL_CATEGORIES.includes(parsed.category)
-      ? parsed.category
-      : 'other'
-    
-    // Validate tags
-    const tags = Array.isArray(parsed.tags)
-      ? parsed.tags.filter((t: unknown): t is string => typeof t === 'string').slice(0, 5)
-      : []
-    
-    // Get reasoning
-    const reasoning = typeof parsed.reasoning === 'string'
-      ? parsed.reasoning
-      : 'No reasoning provided'
-    
-    return { category, tags, reasoning }
-  } catch (err) {
-    // If JSON parsing fails, try to extract info manually
-    console.error('Failed to parse JSON:', err, content)
-    return {
-      category: 'other',
-      tags: [],
-      reasoning: `Failed to parse AI response: ${content.slice(0, 100)}...`,
-    }
-  }
-}

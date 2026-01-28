@@ -11,12 +11,12 @@ crons.interval(
   { maxBatches: 5 },
 )
 
-// Categorize uncategorized skills every hour using AI
+// Categorize uncategorized skills every hour using logic-based rules
 crons.interval(
-  'ai-skill-categorization',
+  'logic-skill-categorization',
   { hours: 1 },
   internal.categorization.categorizeSkillsBatch,
-  { limit: 100 }, // Increased from 20 to process ~100 skills/hour
+  { limit: 200 }, // Process up to 200 skills/hour (logic-based is fast)
 )
 
 export default crons

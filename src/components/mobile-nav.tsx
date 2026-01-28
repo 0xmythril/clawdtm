@@ -53,8 +53,7 @@ const FIXED_CATEGORIES = [
   { name: "all", label: "All", icon: null },
   { name: "featured", label: "Featured", icon: "⭐" },
   { name: "verified", label: "Verified", icon: "✓" },
-  { name: "popular", label: "Popular", icon: "🔥" },
-  { name: "productivity", label: "Productivity", icon: null },
+  { name: "latest", label: "Latest", icon: "🆕" },
 ];
 
 export function MobileNav({

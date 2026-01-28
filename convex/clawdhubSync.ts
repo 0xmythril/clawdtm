@@ -902,10 +902,13 @@ export const listCachedSkillsWithFilters = query({
         skills = skills.filter(s => FEATURED_SLUGS.includes(s.slug))
       } else if (args.category === 'verified') {
         skills = skills.filter(s => VERIFIED_SLUGS.includes(s.slug))
-      } else if (args.category === 'popular') {
-        // Popular = top skills by combined popularity score (downloads + stars + installs)
-        // We'll sort after filtering, but filter to skills with meaningful engagement
-        skills = skills.filter(s => s.downloads > 10 || s.stars > 0 || s.installs > 0)
+      } else if (args.category === 'latest') {
+        // Latest = skills updated in last 24 hours
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000)
+        skills = skills.filter(s => {
+          const updatedAt = s.externalUpdatedAt ?? s.lastSyncedAt ?? 0
+          return updatedAt >= twentyFourHoursAgo
+        })
       } else {
         skills = skills.filter(s => s.category === args.category)
       }
@@ -931,12 +934,12 @@ export const listCachedSkillsWithFilters = query({
     }
     
     // Sort
-    if (args.category === 'popular') {
-      // Popular category: sort by combined popularity score
+    if (args.category === 'latest') {
+      // Latest category: sort by most recently updated
       skills = skills.sort((a, b) => {
-        const scoreA = a.downloads * 0.5 + a.stars * 2 + a.installs * 1.5
-        const scoreB = b.downloads * 0.5 + b.stars * 2 + b.installs * 1.5
-        return scoreB - scoreA
+        const updatedA = a.externalUpdatedAt ?? a.lastSyncedAt ?? 0
+        const updatedB = b.externalUpdatedAt ?? b.lastSyncedAt ?? 0
+        return updatedB - updatedA
       })
     } else if (args.sortBy === 'downloads') {
       skills = skills.sort((a, b) => b.downloads - a.downloads)
