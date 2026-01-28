@@ -432,6 +432,10 @@ const clawdhubSyncState = defineTable({
   ),
   lastError: v.optional(v.string()),
   updatedAt: v.number(),
+  // Cached counts to avoid full table scans
+  categoryCounts: v.optional(v.any()), // { category: count }
+  tagCounts: v.optional(v.any()), // [{ tag, count }]
+  totalVisible: v.optional(v.number()),
 }).index('by_key', ['key'])
 
 // AI categorization logs

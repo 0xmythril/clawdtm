@@ -157,6 +157,74 @@ export const upsertCachedSkill = internalMutation({
   },
 })
 
+// Internal mutation to update cached counts (reduces full table scans)
+export const updateCachedCounts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    const skills = allSkills.filter(s => !s.hidden)
+    
+    // Build category counts
+    const categoryCounts: Record<string, number> = {}
+    for (const skill of skills) {
+      const cat = skill.category ?? 'uncategorized'
+      categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1
+    }
+    
+    // Build tag counts with validation
+    const EXCLUDED_TAGS = new Set(['latest', 'stable', 'beta', 'alpha', 'dev', 'main', 'master'])
+    const isVersionTag = (tag: string) => /^v?\d+\.\d+(\.\d+)?(-.*)?$/.test(tag)
+    const isValidTag = (tag: string) => {
+      if (!tag || typeof tag !== 'string') return false
+      const normalized = tag.toLowerCase().trim()
+      if (normalized.length < 2 || normalized.length > 30) return false
+      if (EXCLUDED_TAGS.has(normalized)) return false
+      if (isVersionTag(normalized)) return false
+      return true
+    }
+    
+    const tagCounts: Record<string, number> = {}
+    for (const skill of skills) {
+      const tags = skill.tags
+      if (Array.isArray(tags)) {
+        for (const tag of tags) {
+          if (isValidTag(tag)) {
+            const normalized = tag.toLowerCase().trim()
+            tagCounts[normalized] = (tagCounts[normalized] ?? 0) + 1
+          }
+        }
+      } else if (tags && typeof tags === 'object') {
+        for (const key of Object.keys(tags)) {
+          if (isValidTag(key)) {
+            const normalized = key.toLowerCase().trim()
+            tagCounts[normalized] = (tagCounts[normalized] ?? 0) + 1
+          }
+        }
+      }
+    }
+    
+    const sortedTags = Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count }))
+    
+    // Update sync state with cached counts
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
+    
+    if (state) {
+      await ctx.db.patch(state._id, {
+        categoryCounts,
+        tagCounts: sortedTags,
+        totalVisible: skills.length,
+      })
+    }
+    
+    return { categories: Object.keys(categoryCounts).length, tags: sortedTags.length, total: skills.length }
+  },
+})
+
 // ============================================
 // Internal Action (called by cron)
 // ============================================
@@ -333,6 +401,9 @@ export const syncSkillsBatch = internalAction({
           markFullSync: true,
         })
         
+        // Update cached counts to avoid full table scans on queries
+        await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
+        
         return { synced, hasMore: false }
       }
     } catch (err) {
@@ -422,6 +493,8 @@ export const fullSyncFromClawdHub = internalAction({
             status: 'idle',
             markFullSync: true,
           })
+          // Update cached counts to avoid full table scans on queries
+          await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
           return { totalSynced, batchCount, complete: true }
         }
         
@@ -621,39 +694,67 @@ export const getSyncStatus = query({
       .withIndex('by_key', (q) => q.eq('key', 'skills'))
       .unique()
     
-    const allCached = await ctx.db
+    // Use cached totalVisible if available (avoids full table scan)
+    if (state?.totalVisible !== undefined) {
+      // Get hidden count from index (efficient)
+      const hiddenSkills = await ctx.db
+        .query('cachedSkills')
+        .withIndex('by_hidden', (q) => q.eq('hidden', true))
+        .collect()
+      
+      return {
+        status: state?.status ?? 'idle',
+        totalSynced: state?.totalSynced ?? 0,
+        totalCached: state.totalVisible,
+        totalHidden: hiddenSkills.length,
+        lastFullSyncAt: state?.lastFullSyncAt,
+        lastError: state?.lastError,
+      }
+    }
+    
+    // Fallback: use index for hidden count (more efficient than full scan)
+    const hiddenSkills = await ctx.db
       .query('cachedSkills')
+      .withIndex('by_hidden', (q) => q.eq('hidden', true))
       .collect()
     
-    const hiddenCount = allCached.filter(s => s.hidden).length
+    // Get total count from another approach - just count all
+    const allCached = await ctx.db.query('cachedSkills').collect()
     
     return {
       status: state?.status ?? 'not_initialized',
       totalSynced: state?.totalSynced ?? 0,
-      totalCached: allCached.length - hiddenCount,
-      totalHidden: hiddenCount,
+      totalCached: allCached.length - hiddenSkills.length,
+      totalHidden: hiddenSkills.length,
       lastFullSyncAt: state?.lastFullSyncAt,
       lastError: state?.lastError,
     }
   },
 })
 
-// Get all unique categories from cached skills
+// Get all unique categories from cached skills (uses cached data)
 export const getCategories = query({
   args: {},
   handler: async (ctx) => {
-    const allSkills = await ctx.db.query('cachedSkills').collect()
-    // Filter out hidden skills
-    const skills = allSkills.filter(s => !s.hidden)
+    // Try to use cached counts first (avoids full table scan)
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
     
-    const categorySet = new Set<string>()
-    for (const skill of skills) {
-      if (skill.category) {
-        categorySet.add(skill.category)
+    if (state?.categoryCounts && state?.totalVisible !== undefined) {
+      const counts = state.categoryCounts as Record<string, number>
+      return {
+        categories: Object.keys(counts).filter(c => c !== 'uncategorized').sort(),
+        counts,
+        total: state.totalVisible,
       }
     }
     
-    // Return sorted categories with counts
+    // Fallback: compute from skills (only if cache missing)
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    const skills = allSkills.filter(s => !s.hidden)
+    
     const categoryCounts: Record<string, number> = {}
     for (const skill of skills) {
       const cat = skill.category ?? 'uncategorized'
@@ -661,7 +762,7 @@ export const getCategories = query({
     }
     
     return {
-      categories: Array.from(categorySet).sort(),
+      categories: Object.keys(categoryCounts).filter(c => c !== 'uncategorized').sort(),
       counts: categoryCounts,
       total: skills.length,
     }
@@ -689,14 +790,23 @@ function isValidTag(tag: string): boolean {
 export const getTags = query({
   args: {},
   handler: async (ctx) => {
+    // Try to use cached counts first (avoids full table scan)
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
+    
+    if (state?.tagCounts && Array.isArray(state.tagCounts)) {
+      return { tags: state.tagCounts as Array<{ tag: string; count: number }> }
+    }
+    
+    // Fallback: compute from skills (only if cache missing)
     const allSkills = await ctx.db.query('cachedSkills').collect()
-    // Filter out hidden skills
     const skills = allSkills.filter(s => !s.hidden)
     
     const tagCounts: Record<string, number> = {}
     
     for (const skill of skills) {
-      // Handle tags as array or object
       const tags = skill.tags
       if (Array.isArray(tags)) {
         for (const tag of tags) {
@@ -706,7 +816,6 @@ export const getTags = query({
           }
         }
       } else if (tags && typeof tags === 'object') {
-        // Tags might be { latest: "1.0.0" } format - skip version keys
         for (const key of Object.keys(tags)) {
           if (isValidTag(key)) {
             const normalized = key.toLowerCase().trim()
@@ -716,7 +825,6 @@ export const getTags = query({
       }
     }
     
-    // Sort by count descending
     const sortedTags = Object.entries(tagCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([tag, count]) => ({ tag, count }))
@@ -848,6 +956,14 @@ export const triggerSync = action({
     return await ctx.runAction(internal.clawdhubSync.syncFromClawdHub, {
       maxBatches: 10,
     })
+  },
+})
+
+// Manual trigger to refresh cached counts (reduces bandwidth on category/tag queries)
+export const refreshCachedCounts = action({
+  args: {},
+  handler: async (ctx): Promise<{ categories: number; tags: number; total: number }> => {
+    return await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
   },
 })
 

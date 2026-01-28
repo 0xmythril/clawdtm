@@ -14,15 +14,19 @@ export const metadata: Metadata = {
   description: "Browse and install skills for your Moltbot agent. Search through hundreds of community-built skill packs.",
   keywords: ["moltbot", "clawdbot", "claude", "skills", "agent", "AI", "automation"],
   authors: [{ name: "0xMythril" }],
+  metadataBase: new URL("https://clawdtm.com"),
   openGraph: {
     title: "ClawdTM - Skills for Moltbot",
-    description: "Browse and install skills for your Moltbot agent",
+    description: "Browse and install skills for your Moltbot agent. Search through hundreds of community-built skill packs.",
     type: "website",
+    url: "https://clawdtm.com",
+    siteName: "ClawdTM",
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ClawdTM - Skills for Moltbot",
-    description: "Browse and install skills for your Moltbot agent",
+    site: "@0xmythril",
+    creator: "@0xmythril",
   },
 };
 
