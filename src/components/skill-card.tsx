@@ -4,6 +4,7 @@ import { Star, Download, Terminal, ExternalLink, BadgeCheck } from "lucide-react
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { trackExternalLink } from "@/lib/analytics";
 
 // Tag color palette
 const TAG_COLORS = [
@@ -124,14 +125,15 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
             >
               Install
             </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a
-                href={`https://clawdhub.com/skills/${skill.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "skill_detail");
+                window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+              }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
             </Button>
           </div>
         </CardContent>
@@ -210,17 +212,18 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
           >
             Install
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <a
-              href={`https://clawdhub.com/skills/${skill.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "skill_detail");
+                window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+              }}
             >
               <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }

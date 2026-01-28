@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Skill } from "./skill-card";
+import { trackExternalLink } from "@/lib/analytics";
 
 type InstallModalProps = {
   open: boolean;
@@ -106,19 +107,16 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
                 </>
               )}
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-10"
-              asChild
+              onClick={() => {
+                trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "install_modal");
+                window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+              }}
             >
-              <a
-                href={`https://clawdhub.com/skills/${skill.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View on Clawdhub
-              </a>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View on Clawdhub
             </Button>
           </div>
         </div>
