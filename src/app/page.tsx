@@ -150,8 +150,16 @@ function SkillsContent() {
     return allSkills;
   }, [allSkills, searchResult, query]);
 
-  const isLoading = cachedResult === undefined && !query.trim() && allSkills.length === 0;
-  const isEmpty = skills.length === 0 && !isLoading;
+  // Better loading detection - show loading only if we're actually waiting for initial data
+  // If categories/tags loaded but skills haven't, we're connected - just waiting for skills
+  const isConvexConnected = categoriesData !== undefined || tagsData !== undefined;
+  const isLoading = 
+    !query.trim() && 
+    allSkills.length === 0 && 
+    cachedResult === undefined && 
+    isConvexConnected; // Only show loading if Convex is connected (categories/tags loaded)
+  
+  const isEmpty = skills.length === 0 && !isLoading && (cachedResult !== undefined || query.trim());
   const hasMore = cachedResult?.hasMore ?? false;
   const totalCount = cachedResult?.totalCount ?? 0;
 

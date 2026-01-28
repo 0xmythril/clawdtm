@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Sparkles,
   FileText,
@@ -14,10 +14,13 @@ import {
   FolderOpen,
   Cpu,
   HelpCircle,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import {
   Collapsible,
   CollapsibleContent,
@@ -26,6 +29,7 @@ import {
 import { Logo } from "./logo";
 import { GettingStartedModal } from "./getting-started-modal";
 import Link from "next/link";
+import { useState, useMemo } from "react";
 
 // Tag color palette
 const TAG_COLORS = [
@@ -75,6 +79,8 @@ export function Sidebar({
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [tagSearch, setTagSearch] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -97,7 +103,29 @@ export function Sidebar({
     }
   }, [tagsOpen, mounted]);
 
-  const topTags = tags.slice(0, 15);
+  // Filter and limit categories
+  const filteredCategories = useMemo(() => {
+    let filtered = categories;
+    if (categorySearch.trim()) {
+      const searchLower = categorySearch.toLowerCase();
+      filtered = categories.filter((cat) =>
+        cat.name.toLowerCase().includes(searchLower)
+      );
+    }
+    return filtered.slice(0, 20); // Max 20 categories
+  }, [categories, categorySearch]);
+
+  // Filter and limit tags
+  const filteredTags = useMemo(() => {
+    let filtered = tags;
+    if (tagSearch.trim()) {
+      const searchLower = tagSearch.toLowerCase();
+      filtered = tags.filter((tag) =>
+        tag.tag.toLowerCase().includes(searchLower)
+      );
+    }
+    return filtered.slice(0, 50); // Max 50 tags (increased from 15)
+  }, [tags, tagSearch]);
 
   return (
     <aside className="hidden md:flex md:w-60 lg:w-64 flex-col border-r border-border/40 bg-background h-screen sticky top-0 overflow-hidden">
@@ -142,7 +170,26 @@ export function Sidebar({
               )}
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-0.5 mt-1">
+          <CollapsibleContent className="space-y-1.5 mt-1">
+            {/* Category Search */}
+            <div className="px-3 relative">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search categories..."
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                className="h-7 pl-8 pr-7 text-xs bg-background"
+              />
+              {categorySearch && (
+                <button
+                  onClick={() => setCategorySearch("")}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
             <button
               onClick={() => onCategoryChange("all")}
               className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -163,22 +210,33 @@ export function Sidebar({
             >
               <span>⭐ Featured</span>
             </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.name}
-                onClick={() => onCategoryChange(cat.name)}
-                className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  activeCategory === cat.name
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                }`}
-              >
-                <span className="capitalize truncate">
-                  {cat.name.replace(/-/g, " ")}
-                </span>
-                <span className="text-xs opacity-60 ml-2">{cat.count}</span>
-              </button>
-            ))}
+            {filteredCategories.length > 0 ? (
+              filteredCategories.map((cat) => (
+                <button
+                  key={cat.name}
+                  onClick={() => onCategoryChange(cat.name)}
+                  className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    activeCategory === cat.name
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  }`}
+                >
+                  <span className="capitalize truncate">
+                    {cat.name.replace(/-/g, " ")}
+                  </span>
+                  <span className="text-xs opacity-60 ml-2">{cat.count}</span>
+                </button>
+              ))
+            ) : categorySearch ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                No categories found
+              </div>
+            ) : null}
+            {categories.length > 20 && !categorySearch && (
+              <div className="px-3 py-1 text-xs text-muted-foreground text-center">
+                Showing top 20 of {categories.length}
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
 
@@ -197,32 +255,64 @@ export function Sidebar({
               )}
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2 px-3">
-            <div className="flex flex-wrap gap-1.5">
-              {topTags.map(({ tag, count }) => {
-                const isSelected = selectedTags.includes(tag);
-                return (
-                  <Badge
-                    key={tag}
-                    variant="outline"
-                    className={`cursor-pointer transition-all text-xs px-2 py-0.5 border-0 ${
-                      isSelected
-                        ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                        : "hover:ring-1 hover:ring-primary/50"
-                    } ${getTagColor(tag)}`}
-                    onClick={() => onTagToggle(tag)}
-                  >
-                    {tag}
-                    <span className="ml-1 opacity-60">{count}</span>
-                  </Badge>
-                );
-              })}
+          <CollapsibleContent className="mt-2 space-y-2">
+            {/* Tag Search */}
+            <div className="px-3 relative">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search tags..."
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="h-7 pl-8 pr-7 text-xs bg-background"
+              />
+              {tagSearch && (
+                <button
+                  onClick={() => setTagSearch("")}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <div className="px-3">
+              <div className="flex flex-wrap gap-1.5">
+                {filteredTags.length > 0 ? (
+                  filteredTags.map(({ tag, count }) => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className={`cursor-pointer transition-all text-xs px-2 py-0.5 border-0 ${
+                          isSelected
+                            ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                            : "hover:ring-1 hover:ring-primary/50"
+                        } ${getTagColor(tag)}`}
+                        onClick={() => onTagToggle(tag)}
+                      >
+                        {tag}
+                        <span className="ml-1 opacity-60">{count}</span>
+                      </Badge>
+                    );
+                  })
+                ) : tagSearch ? (
+                  <div className="w-full py-2 text-xs text-muted-foreground text-center">
+                    No tags found
+                  </div>
+                ) : null}
+              </div>
+              {tags.length > 50 && !tagSearch && (
+                <div className="mt-2 text-xs text-muted-foreground text-center">
+                  Showing top 50 of {tags.length}
+                </div>
+              )}
             </div>
             {selectedTags.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="mt-2 h-7 px-2 text-xs w-full justify-start"
+                className="mx-3 mt-1 h-7 px-2 text-xs w-auto justify-start"
                 onClick={onClearTags}
               >
                 Clear selected tags
