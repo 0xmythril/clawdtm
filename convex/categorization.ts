@@ -2,8 +2,8 @@ import { v } from 'convex/values'
 import { query, action, internalAction, internalMutation, internalQuery } from './_generated/server'
 import { internal } from './_generated/api'
 
-// Environment variable for model (defaults to claude-sonnet-4-20250514)
-const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-20250514'
+// Environment variable for model (defaults to claude-3.5-haiku - fast & cost-effective for classification)
+const DEFAULT_MODEL = 'anthropic/claude-3.5-haiku-20241022'
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 // Predefined categories for skills

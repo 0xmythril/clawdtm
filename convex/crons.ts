@@ -16,7 +16,7 @@ crons.interval(
   'ai-skill-categorization',
   { hours: 1 },
   internal.categorization.categorizeSkillsBatch,
-  { limit: 20 },
+  { limit: 100 }, // Increased from 20 to process ~100 skills/hour
 )
 
 export default crons
