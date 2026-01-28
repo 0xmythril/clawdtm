@@ -310,6 +310,16 @@ export const categorizeSkillsBatch = internalAction({
     
     console.log(`Categorization complete: ${succeeded} succeeded, ${failed} failed`)
     
+    // Update cached counts so frontend shows fresh category/tag data
+    if (succeeded > 0) {
+      try {
+        await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
+        console.log('Updated cached category/tag counts')
+      } catch (err) {
+        console.warn('Failed to update cached counts:', err)
+      }
+    }
+    
     return { processed: skills.length, succeeded, failed }
   },
 })
