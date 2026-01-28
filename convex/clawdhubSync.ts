@@ -431,6 +431,12 @@ export const syncFromClawdHub = internalAction({
     // Get current sync state
     const state = await ctx.runQuery(internal.clawdhubSync.getSyncState, {})
     
+    // Skip if sync is already running (prevents write conflicts)
+    if (state?.status === 'running') {
+      console.log('Sync already in progress, skipping...')
+      return { totalSynced: 0, batchCount: 0, complete: false, skipped: true }
+    }
+    
     // Start from cursor if we have one (continuing a previous sync)
     let cursor = state?.cursor
     let totalSynced = 0
@@ -462,6 +468,15 @@ export const syncFromClawdHub = internalAction({
 export const fullSyncFromClawdHub = internalAction({
   args: {},
   handler: async (ctx) => {
+    // Get current sync state
+    const state = await ctx.runQuery(internal.clawdhubSync.getSyncState, {})
+    
+    // Skip if sync is already running (prevents write conflicts)
+    if (state?.status === 'running') {
+      console.log('Sync already in progress, skipping full sync...')
+      return { totalSynced: 0, batchCount: 0, complete: false, aborted: true }
+    }
+    
     console.log('Starting full sync from ClawdHub...')
     
     // Reset sync state
@@ -964,6 +979,27 @@ export const refreshCachedCounts = action({
   args: {},
   handler: async (ctx): Promise<{ categories: number; tags: number; total: number }> => {
     return await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
+  },
+})
+
+// Reset stuck sync state (for recovery from errors)
+export const resetSyncStatus = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
+    
+    if (state) {
+      await ctx.db.patch(state._id, {
+        status: 'idle',
+        lastError: undefined,
+      })
+      return { success: true, previousStatus: state.status }
+    }
+    
+    return { success: false, message: 'No sync state found' }
   },
 })
 
