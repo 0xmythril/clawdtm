@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, LayoutGrid, List, ChevronDown } from "lucide-react";
+import { Search, X, LayoutGrid, List, ChevronDown, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ type SearchBarProps = {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   isSearching?: boolean;
+  isLoading?: boolean;
   resultCount?: number;
   totalCount?: number;
 };
@@ -46,6 +47,7 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       viewMode,
       onViewModeChange,
       isSearching,
+      isLoading,
       resultCount,
       totalCount,
     },
@@ -110,10 +112,16 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
           {/* Sort dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="shrink-0 gap-1.5 h-10">
-                <span className="hidden sm:inline">{activeSortLabel}</span>
-                <span className="sm:hidden">Sort</span>
-                <ChevronDown className="h-4 w-4 opacity-50" />
+              <Button variant="outline" className="shrink-0 gap-1.5 h-10" disabled={isLoading}>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">{activeSortLabel}</span>
+                    <span className="sm:hidden">Sort</span>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

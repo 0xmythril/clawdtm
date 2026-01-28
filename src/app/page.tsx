@@ -134,6 +134,10 @@ function SkillsContent() {
 
   const isLoading = cachedResult === undefined && !query.trim() && allSkills.length === 0;
   const isEmpty = skills.length === 0 && !isLoading;
+  
+  // Track loading state for sort/filter transitions
+  const isTransitioning = 
+    (query.trim() ? searchResult === undefined : cachedResult === undefined && allSkills.length === 0);
   const hasMore = cachedResult?.hasMore ?? false;
   const totalCount = cachedResult?.totalCount ?? 0;
 
@@ -267,6 +271,7 @@ function SkillsContent() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             isSearching={query.trim().length > 0 && searchResult === undefined}
+            isLoading={isTransitioning}
             resultCount={query.trim() ? skills.length : undefined}
             totalCount={totalCount}
           />
