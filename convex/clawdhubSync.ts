@@ -128,25 +128,57 @@ export const upsertCachedSkill = internalMutation({
     const now = Date.now()
     
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        externalId: args.externalId,
-        name: args.name,
-        displayName: args.displayName,
-        description: args.description,
-        summary: args.summary,
-        author: args.author,
-        authorHandle: args.authorHandle,
-        downloads: args.downloads,
-        stars: args.stars,
-        installs: args.installs,
-        tags: args.tags,
-        category: args.category,
-        version: args.version,
-        externalCreatedAt: args.externalCreatedAt,
-        externalUpdatedAt: args.externalUpdatedAt,
-        lastSyncedAt: now,
-      })
-      return { updated: true, id: existing._id }
+      // Check if data actually changed to avoid unnecessary writes
+      const hasChanges = 
+        existing.externalId !== args.externalId ||
+        existing.name !== args.name ||
+        existing.displayName !== args.displayName ||
+        existing.description !== args.description ||
+        existing.summary !== args.summary ||
+        existing.author !== args.author ||
+        existing.authorHandle !== args.authorHandle ||
+        existing.downloads !== args.downloads ||
+        existing.stars !== args.stars ||
+        existing.installs !== args.installs ||
+        JSON.stringify(existing.tags) !== JSON.stringify(args.tags) ||
+        existing.category !== args.category ||
+        existing.version !== args.version ||
+        existing.externalCreatedAt !== args.externalCreatedAt ||
+        existing.externalUpdatedAt !== args.externalUpdatedAt
+      
+      // Only update if something changed
+      if (hasChanges) {
+        await ctx.db.patch(existing._id, {
+          externalId: args.externalId,
+          name: args.name,
+          displayName: args.displayName,
+          description: args.description,
+          summary: args.summary,
+          author: args.author,
+          authorHandle: args.authorHandle,
+          downloads: args.downloads,
+          stars: args.stars,
+          installs: args.installs,
+          tags: args.tags,
+          category: args.category,
+          version: args.version,
+          externalCreatedAt: args.externalCreatedAt,
+          externalUpdatedAt: args.externalUpdatedAt,
+          lastSyncedAt: now,
+        })
+        return { updated: true, id: existing._id, changed: true }
+      } else {
+        // Data unchanged, just update lastSyncedAt (but less frequently)
+        // Only update lastSyncedAt if it's been more than 1 hour since last sync
+        const oneHourAgo = now - (60 * 60 * 1000)
+        if (!existing.lastSyncedAt || existing.lastSyncedAt < oneHourAgo) {
+          await ctx.db.patch(existing._id, {
+            lastSyncedAt: now,
+          })
+          return { updated: true, id: existing._id, changed: false }
+        }
+        return { updated: false, id: existing._id, changed: false }
+      }
     } else {
       const id = await ctx.db.insert('cachedSkills', {
         ...args,
@@ -434,6 +466,13 @@ export const syncFromClawdHub = internalAction({
     // Skip if sync is already running (prevents write conflicts)
     if (state?.status === 'running') {
       console.log('Sync already in progress, skipping...')
+      return { totalSynced: 0, batchCount: 0, complete: false, skipped: true }
+    }
+    
+    // Skip if we just synced recently (within last 10 minutes) - reduces unnecessary syncs
+    const tenMinutesAgo = Date.now() - (10 * 60 * 1000)
+    if (state?.lastFullSyncAt && state.lastFullSyncAt > tenMinutesAgo && !state.cursor) {
+      console.log('Recent sync detected, skipping incremental sync...')
       return { totalSynced: 0, batchCount: 0, complete: false, skipped: true }
     }
     
