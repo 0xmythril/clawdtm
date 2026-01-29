@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Clawdtm (Superskill)
 
-## Getting Started
+**Built by [@0xmythril](https://x.com/0xmythril)** · [Clawdbot](https://discord.gg/clawdbot) · [Clawdhub](https://clawdhub.com)
 
-First, run the development server:
+---
+
+**Superskill your Clawdbot Moltbot** — a web app to browse, search, and install community skills from [Clawdhub](https://clawdhub.com) for [Clawdbot](https://discord.gg/clawdbot) / Moltbot.
+
+**What it is:** A public skill catalog and installer for Clawdbot/Moltbot. Skills are community-built add-ons (tools, workflows, integrations). This app syncs the catalog from Clawdhub, lets users search and filter by category/tags, and provides install instructions. Think “npm for Clawdbot” or “skill store.”
+
+- **Stack:** Next.js 16 (App Router), React 19, Convex, Tailwind 4
+- **Data:** Skills synced from Clawdhub API into Convex; categories/tags; full-text search
+- **UI:** Sidebar filters (category, tags), search bar, card/list view, install modal, mobile bottom nav
+
+## Quick start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Convex (required)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. [Convex](https://convex.dev) account and project
+2. `npx convex dev` in a separate terminal (or `npx convex deploy` for prod)
+3. Env: `.env.local` with `NEXT_PUBLIC_CONVEX_URL` (and any Convex env vars you need)
 
-## Learn More
+The app reads from Convex only; no Convex = no skills data. Sync from Clawdhub runs on Convex crons.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command        | Description                    |
+|----------------|--------------------------------|
+| `npm run dev`  | Next.js dev server             |
+| `npm run build`| Production build               |
+| `npm run start`| Run production server          |
+| `npm run lint` | ESLint                         |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Run Convex CLI from project root: `npx convex dev`, `npx convex deploy`, `npx convex dashboard`, etc.
 
-## Deploy on Vercel
+## Project layout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+  app/           # Next App Router: page, layout, providers, meta images
+  components/    # Sidebar, SearchBar, SkillCard, InstallModal, mobile nav, UI primitives
+  lib/           # analytics (GA4), utils
+convex/
+  clawdhubSync.ts   # Clawdhub API sync, cached skills CRUD, public queries
+  categorization.ts # Logic-based category/tag assignment (cron)
+  crons.ts          # Cron definitions (sync every 15m, categorization every 1h)
+  schema.ts         # Convex schema (cachedSkills, clawdhubSyncState, etc.)
+  lib/embeddings.ts # Embedding config (for future semantic search)
+public/         # Favicons, logo, static assets
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture
+
+- **Frontend:** Single main page; URL state for `q`, `category`, `sort`, `tags`; Convex `useQuery` for categories, tags, sync status, paginated skill list, and search.
+- **Backend:** Convex tables `cachedSkills` and `clawdhubSyncState`. Cron `clawdhub-skill-sync` runs every 15 minutes and pulls from `https://clawdhub.com/api/v1/skills` (paginated); another cron runs logic-based categorization hourly. Public API: `getCategories`, `getTags`, `getSyncStatus`, `listCachedSkillsWithFilters`, `searchCachedSkills` (see [convex/README.md](convex/README.md)).
+
+## Analytics
+
+GA4 via `@next/third-parties` and `src/lib/analytics.ts`. Events: search, category/tag filters, sort, view mode, load more, skill install, external links. Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` if you use GA4.
+
+## Deploy
+
+- **Frontend:** Vercel (or any Next.js host). Point to your Convex deployment.
+- **Backend:** Convex (`npx convex deploy`). Crons and env are configured in the Convex dashboard.
+
+Do not commit `.env*`; `.notes/` is gitignored for local/private notes.
+
+---
+
+**Author / Credits** — Built by [@0xmythril](https://x.com/0xmythril). If you fork this repo, please keep this credit visible or add your own.
