@@ -915,8 +915,9 @@ export const listCachedSkillsWithFilters = query({
     // Filter out hidden skills first
     skills = skills.filter(s => !s.hidden)
     
-    // Curated featured skills list
+    // Curated featured skills list (align with clawdhub install / getting-started example)
     const FEATURED_SLUGS = [
+      'web-search',       // Getting-started example: clawdhub install web-search
       'gog',              // Google Workspace (Gmail, Calendar, Tasks, Drive, Sheets, Docs)
       'notion',           // Notion pages, databases, blocks
       'bird',             // X/Twitter CLI (feed, mentions, DMs)
@@ -926,7 +927,6 @@ export const listCachedSkillsWithFilters = query({
       'gifgrep',          // GIF search & download
       'goplaces',         // Google Places API
       'github',           // GitHub CLI (issues, PRs, runs)
-      'heartbeat-update', // Periodic status checks
       'summarize',        // URL/file summarization
     ]
     
