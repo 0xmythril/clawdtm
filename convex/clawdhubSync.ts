@@ -463,8 +463,15 @@ export const syncFromClawdHub = internalAction({
     // Get current sync state
     const state = await ctx.runQuery(internal.clawdhubSync.getSyncState, {})
     
-    // Skip if sync is already running (prevents write conflicts)
-    if (state?.status === 'running') {
+    // Check for stale running state (stuck for > 30 minutes = likely crashed)
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000)
+    if (state?.status === 'running' && state.updatedAt && state.updatedAt < thirtyMinutesAgo) {
+      console.log('Stale running state detected, resetting to idle...')
+      await ctx.runMutation(internal.clawdhubSync.updateSyncState, {
+        status: 'idle',
+        lastError: 'Reset from stale running state',
+      })
+    } else if (state?.status === 'running') {
       console.log('Sync already in progress, skipping...')
       return { totalSynced: 0, batchCount: 0, complete: false, skipped: true }
     }
@@ -481,25 +488,44 @@ export const syncFromClawdHub = internalAction({
     let totalSynced = 0
     let batchCount = 0
     
-    while (batchCount < maxBatches) {
-      const result = await ctx.runAction(internal.clawdhubSync.syncSkillsBatch, {
-        cursor,
-        batchSize: BATCH_SIZE,
-      })
-      
-      totalSynced += result.synced
-      batchCount++
-      
-      if (!result.hasMore) {
-        console.log(`Sync complete: ${totalSynced} skills synced in ${batchCount} batches`)
-        return { totalSynced, batchCount, complete: true }
+    try {
+      while (batchCount < maxBatches) {
+        const result = await ctx.runAction(internal.clawdhubSync.syncSkillsBatch, {
+          cursor,
+          batchSize: BATCH_SIZE,
+        })
+        
+        totalSynced += result.synced
+        batchCount++
+        
+        if (!result.hasMore) {
+          console.log(`Sync complete: ${totalSynced} skills synced in ${batchCount} batches`)
+          return { totalSynced, batchCount, complete: true }
+        }
+        
+        cursor = result.nextCursor
       }
       
-      cursor = result.nextCursor
+      // Pausing after maxBatches - set status to idle so next cron can continue
+      await ctx.runMutation(internal.clawdhubSync.updateSyncState, {
+        status: 'idle',
+        cursor, // Preserve cursor to continue from where we left off
+      })
+      
+      console.log(`Sync paused: ${totalSynced} skills synced in ${batchCount} batches, will continue next cron`)
+      return { totalSynced, batchCount, complete: false }
+    } catch (err) {
+      // Ensure we reset to idle on any error so we don't get stuck
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      console.error('syncFromClawdHub error:', errorMessage)
+      
+      await ctx.runMutation(internal.clawdhubSync.updateSyncState, {
+        status: 'idle',
+        lastError: errorMessage,
+      })
+      
+      throw err
     }
-    
-    console.log(`Sync paused: ${totalSynced} skills synced in ${batchCount} batches, will continue next cron`)
-    return { totalSynced, batchCount, complete: false }
   },
 })
 
@@ -1133,5 +1159,137 @@ export const listHiddenSkills = query({
       hiddenReason: s.hiddenReason,
       hiddenAt: s.hiddenAt,
     }))
+  },
+})
+
+// ============================================
+// Manual Reset (unstick sync state)
+// ============================================
+
+// Force reset sync state to idle (use when stuck)
+export const resetSyncState = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
+    
+    if (state) {
+      await ctx.db.patch(state._id, {
+        status: 'idle',
+        cursor: undefined,
+        lastError: 'Manual reset',
+        updatedAt: Date.now(),
+      })
+      console.log('Sync state reset to idle')
+      return { success: true, previousStatus: state.status }
+    }
+    
+    return { success: false, error: 'No sync state found' }
+  },
+})
+
+// ============================================
+// Author Enrichment (fetches owner from detail endpoint)
+// ============================================
+
+// Get skills that need author enrichment (author is 'unknown' or missing)
+export const getSkillsNeedingAuthorEnrichment = internalQuery({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50
+    
+    // Get all skills and filter for unknown/missing authors
+    const allSkills = await ctx.db
+      .query('cachedSkills')
+      .collect()
+    
+    return allSkills
+      .filter(s => !s.author || s.author === 'unknown')
+      .slice(0, limit)
+      .map(s => ({ _id: s._id, slug: s.slug }))
+  },
+})
+
+// Update a skill's author info
+export const updateSkillAuthor = internalMutation({
+  args: {
+    skillId: v.id('cachedSkills'),
+    author: v.string(),
+    authorHandle: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.skillId, {
+      author: args.author,
+      authorHandle: args.authorHandle,
+    })
+  },
+})
+
+// Fetch author info from detail endpoint and update skill
+export const enrichSkillAuthors = internalAction({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50
+    
+    // Get skills needing enrichment
+    const skills = await ctx.runQuery(internal.clawdhubSync.getSkillsNeedingAuthorEnrichment, { limit })
+    
+    if (skills.length === 0) {
+      console.log('No skills need author enrichment')
+      return { enriched: 0, failed: 0 }
+    }
+    
+    console.log(`Enriching author info for ${skills.length} skills`)
+    
+    let enriched = 0
+    let failed = 0
+    
+    for (const skill of skills) {
+      try {
+        // Fetch detail endpoint
+        const response = await fetch(`${CLAWDHUB_API}/skills/${skill.slug}`)
+        
+        if (!response.ok) {
+          console.warn(`Failed to fetch detail for ${skill.slug}: ${response.status}`)
+          failed++
+          continue
+        }
+        
+        const data = await response.json()
+        const owner = data.owner
+        
+        if (owner && (owner.handle || owner.displayName)) {
+          // Update the skill with author info
+          await ctx.runMutation(internal.clawdhubSync.updateSkillAuthor, {
+            skillId: skill._id,
+            author: owner.displayName ?? owner.handle,
+            authorHandle: owner.handle,
+          })
+          enriched++
+        } else {
+          // No owner data, mark as 'community' to avoid re-fetching
+          await ctx.runMutation(internal.clawdhubSync.updateSkillAuthor, {
+            skillId: skill._id,
+            author: 'community',
+            authorHandle: undefined,
+          })
+          enriched++
+        }
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+      } catch (err) {
+        console.error(`Error enriching ${skill.slug}:`, err)
+        failed++
+      }
+    }
+    
+    console.log(`Author enrichment complete: ${enriched} enriched, ${failed} failed`)
+    return { enriched, failed }
   },
 })

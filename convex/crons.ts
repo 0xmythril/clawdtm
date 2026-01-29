@@ -19,4 +19,12 @@ crons.interval(
   { limit: 200 },
 )
 
+// Enrich skills with author info from detail endpoint (runs after sync)
+crons.interval(
+  'clawdhub-author-enrichment',
+  { minutes: 30 },
+  internal.clawdhubSync.enrichSkillAuthors,
+  { limit: 50 },
+)
+
 export default crons
