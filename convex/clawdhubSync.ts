@@ -968,12 +968,8 @@ export const listCachedSkillsWithFilters = query({
       } else if (args.category === 'verified') {
         skills = skills.filter(s => VERIFIED_SLUGS.includes(s.slug))
       } else if (args.category === 'latest') {
-        // Latest = skills updated in last 24 hours
-        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000)
-        skills = skills.filter(s => {
-          const updatedAt = s.externalUpdatedAt ?? s.lastSyncedAt ?? 0
-          return updatedAt >= twentyFourHoursAgo
-        })
+        // Latest = no filter, just sort by most recently updated (handled in sort section below)
+        // This ensures we always show results, not just skills from last 24h
       } else {
         skills = skills.filter(s => s.category === args.category)
       }
