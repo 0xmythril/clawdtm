@@ -688,9 +688,9 @@ export const searchCachedSkills = query({
     const limit = args.limit ?? 30
     const sortBy = args.sortBy ?? 'relevance'
     
-    // Get all skills and filter in memory for comprehensive search
-    // This works well for < 10k skills; for larger datasets, use proper search index
-    const allSkills = await ctx.db.query('cachedSkills').collect()
+    // OPTIMIZATION: Cap the scan to avoid excessive bandwidth
+    // For comprehensive search on larger datasets, use Convex search index
+    const allSkills = await ctx.db.query('cachedSkills').take(1500)
     
     // Filter out hidden skills
     const visibleSkills = allSkills.filter(s => !s.hidden)
@@ -792,20 +792,13 @@ export const getSyncStatus = query({
       }
     }
     
-    // Fallback: use index for hidden count (more efficient than full scan)
-    const hiddenSkills = await ctx.db
-      .query('cachedSkills')
-      .withIndex('by_hidden', (q) => q.eq('hidden', true))
-      .collect()
-    
-    // Get total count from another approach - just count all
-    const allCached = await ctx.db.query('cachedSkills').collect()
-    
+    // Fallback: return 0 counts to avoid expensive full table scan
+    // The cache will be populated on next sync
     return {
       status: state?.status ?? 'not_initialized',
       totalSynced: state?.totalSynced ?? 0,
-      totalCached: allCached.length - hiddenSkills.length,
-      totalHidden: hiddenSkills.length,
+      totalCached: 0,
+      totalHidden: 0,
       lastFullSyncAt: state?.lastFullSyncAt,
       lastError: state?.lastError,
     }
@@ -831,20 +824,12 @@ export const getCategories = query({
       }
     }
     
-    // Fallback: compute from skills (only if cache missing)
-    const allSkills = await ctx.db.query('cachedSkills').collect()
-    const skills = allSkills.filter(s => !s.hidden)
-    
-    const categoryCounts: Record<string, number> = {}
-    for (const skill of skills) {
-      const cat = skill.category ?? 'uncategorized'
-      categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1
-    }
-    
+    // Fallback: return empty to avoid expensive full table scan
+    // The cache will be populated on next sync via updateCachedCounts
     return {
-      categories: Object.keys(categoryCounts).filter(c => c !== 'uncategorized').sort(),
-      counts: categoryCounts,
-      total: skills.length,
+      categories: [],
+      counts: {},
+      total: 0,
     }
   },
 })
@@ -880,36 +865,9 @@ export const getTags = query({
       return { tags: state.tagCounts as Array<{ tag: string; count: number }> }
     }
     
-    // Fallback: compute from skills (only if cache missing)
-    const allSkills = await ctx.db.query('cachedSkills').collect()
-    const skills = allSkills.filter(s => !s.hidden)
-    
-    const tagCounts: Record<string, number> = {}
-    
-    for (const skill of skills) {
-      const tags = skill.tags
-      if (Array.isArray(tags)) {
-        for (const tag of tags) {
-          if (isValidTag(tag)) {
-            const normalized = tag.toLowerCase().trim()
-            tagCounts[normalized] = (tagCounts[normalized] ?? 0) + 1
-          }
-        }
-      } else if (tags && typeof tags === 'object') {
-        for (const key of Object.keys(tags)) {
-          if (isValidTag(key)) {
-            const normalized = key.toLowerCase().trim()
-            tagCounts[normalized] = (tagCounts[normalized] ?? 0) + 1
-          }
-        }
-      }
-    }
-    
-    const sortedTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag, count]) => ({ tag, count }))
-    
-    return { tags: sortedTags }
+    // Fallback: return empty to avoid expensive full table scan
+    // The cache will be populated on next sync via updateCachedCounts
+    return { tags: [] }
   },
 })
 
@@ -932,14 +890,58 @@ export const listCachedSkillsWithFilters = query({
     const limit = args.limit ?? 50
     const offset = args.cursor ?? 0
     
-    // Get all skills for filtering (we'll paginate after filtering)
-    let skills = await ctx.db
-      .query('cachedSkills')
-      .order('desc')
-      .collect()
+    // OPTIMIZATION: For simple cases (no filters, just sorting), use indexed queries
+    // This avoids loading all skills into memory
+    const hasFilters = args.category || (args.tags && args.tags.length > 0) || args.hasNix !== undefined
+    const sortBy = args.sortBy ?? 'downloads'
     
-    // Filter out hidden skills first
-    skills = skills.filter(s => !s.hidden)
+    let skills
+    
+    if (!hasFilters && !args.category) {
+      // Fast path: No filters, use index-based query with limit
+      // Fetch enough to handle pagination (offset + limit + buffer for hidden)
+      const fetchLimit = Math.min(offset + limit + 50, 300) // Cap at 300 to save bandwidth
+      
+      let rawSkills
+      if (sortBy === 'downloads') {
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_downloads')
+          .order('desc')
+          .take(fetchLimit)
+      } else if (sortBy === 'stars') {
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_stars')
+          .order('desc')
+          .take(fetchLimit)
+      } else if (sortBy === 'installs') {
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_installs')
+          .order('desc')
+          .take(fetchLimit)
+      } else {
+        // Recent sort - use creation time
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .order('desc')
+          .take(fetchLimit)
+      }
+      
+      // Filter out hidden skills
+      skills = rawSkills.filter(s => !s.hidden)
+    } else {
+      // Slow path: Has filters, need to scan more (but still cap it)
+      // Cap at 1500 to avoid massive bandwidth on filtered queries
+      const allSkills = await ctx.db
+        .query('cachedSkills')
+        .order('desc')
+        .take(1500)
+      
+      // Filter out hidden skills first
+      skills = allSkills.filter(s => !s.hidden)
+    }
     
     // Curated featured skills list (align with clawdhub install / getting-started example)
     const FEATURED_SLUGS = [
@@ -1196,12 +1198,14 @@ export const getSkillsNeedingAuthorEnrichment = internalQuery({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50
     
-    // Get all skills and filter for unknown/missing authors
-    const allSkills = await ctx.db
+    // OPTIMIZATION: Only fetch what we need, don't scan the entire table
+    // Fetch enough to find `limit` skills with unknown author
+    const fetchLimit = limit * 5 // Fetch 5x to account for skills that already have authors
+    const skills = await ctx.db
       .query('cachedSkills')
-      .collect()
+      .take(fetchLimit)
     
-    return allSkills
+    return skills
       .filter(s => !s.author || s.author === 'unknown')
       .slice(0, limit)
       .map(s => ({ _id: s._id, slug: s.slug }))

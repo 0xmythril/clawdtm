@@ -271,7 +271,9 @@ export const getUncategorizedSkills = internalQuery({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 100
     
-    const allSkills = await ctx.db.query('cachedSkills').collect()
+    // OPTIMIZATION: Only fetch what we need, don't scan the entire table
+    const fetchLimit = limit * 3 // Fetch 3x to account for categorized skills
+    const allSkills = await ctx.db.query('cachedSkills').take(fetchLimit)
     const uncategorized = allSkills
       .filter(s => !s.hidden && (!s.category || s.category === 'uncategorized'))
       .slice(0, limit)
