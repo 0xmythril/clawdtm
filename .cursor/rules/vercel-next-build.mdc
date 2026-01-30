@@ -1,0 +1,16 @@
+---
+description: Avoid Vercel/Next.js build failures. Apply when editing code that affects npm run build or deployment.
+globs: ["**/*.ts", "**/*.tsx", "**/next.config.*", "**/package.json"]
+---
+
+# Vercel & Next.js build safety
+
+- **Browser APIs**: Never use `window`, `document`, `localStorage`, or other browser globals at module top level. Guard with `typeof window !== 'undefined'` or use inside `useEffect` / client-only code.
+- **"use client"**: Add only to components that use hooks, browser APIs, or event handlers. Don't add to pure server components or files that only export server logic.
+- **Server/client boundary**: Don't import server-only modules (e.g. Node APIs, Convex server helpers that use Node) into client components. Use server actions or API routes for server logic.
+- **Env vars**: Use `NEXT_PUBLIC_*` for client-side. For server-only vars, provide safe defaults or check at runtime so build doesn't fail when var is missing in Vercel.
+- **Dynamic imports**: For heavy or client-only libraries, use `next/dynamic` or `import()` so they aren't executed during server/build.
+- **Next.js 15+**: In `generateMetadata` and `generateStaticParams`, await dynamic params (e.g. `params.id` may be a Promise).
+- **Images**: Prefer `next/image`; add external domains to `images.remotePatterns` in `next.config` if needed.
+- **Before pushing**: When changing dependencies, config, or app router layout/metadata, run `npm run build` locally and fix any errors before relying on Vercel build.
+- **When suggesting push**: Remind to run `npm run build` (and `npm run lint` if present) first when deployable code or config changed; don't suggest pushing if build/lint would fail.

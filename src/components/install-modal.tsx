@@ -112,7 +112,7 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
             </p>
             <ul className="text-muted-foreground text-xs space-y-1 ml-4 list-disc">
               <li><code className="text-foreground break-all">./skills</code> — current workspace (default)</li>
-              <li><code className="text-foreground break-all">~/.clawdbot/skills</code> — shared across all agents</li>
+              <li><code className="text-foreground break-all">~/.openclaw/skills</code> — shared across all agents</li>
             </ul>
           </div>
 
@@ -121,12 +121,12 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
             <p className="text-muted-foreground">
               <strong className="text-foreground">Prerequisites:</strong> Make sure you have{" "}
               <a
-                href="https://docs.molt.bot/"
+                href="https://docs.openclaw.ai/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Moltbot
+                OpenClaw
               </a>{" "}
               installed and configured.
             </p>

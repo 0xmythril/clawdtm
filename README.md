@@ -1,12 +1,12 @@
-# Clawdtm (Superskill)
+# ClawdTM
 
-**Built by [@0xmythril](https://x.com/0xmythril)** · [Clawdbot](https://discord.gg/clawdbot) · [Clawdhub](https://clawdhub.com)
+**Built by [@0xmythril](https://x.com/0xmythril)** · Based on [OpenClaw](https://openclaw.ai/) · [Clawdhub](https://clawdhub.com)
 
 ---
 
-**Superskill your Clawdbot Moltbot** — a web app to browse, search, and install community skills from [Clawdhub](https://clawdhub.com) for [Clawdbot](https://discord.gg/clawdbot) / Moltbot.
+**Superskill your ~~Clawdbot~~ OpenClaw** — a web app to browse, search, and install community skills from [Clawdhub](https://clawdhub.com) for [OpenClaw](https://openclaw.ai/).
 
-**What it is:** A public skill catalog and installer for Clawdbot/Moltbot. Skills are community-built add-ons (tools, workflows, integrations). This app syncs the catalog from Clawdhub, lets users search and filter by category/tags, and provides install instructions. Think “npm for Clawdbot” or “skill store.”
+**What it is:** A public skill catalog and installer for OpenClaw. Skills are community-built add-ons (tools, workflows, integrations). This app syncs the catalog from Clawdhub, lets users search and filter by category/tags, and provides install instructions. Think “npm for OpenClaw” or “skill store.”
 
 - **Stack:** Next.js 16 (App Router), React 19, Convex, Tailwind 4
 - **Data:** Skills synced from Clawdhub API into Convex; categories/tags; full-text search
@@ -74,4 +74,4 @@ Do not commit `.env*`; `.notes/` is gitignored for local/private notes.
 
 ---
 
-**Author / Credits** — Built by [@0xmythril](https://x.com/0xmythril). If you fork this repo, please keep this credit visible or add your own.
+**Author / Credits** — Built by [@0xmythril](https://x.com/0xmythril)

@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-export const alt = "ClawdTM - Skills for Moltbot";
+export const alt = "ClawdTM - Skills for OpenClaw";
 export const size = {
   width: 1200,
   height: 630,
@@ -115,7 +115,7 @@ export default async function Image() {
               letterSpacing: "0.5px",
             }}
           >
-            Superskill your Moltbot
+            Superskill your OpenClaw
           </div>
 
           {/* Stats row */}

@@ -265,13 +265,13 @@ export function Sidebar({
         {/* External Links */}
         <div className="mt-6 space-y-1">
           <a
-            href="https://docs.molt.bot/"
+            href="https://docs.openclaw.ai/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"
           >
             <FileText className="h-4 w-4" />
-            Moltbot Docs
+            OpenClaw Docs
             <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
           </a>
           <a

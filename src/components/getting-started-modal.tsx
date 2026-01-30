@@ -35,12 +35,12 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             <p className="text-sm text-muted-foreground leading-relaxed">
               ClawdTM is a skill directory for{" "}
               <a
-                href="https://docs.molt.bot/"
+                href="https://docs.openclaw.ai/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline inline-flex items-center gap-0.5"
               >
-                Moltbot
+                OpenClaw
                 <ExternalLink className="h-3 w-3" />
               </a>
               . Skills are pre-built capabilities you can add to your agent to extend its functionality.
@@ -130,7 +130,7 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               Skills are installed to <code className="font-mono">./skills</code> by default, or{" "}
-              <code className="font-mono">~/.clawdbot/skills</code> for global access.
+              <code className="font-mono">~/.openclaw/skills</code> for global access.
             </p>
           </section>
 
@@ -142,12 +142,12 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             <p className="text-sm text-muted-foreground">
               Make sure you have{" "}
               <a
-                href="https://docs.molt.bot/"
+                href="https://docs.openclaw.ai/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Moltbot
+                OpenClaw
               </a>{" "}
               installed and configured before installing skills.
             </p>
@@ -157,12 +157,12 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
           <section className="flex flex-col sm:flex-row gap-2 pt-2">
             <Button variant="outline" className="flex-1" asChild>
               <a
-                href="https://docs.molt.bot/"
+                href="https://docs.openclaw.ai/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Moltbot Docs
+                OpenClaw Docs
               </a>
             </Button>
             <Button variant="outline" className="flex-1" asChild>
