@@ -3,26 +3,27 @@ import { internal } from './_generated/api'
 
 const crons = cronJobs()
 
-// Sync skills from ClawdHub API every 15 minutes
+// Sync skills from ClawdHub API every 2 hours (reduced from 15 min to save bandwidth)
+// Each sync triggers reactive re-fetches for all connected clients
 crons.interval(
   'clawdhub-skill-sync',
-  { minutes: 15 },
+  { hours: 2 },
   internal.clawdhubSync.syncFromClawdHub,
   { maxBatches: 5 },
 )
 
-// Categorize uncategorized skills every hour using logic-based rules
+// Categorize uncategorized skills every 4 hours (reduced from 1 hour)
 crons.interval(
   'logic-skill-categorization',
-  { hours: 1 },
+  { hours: 4 },
   internal.categorization.categorizeSkillsBatch,
-  { limit: 200 },
+  { limit: 100 },
 )
 
-// Enrich skills with author info from detail endpoint (runs after sync)
+// Enrich skills with author info every 2 hours (reduced from 30 min)
 crons.interval(
   'clawdhub-author-enrichment',
-  { minutes: 30 },
+  { hours: 2 },
   internal.clawdhubSync.enrichSkillAuthors,
   { limit: 50 },
 )
