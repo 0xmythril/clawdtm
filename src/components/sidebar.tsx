@@ -64,8 +64,6 @@ function getTagColor(tag: string): string {
 
 type TagData = { tag: string; count: number };
 
-export type VoteFilter = "combined" | "human" | "bot";
-
 type SidebarProps = {
   tags: TagData[];
   activeCategory: string;

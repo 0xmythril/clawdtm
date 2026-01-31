@@ -466,6 +466,8 @@ const clerkUsers = defineTable({
   email: v.optional(v.string()),
   name: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
+  // User-chosen display name for public display in reviews
+  displayName: v.optional(v.string()),
   createdAt: v.number(),
   updatedAt: v.number(),
 })

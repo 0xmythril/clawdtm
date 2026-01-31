@@ -15,12 +15,11 @@ import {
   MessageSquare,
   Bot,
   User,
-  Heart,
 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { VoteButtons } from "@/components/vote-buttons";
 import { StarRating } from "@/components/star-rating";
+import { QuickRating } from "@/components/quick-rating";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewList } from "@/components/review-list";
 import { Button } from "@/components/ui/button";
@@ -44,12 +43,6 @@ type SkillData = {
   downloads: number;
   stars: number;
   installs: number;
-  upvotes: number;
-  downvotes: number;
-  humanUpvotes: number;
-  humanDownvotes: number;
-  botUpvotes: number;
-  botDownvotes: number;
   reviewCount: number;
   humanReviewCount: number;
   botReviewCount: number;
@@ -73,12 +66,6 @@ export function SkillDetailClient({ slug, initialSkill }: Props) {
   // Real-time skill data
   const skill = useQuery(api.reviews.getSkillBySlug, { slug }) ?? initialSkill;
 
-  // User's vote for this skill
-  const userVote = useQuery(
-    api.voting.getUserVoteForSkill,
-    user?.id ? { cachedSkillId: skill._id, clerkId: user.id } : "skip"
-  );
-
   // User's existing review
   const userReview = useQuery(
     api.reviews.getUserReview,
@@ -100,9 +87,6 @@ export function SkillDetailClient({ slug, initialSkill }: Props) {
     : typeof skill.tags === "object" && skill.tags
       ? Object.keys(skill.tags)
       : [];
-
-  // Vote counts (combined for detail page)
-  const displayedVotes = { up: skill.upvotes, down: skill.downvotes };
 
   // Calculate review counts based on filter
   const getDisplayedReviewCount = () => {
@@ -152,8 +136,6 @@ export function SkillDetailClient({ slug, initialSkill }: Props) {
           installCommand={installCommand}
           copied={copied}
           copyCommand={copyCommand}
-          displayedVotes={displayedVotes}
-          userVote={userVote ?? null}
           reviewFilter={reviewFilter}
           setReviewFilter={setReviewFilter}
           displayedReviewCount={getDisplayedReviewCount()}
@@ -173,8 +155,6 @@ type SkillContentProps = {
   installCommand: string;
   copied: boolean;
   copyCommand: () => void;
-  displayedVotes: { up: number; down: number };
-  userVote: "up" | "down" | null;
   reviewFilter: "combined" | "human" | "bot";
   setReviewFilter: (filter: "combined" | "human" | "bot") => void;
   displayedReviewCount: number;
@@ -190,8 +170,6 @@ function SkillContent({
   installCommand,
   copied,
   copyCommand,
-  displayedVotes,
-  userVote,
   reviewFilter,
   setReviewFilter,
   displayedReviewCount,
@@ -202,17 +180,6 @@ function SkillContent({
 }: SkillContentProps) {
   return (
     <div className="space-y-6">
-      {/* Back link (desktop only) */}
-      <div className="hidden md:block">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to skills
-        </Link>
-      </div>
-
       {/* Header */}
       <div className="space-y-4">
         <div className="flex items-start gap-4">
@@ -243,13 +210,12 @@ function SkillContent({
             </p>
           </div>
           
-          {/* Vote buttons */}
-          <VoteButtons
+          {/* Quick rating */}
+          <QuickRating
             skillId={skill._id}
-            upvotes={displayedVotes.up}
-            downvotes={displayedVotes.down}
-            userVote={userVote}
-            variant="vertical"
+            avgRating={skill.avgRating}
+            reviewCount={skill.reviewCount}
+            userRating={userReview?.rating ?? null}
             size="md"
           />
         </div>
@@ -304,11 +270,9 @@ function SkillContent({
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-lg font-semibold">
+                <span className="text-base">🦞</span>
                 {skill.avgRating !== null ? (
-                  <>
-                    <Heart className="h-4 w-4 text-rose-500 fill-rose-500" />
-                    {skill.avgRating.toFixed(1)}
-                  </>
+                  <span className="text-orange-600 dark:text-orange-400">{skill.avgRating.toFixed(1)}</span>
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
@@ -370,7 +334,7 @@ function SkillContent({
               </Badge>
               {displayedAvgRating !== null && (
                 <span className="flex items-center gap-1 text-sm font-normal text-muted-foreground">
-                  <Heart className="h-4 w-4 text-rose-500 fill-rose-500" />
+                  <span>🦞</span>
                   {displayedAvgRating.toFixed(1)}
                 </span>
               )}

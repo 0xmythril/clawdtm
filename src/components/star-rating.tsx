@@ -1,6 +1,5 @@
 "use client";
 
-import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type RatingProps = {
@@ -12,8 +11,8 @@ type RatingProps = {
   className?: string;
 };
 
-// Renamed from StarRating to avoid confusion with ClawdHub's star system
-// Using hearts instead
+// Using lobster emoji to match ClawdTM branding
+// Export as StarRating for backward compat but renders lobsters
 export function StarRating({
   rating,
   maxRating = 5,
@@ -23,9 +22,9 @@ export function StarRating({
   className,
 }: RatingProps) {
   const sizeClasses = {
-    sm: "h-3.5 w-3.5",
-    md: "h-5 w-5",
-    lg: "h-6 w-6",
+    sm: "text-sm",
+    md: "text-lg",
+    lg: "text-xl",
   };
 
   const handleClick = (index: number) => {
@@ -45,19 +44,14 @@ export function StarRating({
             disabled={!interactive}
             onClick={() => handleClick(index)}
             className={cn(
-              "focus:outline-none transition-transform",
-              interactive && "hover:scale-110 cursor-pointer",
-              !interactive && "cursor-default"
+              "focus:outline-none transition-transform leading-none",
+              sizeClasses[size],
+              interactive && "hover:scale-125 cursor-pointer",
+              !interactive && "cursor-default",
+              filled ? "opacity-100" : "opacity-30 grayscale"
             )}
           >
-            <Heart
-              className={cn(
-                sizeClasses[size],
-                filled
-                  ? "text-rose-500 fill-rose-500"
-                  : "text-muted-foreground/30"
-              )}
-            />
+            🦞
           </button>
         );
       })}

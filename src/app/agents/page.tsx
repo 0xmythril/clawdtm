@@ -496,8 +496,6 @@ export default function AgentsPage() {
         onTagToggle={noopTag}
         onClearTags={noopClear}
         onSearchFocus={() => {}}
-        voteFilter="combined"
-        onVoteFilterChange={() => {}}
       />
     </div>
   );

@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Users, Eye, Bot } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot } from "lucide-react";
 import Link from "next/link";
-import type { VoteFilter } from "./sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -50,8 +49,6 @@ type MobileNavProps = {
   onTagToggle: (tag: string) => void;
   onClearTags: () => void;
   onSearchFocus: () => void;
-  voteFilter?: VoteFilter;
-  onVoteFilterChange?: (filter: VoteFilter) => void;
 };
 
 // Fixed categories - same as sidebar
@@ -70,8 +67,6 @@ export function MobileNav({
   onTagToggle,
   onClearTags,
   onSearchFocus,
-  voteFilter = "combined",
-  onVoteFilterChange,
 }: MobileNavProps) {
   const { theme, setTheme } = useTheme();
   const authRedirectUrl =
@@ -80,7 +75,7 @@ export function MobileNav({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
   const [agentVotingOpen, setAgentVotingOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"categories" | "tags" | "votes">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "tags">("categories");
 
   const topTags = tags.slice(0, 20);
   const hasActiveFilters = activeCategory !== "all" || selectedTags.length > 0;
@@ -166,27 +161,11 @@ export function MobileNav({
                     </span>
                   )}
                 </button>
-                {onVoteFilterChange && (
-                  <button
-                    onClick={() => setActiveTab("votes")}
-                    className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${
-                      activeTab === "votes"
-                        ? "text-foreground border-b-2 border-primary"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <Eye className="h-4 w-4" />
-                    Votes
-                    {voteFilter !== "combined" && (
-                      <span className="h-2 w-2 bg-primary rounded-full" />
-                    )}
-                  </button>
-                )}
               </div>
 
               {/* Content */}
               <div className="overflow-y-auto max-h-[calc(80vh-130px)] p-4">
-                {activeTab === "categories" ? (
+                {activeTab === "categories" && (
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => {
@@ -221,7 +200,8 @@ export function MobileNav({
                       </button>
                     ))}
                   </div>
-                ) : activeTab === "tags" ? (
+                )}
+                {activeTab === "tags" && (
                   <div className="space-y-4">
                     {selectedTags.length > 0 && (
                       <div className="flex items-center justify-between pb-2 border-b border-border/40">
@@ -258,64 +238,6 @@ export function MobileNav({
                         );
                       })}
                     </div>
-                  </div>
-                ) : (
-                  /* Votes tab */
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Choose which votes to display
-                    </p>
-                    <button
-                      onClick={() => {
-                        onVoteFilterChange?.("combined");
-                        setFiltersOpen(false);
-                      }}
-                      className={`w-full p-4 rounded-xl text-sm font-medium transition-all text-left flex items-center gap-3 cursor-pointer ${
-                        voteFilter === "combined"
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted hover:bg-muted/80 text-foreground"
-                      }`}
-                    >
-                      <Users className="h-5 w-5" />
-                      <div>
-                        <div>Combined</div>
-                        <div className="text-xs opacity-70">Human + AI votes</div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onVoteFilterChange?.("human");
-                        setFiltersOpen(false);
-                      }}
-                      className={`w-full p-4 rounded-xl text-sm font-medium transition-all text-left flex items-center gap-3 cursor-pointer ${
-                        voteFilter === "human"
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted hover:bg-muted/80 text-foreground"
-                      }`}
-                    >
-                      <Users className="h-5 w-5" />
-                      <div>
-                        <div>Human Only</div>
-                        <div className="text-xs opacity-70">Votes from logged-in users</div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onVoteFilterChange?.("bot");
-                        setFiltersOpen(false);
-                      }}
-                      className={`w-full p-4 rounded-xl text-sm font-medium transition-all text-left flex items-center gap-3 cursor-pointer ${
-                        voteFilter === "bot"
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted hover:bg-muted/80 text-foreground"
-                      }`}
-                    >
-                      <Bot className="h-5 w-5" />
-                      <div>
-                        <div>AI Only</div>
-                        <div className="text-xs opacity-70">Votes from AI agents</div>
-                      </div>
-                    </button>
                   </div>
                 )}
               </div>

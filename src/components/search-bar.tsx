@@ -10,19 +10,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { VoteFilter } from "./sidebar";
 
 const SORT_OPTIONS = [
   { value: "downloads", label: "Downloads", symbol: "↓" },
   { value: "stars", label: "Stars", symbol: "★" },
   { value: "installs", label: "Installs", symbol: "⬇" },
-  { value: "votes", label: "Votes", symbol: "▲" },
-] as const;
-
-const VOTE_FILTER_OPTIONS = [
-  { value: "combined", label: "All", emoji: "👥" },
-  { value: "human", label: "Human", emoji: "🧑" },
-  { value: "bot", label: "AI", emoji: "🤖" },
+  { value: "rating", label: "Rating", symbol: "🦞" },
 ] as const;
 
 type SortOption = (typeof SORT_OPTIONS)[number]["value"];
@@ -37,8 +30,6 @@ type SearchBarProps = {
   onViewModeChange: (mode: ViewMode) => void;
   isSearching?: boolean;
   resultCount?: number;
-  voteFilter?: VoteFilter;
-  onVoteFilterChange?: (filter: VoteFilter) => void;
 };
 
 export type SearchBarRef = {
@@ -56,8 +47,6 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       onViewModeChange,
       isSearching,
       resultCount,
-      voteFilter = "combined",
-      onVoteFilterChange,
     },
     ref
   ) {
@@ -91,7 +80,6 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
     };
 
     const activeSort$ = SORT_OPTIONS.find((o) => o.value === activeSort);
-    const activeVoteFilter = VOTE_FILTER_OPTIONS.find((o) => o.value === voteFilter);
 
     return (
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40 -mx-4 px-4 py-3 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -140,38 +128,6 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Vote filter dropdown */}
-          {onVoteFilterChange && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className={`shrink-0 gap-1 h-10 cursor-pointer px-2.5 ${
-                    voteFilter !== "combined" 
-                      ? "border-primary/50 bg-primary/5" 
-                      : ""
-                  }`}
-                >
-                  <span>{activeVoteFilter?.emoji}</span>
-                  <span className="hidden sm:inline">{activeVoteFilter?.label}</span>
-                  <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {VOTE_FILTER_OPTIONS.map((option) => (
-                  <DropdownMenuItem
-                    key={option.value}
-                    onClick={() => onVoteFilterChange(option.value as VoteFilter)}
-                    className={`cursor-pointer gap-2 ${voteFilter === option.value ? "bg-accent" : ""}`}
-                  >
-                    <span>{option.emoji}</span>
-                    {option.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
 
           {/* View mode toggle */}
           <div className="hidden sm:flex border border-border rounded-lg overflow-hidden">

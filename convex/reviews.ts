@@ -125,7 +125,8 @@ export const addReview = mutation({
       .unique()
 
     const now = Date.now()
-    const reviewerName = user.name || 'Anonymous'
+    // Use displayName (user-chosen), fall back to Clerk name, then Anonymous
+    const reviewerName = user.displayName || user.name || 'Anonymous'
 
     if (existingReview) {
       // Update existing review
@@ -564,6 +565,45 @@ export const getUserReview = query({
   },
 })
 
+// Get current user's ratings for multiple skills (batch)
+export const getUserRatingsForSkills = query({
+  args: {
+    cachedSkillIds: v.array(v.id('cachedSkills')),
+    clerkId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const clerkId = args.clerkId
+    if (!clerkId || args.cachedSkillIds.length === 0) {
+      return {}
+    }
+
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', clerkId))
+      .unique()
+
+    if (!user) {
+      return {}
+    }
+
+    // Get all reviews for this user
+    const allReviews = await ctx.db
+      .query('skillReviews')
+      .withIndex('by_human_user', (q) => q.eq('clerkUserId', user._id))
+      .collect()
+
+    // Build a map of skillId -> rating
+    const ratingMap: Record<string, number> = {}
+    for (const review of allReviews) {
+      if (args.cachedSkillIds.includes(review.cachedSkillId)) {
+        ratingMap[review.cachedSkillId] = review.rating
+      }
+    }
+
+    return ratingMap
+  },
+})
+
 // Get skill by slug (for detail page server component)
 export const getSkillBySlug = query({
   args: {
@@ -594,13 +634,6 @@ export const getSkillBySlug = query({
       downloads: skill.downloads,
       stars: skill.stars,
       installs: skill.installs,
-      // Vote counts
-      upvotes: skill.clawdtmUpvotes ?? 0,
-      downvotes: skill.clawdtmDownvotes ?? 0,
-      humanUpvotes: skill.clawdtmHumanUpvotes ?? 0,
-      humanDownvotes: skill.clawdtmHumanDownvotes ?? 0,
-      botUpvotes: skill.clawdtmBotUpvotes ?? 0,
-      botDownvotes: skill.clawdtmBotDownvotes ?? 0,
       // Review stats
       reviewCount: skill.reviewCount ?? 0,
       humanReviewCount: skill.humanReviewCount ?? 0,

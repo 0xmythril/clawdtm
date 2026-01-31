@@ -677,7 +677,7 @@ export const searchCachedSkills = query({
       v.literal('downloads'),
       v.literal('stars'),
       v.literal('installs'),
-      v.literal('votes'),
+      v.literal('rating'),
     )),
   },
   handler: async (ctx, args) => {
@@ -748,11 +748,14 @@ export const searchCachedSkills = query({
       case 'installs':
         sorted = scored.sort((a, b) => b.skill.installs - a.skill.installs)
         break
-      case 'votes':
+      case 'rating':
         sorted = scored.sort((a, b) => {
-          const netA = (a.skill.clawdtmUpvotes ?? 0) - (a.skill.clawdtmDownvotes ?? 0)
-          const netB = (b.skill.clawdtmUpvotes ?? 0) - (b.skill.clawdtmDownvotes ?? 0)
-          if (netB !== netA) return netB - netA
+          const ratingA = a.skill.avgRating ?? 0
+          const ratingB = b.skill.avgRating ?? 0
+          if (ratingB !== ratingA) return ratingB - ratingA
+          const countA = a.skill.reviewCount ?? 0
+          const countB = b.skill.reviewCount ?? 0
+          if (countB !== countA) return countB - countA
           return b.skill.downloads - a.skill.downloads
         })
         break
@@ -872,7 +875,7 @@ export const listCachedSkillsWithFilters = query({
       v.literal('stars'),
       v.literal('installs'),
       v.literal('recent'),
-      v.literal('votes')
+      v.literal('rating')
     )),
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -1002,12 +1005,15 @@ export const listCachedSkillsWithFilters = query({
       skills = skills.sort((a, b) => b.stars - a.stars)
     } else if (args.sortBy === 'installs') {
       skills = skills.sort((a, b) => b.installs - a.installs)
-    } else if (args.sortBy === 'votes') {
-      // Sort by net vote score (upvotes - downvotes), then by downloads as tiebreaker
+    } else if (args.sortBy === 'rating') {
+      // Sort by avg rating (highest first), then by review count, then by downloads as tiebreaker
       skills = skills.sort((a, b) => {
-        const netA = (a.clawdtmUpvotes ?? 0) - (a.clawdtmDownvotes ?? 0)
-        const netB = (b.clawdtmUpvotes ?? 0) - (b.clawdtmDownvotes ?? 0)
-        if (netB !== netA) return netB - netA
+        const ratingA = a.avgRating ?? 0
+        const ratingB = b.avgRating ?? 0
+        if (ratingB !== ratingA) return ratingB - ratingA
+        const countA = a.reviewCount ?? 0
+        const countB = b.reviewCount ?? 0
+        if (countB !== countA) return countB - countA
         return b.downloads - a.downloads
       })
     }

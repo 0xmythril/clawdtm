@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
-import { Sidebar, type VoteFilter } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { SearchBar, type SearchBarRef } from "@/components/search-bar";
 import { SkillCard, type Skill } from "@/components/skill-card";
@@ -25,7 +25,7 @@ import {
   trackExternalLink,
 } from "@/lib/analytics";
 
-type SortOption = "downloads" | "stars" | "installs" | "votes";
+type SortOption = "downloads" | "stars" | "installs" | "rating";
 type ViewMode = "card" | "list";
 
 // Loading fallback for Suspense
@@ -59,29 +59,21 @@ function SkillsContent() {
   // Local state
   const [query, setQuery] = useState(urlQuery);
   const [viewMode, setViewMode] = useState<ViewMode>("card");
-  const [voteFilter, setVoteFilter] = useState<VoteFilter>("combined");
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [installOpen, setInstallOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
 
-  // Load view mode and vote filter from localStorage
+  // Load view mode from localStorage
   useEffect(() => {
     const savedViewMode = localStorage.getItem("skill-view-mode") as ViewMode | null;
     if (savedViewMode) setViewMode(savedViewMode);
-    const savedVoteFilter = localStorage.getItem("skill-vote-filter") as VoteFilter | null;
-    if (savedVoteFilter) setVoteFilter(savedVoteFilter);
   }, []);
 
   // Save view mode to localStorage
   useEffect(() => {
     localStorage.setItem("skill-view-mode", viewMode);
   }, [viewMode]);
-
-  // Save vote filter to localStorage
-  useEffect(() => {
-    localStorage.setItem("skill-vote-filter", voteFilter);
-  }, [voteFilter]);
 
   // Reset pagination when filters change
   const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}`;
@@ -119,9 +111,9 @@ function SkillsContent() {
     return allSkills.map((s) => s._id as Id<"cachedSkills">);
   }, [allSkills, searchResult, query]);
 
-  // Fetch user votes for visible skills
-  const userVotes = useQuery(
-    api.voting.getUserVotesForSkills,
+  // Fetch user ratings for visible skills
+  const userRatings = useQuery(
+    api.reviews.getUserRatingsForSkills,
     userLoaded && user && skillIds.length > 0
       ? { cachedSkillIds: skillIds, clerkId: user.id }
       : "skip"
@@ -325,8 +317,6 @@ function SkillsContent() {
             }}
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
-            voteFilter={voteFilter}
-            onVoteFilterChange={setVoteFilter}
           />
 
           {/* Skills grid/list */}
@@ -359,7 +349,7 @@ function SkillsContent() {
                       skill={skill}
                       onInstall={handleInstall}
                       variant={viewMode}
-                      userVote={userVotes?.[skill._id] ?? null}
+                      userRating={userRatings?.[skill._id] ?? null}
                     />
                   ))}
                 </div>
@@ -432,8 +422,6 @@ function SkillsContent() {
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
         onSearchFocus={handleSearchFocus}
-        voteFilter={voteFilter}
-        onVoteFilterChange={setVoteFilter}
       />
 
       {/* Install modal */}
