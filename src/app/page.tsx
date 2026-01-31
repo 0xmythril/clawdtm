@@ -391,6 +391,16 @@ function SkillsContent() {
             </a>
             <span className="text-border">•</span>
             <a
+              href="https://docs.openclaw.ai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+              onClick={() => trackExternalLink("https://docs.openclaw.ai/", "footer_docs")}
+            >
+              OpenClaw Docs
+            </a>
+            <span className="text-border">•</span>
+            <a
               href="https://clawdhub.com"
               target="_blank"
               rel="noopener noreferrer"
