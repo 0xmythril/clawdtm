@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, User, LogIn } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,

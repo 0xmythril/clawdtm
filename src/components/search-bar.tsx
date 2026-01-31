@@ -30,7 +30,6 @@ type SearchBarProps = {
   onViewModeChange: (mode: ViewMode) => void;
   isSearching?: boolean;
   resultCount?: number;
-  totalCount?: number;
 };
 
 export type SearchBarRef = {
@@ -48,7 +47,6 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       onViewModeChange,
       isSearching,
       resultCount,
-      totalCount,
     },
     ref
   ) {

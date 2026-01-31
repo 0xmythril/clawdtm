@@ -51,7 +51,10 @@ function SkillsContent() {
   const urlQuery = searchParams.get("q") ?? "";
   const urlCategory = searchParams.get("category") ?? "all";
   const urlSort = (searchParams.get("sort") as SortOption) ?? "downloads";
-  const urlTags = searchParams.get("tags")?.split(",").filter(Boolean) ?? [];
+  const urlTags = useMemo(
+    () => searchParams.get("tags")?.split(",").filter(Boolean) ?? [],
+    [searchParams]
+  );
 
   // Local state
   const [query, setQuery] = useState(urlQuery);
@@ -116,12 +119,11 @@ function SkillsContent() {
       : "skip"
   );
 
+  const verifiedSlugs = useMemo(() => new Set(["gog"]), []);
+
   // Accumulate skills for infinite scroll
   useEffect(() => {
     if (!cachedResult?.skills) return;
-
-    // Verified skills list (curated/tested)
-    const VERIFIED_SLUGS = new Set(["gog"]);
 
     const newSkills: Skill[] = cachedResult.skills.map((s) => ({
       _id: s._id,
@@ -134,7 +136,7 @@ function SkillsContent() {
       installs: s.installs,
       category: s.category,
       normalizedTags: s.normalizedTags,
-      isVerified: VERIFIED_SLUGS.has(s.slug),
+      isVerified: verifiedSlugs.has(s.slug),
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
     }));
@@ -148,10 +150,7 @@ function SkillsContent() {
         return [...prev, ...unique];
       });
     }
-  }, [cachedResult, cursor]);
-
-  // Verified skills list (curated/tested)
-  const VERIFIED_SLUGS = new Set(["gog"]);
+  }, [cachedResult, cursor, verifiedSlugs]);
 
   // Determine which data to show
   const skills: Skill[] = useMemo(() => {
@@ -165,13 +164,13 @@ function SkillsContent() {
         downloads: s.downloads,
         stars: s.stars,
         installs: s.installs,
-        isVerified: VERIFIED_SLUGS.has(s.slug),
+        isVerified: verifiedSlugs.has(s.slug),
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
       }));
     }
     return allSkills;
-  }, [allSkills, searchResult, query]);
+  }, [allSkills, searchResult, query, verifiedSlugs]);
 
   // Better loading detection - show loading only if we're actually waiting for initial data
   // If categories/tags loaded but skills haven't, we're connected - just waiting for skills
@@ -318,7 +317,6 @@ function SkillsContent() {
             }}
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
-            totalCount={totalCount}
           />
 
           {/* Skills grid/list */}
