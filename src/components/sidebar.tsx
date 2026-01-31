@@ -385,7 +385,7 @@ export function Sidebar({
                   </div>
                   {tags.length > 50 && !tagSearch && (
                     <div className="mt-2 text-xs text-muted-foreground text-center">
-                      Showing top 50 of {tags.length}
+                      Showing top 50 of {tags.length} tags
                     </div>
                   )}
                 </div>

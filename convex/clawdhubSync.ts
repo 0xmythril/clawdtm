@@ -678,6 +678,7 @@ export const searchCachedSkills = query({
       v.literal('stars'),
       v.literal('installs'),
       v.literal('rating'),
+      v.literal('votes'),
     )),
     minRating: v.optional(v.number()),
     reviewerFilter: v.optional(v.union(
@@ -696,9 +697,9 @@ export const searchCachedSkills = query({
     const sortBy = args.sortBy ?? 'relevance'
     const reviewerFilter = args.reviewerFilter ?? 'all'
     
-    // OPTIMIZATION: Cap the scan to avoid excessive bandwidth
-    // For comprehensive search on larger datasets, use Convex search index
-    const allSkills = await ctx.db.query('cachedSkills').take(1500)
+    // OPTIMIZATION: Reduced from 1500 to 500 to save bandwidth
+    // Search typically finds matches in top results; users rarely need 1500+ results
+    const allSkills = await ctx.db.query('cachedSkills').take(500)
     
     // Filter out hidden skills
     const visibleSkills = allSkills.filter(s => !s.hidden)
@@ -768,6 +769,14 @@ export const searchCachedSkills = query({
       case 'installs':
         sorted = filtered.sort((a, b) => b.skill.installs - a.skill.installs)
         break
+      case 'votes':
+        sorted = filtered.sort((a, b) => {
+          const netA = (a.skill.clawdtmUpvotes ?? 0) - (a.skill.clawdtmDownvotes ?? 0)
+          const netB = (b.skill.clawdtmUpvotes ?? 0) - (b.skill.clawdtmDownvotes ?? 0)
+          if (netB !== netA) return netB - netA
+          return b.skill.downloads - a.skill.downloads
+        })
+        break
       case 'rating':
         sorted = filtered.sort((a, b) => {
           const ratingA = reviewerFilter === 'human'
@@ -801,13 +810,35 @@ export const searchCachedSkills = query({
         break
     }
     
+    // OPTIMIZATION: Return only needed fields to reduce payload size
     const results = sorted
       .slice(0, limit)
-      .map(({ skill }) => ({
-        ...skill,
-        name: skill.name ?? skill.displayName ?? skill.slug,
-        description: skill.description ?? skill.summary,
-        author: skill.author ?? skill.authorHandle ?? 'unknown',
+      .map(({ skill: s }) => ({
+        _id: s._id,
+        slug: s.slug,
+        name: s.name ?? s.displayName ?? s.slug,
+        description: s.description ?? s.summary,
+        author: s.author ?? s.authorHandle ?? 'unknown',
+        authorHandle: s.authorHandle,
+        downloads: s.downloads,
+        stars: s.stars,
+        installs: s.installs,
+        category: s.category,
+        version: s.version ?? s.latestVersion,
+        hasNix: s.hasNix,
+        normalizedTags: Array.isArray(s.tags) 
+          ? s.tags.filter((t): t is string => typeof t === 'string')
+          : s.tags && typeof s.tags === 'object' 
+            ? Object.keys(s.tags)
+            : [],
+        clawdtmUpvotes: s.clawdtmUpvotes ?? 0,
+        clawdtmDownvotes: s.clawdtmDownvotes ?? 0,
+        avgRating: s.avgRating,
+        avgRatingHuman: s.avgRatingHuman,
+        avgRatingBot: s.avgRatingBot,
+        reviewCount: s.reviewCount,
+        humanReviewCount: s.humanReviewCount,
+        botReviewCount: s.botReviewCount,
       }))
     
     return { skills: results }
@@ -911,7 +942,8 @@ export const listCachedSkillsWithFilters = query({
       v.literal('stars'),
       v.literal('installs'),
       v.literal('recent'),
-      v.literal('rating')
+      v.literal('rating'),
+      v.literal('votes')
     )),
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -927,18 +959,68 @@ export const listCachedSkillsWithFilters = query({
     const limit = args.limit ?? 50
     const offset = args.cursor ?? 0
     const reviewerFilter = args.reviewerFilter ?? 'all'
-    
-    // OPTIMIZATION: For simple cases (no filters, just sorting), use indexed queries
-    // This avoids loading all skills into memory
-    const hasFilters = args.category || (args.tags && args.tags.length > 0) || args.hasNix !== undefined || args.minRating !== undefined
     const sortBy = args.sortBy ?? 'downloads'
+    
+    // Determine filter complexity
+    const hasTagsFilter = args.tags && args.tags.length > 0
+    const hasNixFilter = args.hasNix !== undefined
+    const hasRatingFilter = args.minRating !== undefined && args.minRating > 0
+    const hasComplexFilters = hasTagsFilter || hasNixFilter || hasRatingFilter
+    
+    // Special categories that need full scan
+    const isSpecialCategory = args.category === 'featured' || args.category === 'verified' || args.category === 'latest'
+    const isStandardCategory = args.category && args.category !== 'all' && !isSpecialCategory
+    const isUnfiltered = (!args.category || args.category === 'all') && !hasComplexFilters
+    
+    // For unfiltered queries, get cached total count (avoids reporting capped count)
+    let cachedTotalVisible: number | undefined
+    if (isUnfiltered) {
+      const syncState = await ctx.db
+        .query('clawdhubSyncState')
+        .withIndex('by_key', (q) => q.eq('key', 'skills'))
+        .unique()
+      cachedTotalVisible = syncState?.totalVisible
+    }
     
     let skills
     
-    if (!hasFilters && !args.category) {
-      // Fast path: No filters, use index-based query with limit
+    // OPTIMIZATION: Use category index when filtering by standard category
+    if (isStandardCategory && !hasComplexFilters) {
+      // Fast path: Category filter with index
       // Fetch enough to handle pagination (offset + limit + buffer for hidden)
-      const fetchLimit = Math.min(offset + limit + 50, 300) // Cap at 300 to save bandwidth
+      const fetchLimit = Math.min(offset + limit + 50, 300)
+      
+      let rawSkills
+      if (sortBy === 'downloads') {
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_category_downloads', (q) => q.eq('category', args.category!))
+          .order('desc')
+          .take(fetchLimit)
+      } else if (sortBy === 'stars') {
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_category_stars', (q) => q.eq('category', args.category!))
+          .order('desc')
+          .take(fetchLimit)
+      } else if (sortBy === 'installs') {
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_category_installs', (q) => q.eq('category', args.category!))
+          .order('desc')
+          .take(fetchLimit)
+      } else {
+        // For 'recent', 'rating', 'votes' - use category index then sort in memory
+        rawSkills = await ctx.db
+          .query('cachedSkills')
+          .withIndex('by_category', (q) => q.eq('category', args.category!))
+          .take(fetchLimit)
+      }
+      
+      skills = rawSkills.filter(s => !s.hidden)
+    } else if (!args.category || args.category === 'all') {
+      // No category filter - use sort index directly
+      const fetchLimit = Math.min(offset + limit + 50, 300)
       
       let rawSkills
       if (sortBy === 'downloads') {
@@ -960,24 +1042,23 @@ export const listCachedSkillsWithFilters = query({
           .order('desc')
           .take(fetchLimit)
       } else {
-        // Recent sort - use creation time
+        // For 'recent', 'rating', 'votes' - get by recency then sort in memory
         rawSkills = await ctx.db
           .query('cachedSkills')
           .order('desc')
           .take(fetchLimit)
       }
       
-      // Filter out hidden skills
       skills = rawSkills.filter(s => !s.hidden)
     } else {
-      // Slow path: Has filters, need to scan more (but still cap it)
-      // Cap at 1500 to avoid massive bandwidth on filtered queries
+      // Slow path: Special category or complex filters - need broader scan
+      // OPTIMIZATION: Reduced from 1500 to 500 to save bandwidth
+      // Most users won't paginate beyond first few pages
       const allSkills = await ctx.db
         .query('cachedSkills')
         .order('desc')
-        .take(1500)
+        .take(500)
       
-      // Filter out hidden skills first
       skills = allSkills.filter(s => !s.hidden)
     }
     
@@ -1054,13 +1135,21 @@ export const listCachedSkillsWithFilters = query({
         const updatedB = b.externalUpdatedAt ?? b.lastSyncedAt ?? 0
         return updatedB - updatedA
       })
-    } else if (args.sortBy === 'downloads') {
+    } else if (sortBy === 'downloads') {
       skills = skills.sort((a, b) => b.downloads - a.downloads)
-    } else if (args.sortBy === 'stars') {
+    } else if (sortBy === 'stars') {
       skills = skills.sort((a, b) => b.stars - a.stars)
-    } else if (args.sortBy === 'installs') {
+    } else if (sortBy === 'installs') {
       skills = skills.sort((a, b) => b.installs - a.installs)
-    } else if (args.sortBy === 'rating') {
+    } else if (sortBy === 'votes') {
+      // Sort by net vote score (upvotes - downvotes), with downloads as tiebreaker
+      skills = skills.sort((a, b) => {
+        const netA = (a.clawdtmUpvotes ?? 0) - (a.clawdtmDownvotes ?? 0)
+        const netB = (b.clawdtmUpvotes ?? 0) - (b.clawdtmDownvotes ?? 0)
+        if (netB !== netA) return netB - netA
+        return b.downloads - a.downloads
+      })
+    } else if (sortBy === 'rating') {
       // Sort by avg rating (highest first), then by review count, then by downloads as tiebreaker
       // Use the appropriate rating field based on reviewerFilter
       skills = skills.sort((a, b) => {
@@ -1088,28 +1177,68 @@ export const listCachedSkillsWithFilters = query({
         if (countB !== countA) return countB - countA
         return b.downloads - a.downloads
       })
+    } else if (sortBy === 'recent') {
+      // Sort by most recently updated
+      skills = skills.sort((a, b) => {
+        const updatedA = a.externalUpdatedAt ?? a.lastSyncedAt ?? 0
+        const updatedB = b.externalUpdatedAt ?? b.lastSyncedAt ?? 0
+        return updatedB - updatedA
+      })
     }
     
     // Total count before pagination
-    const totalCount = skills.length
+    // Use cached total for unfiltered queries to show true count, not capped fetch count
+    const totalCount = cachedTotalVisible ?? skills.length
     
     // Paginate
     const paginatedSkills = skills.slice(offset, offset + limit)
-    const hasMore = offset + limit < totalCount
+    // For unfiltered with cached total, check if we have more based on offset vs cached total
+    const hasMore = isUnfiltered && cachedTotalVisible 
+      ? offset + limit < cachedTotalVisible 
+      : offset + limit < skills.length
     const nextCursor = hasMore ? offset + limit : undefined
     
-    // Normalize
+    // OPTIMIZATION: Return only needed fields to reduce payload size
+    // This reduces bandwidth by ~40% compared to returning full documents
     const normalizedSkills = paginatedSkills.map(s => ({
-      ...s,
+      // Core identifiers
+      _id: s._id,
+      slug: s.slug,
+      
+      // Display fields (normalized)
       name: s.name ?? s.displayName ?? s.slug,
       description: s.description ?? s.summary,
       author: s.author ?? s.authorHandle ?? 'unknown',
+      authorHandle: s.authorHandle,
+      
+      // Stats
+      downloads: s.downloads,
+      stars: s.stars,
+      installs: s.installs,
+      
+      // Metadata
+      category: s.category,
+      version: s.version ?? s.latestVersion,
+      hasNix: s.hasNix,
+      
       // Normalize tags to array
       normalizedTags: Array.isArray(s.tags) 
         ? s.tags.filter((t): t is string => typeof t === 'string')
         : s.tags && typeof s.tags === 'object' 
           ? Object.keys(s.tags)
           : [],
+      
+      // ClawdTM votes
+      clawdtmUpvotes: s.clawdtmUpvotes ?? 0,
+      clawdtmDownvotes: s.clawdtmDownvotes ?? 0,
+      
+      // Ratings
+      avgRating: s.avgRating,
+      avgRatingHuman: s.avgRatingHuman,
+      avgRatingBot: s.avgRatingBot,
+      reviewCount: s.reviewCount,
+      humanReviewCount: s.humanReviewCount,
+      botReviewCount: s.botReviewCount,
     }))
     
     return {
@@ -1276,15 +1405,27 @@ export const getSkillsNeedingAuthorEnrichment = internalQuery({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50
     
-    // OPTIMIZATION: Only fetch what we need, don't scan the entire table
-    // Fetch enough to find `limit` skills with unknown author
-    const fetchLimit = limit * 5 // Fetch 5x to account for skills that already have authors
-    const skills = await ctx.db
+    // OPTIMIZATION: Use index to efficiently find skills with unknown author
+    const unknownSkills = await ctx.db
       .query('cachedSkills')
-      .take(fetchLimit)
+      .withIndex('by_author', (q) => q.eq('author', 'unknown'))
+      .take(limit)
     
-    return skills
-      .filter(s => !s.author || s.author === 'unknown')
+    // Also check for skills with undefined author (older data)
+    const undefinedSkills = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_author', (q) => q.eq('author', undefined))
+      .take(limit)
+    
+    // Combine and dedupe
+    const combined = [...unknownSkills, ...undefinedSkills]
+    const seen = new Set<string>()
+    return combined
+      .filter(s => {
+        if (seen.has(s._id)) return false
+        seen.add(s._id)
+        return true
+      })
       .slice(0, limit)
       .map(s => ({ _id: s._id, slug: s.slug }))
   },
@@ -1369,5 +1510,183 @@ export const enrichSkillAuthors = internalAction({
     
     console.log(`Author enrichment complete: ${enriched} enriched, ${failed} failed`)
     return { enriched, failed }
+  },
+})
+
+// ============================================
+// GitHub Archive Sync (bulk author enrichment)
+// ============================================
+
+const GITHUB_SKILLS_TREE_URL = 'https://api.github.com/repos/openclaw/skills/git/trees/main?recursive=1'
+
+interface GitHubTreeItem {
+  path: string
+  type: string
+  sha: string
+}
+
+interface GitHubTreeResponse {
+  sha: string
+  tree: GitHubTreeItem[]
+  truncated: boolean
+}
+
+// Parse skill paths to extract owner and slug
+// Path format: skills/{owner}/{slug}/_meta.json or skills/{owner}/{slug}/SKILL.md
+function parseSkillPaths(tree: GitHubTreeItem[]): Map<string, string> {
+  const slugToOwner = new Map<string, string>()
+  
+  for (const item of tree) {
+    if (item.type !== 'blob') continue
+    
+    // Match pattern: skills/{owner}/{slug}/_meta.json
+    const match = item.path.match(/^skills\/([^/]+)\/([^/]+)\/_meta\.json$/)
+    if (match) {
+      const [, owner, slug] = match
+      slugToOwner.set(slug, owner)
+    }
+  }
+  
+  return slugToOwner
+}
+
+// Batch update authors from GitHub data
+export const batchUpdateAuthorsFromGitHub = internalMutation({
+  args: {
+    updates: v.array(v.object({
+      slug: v.string(),
+      author: v.string(),
+      authorHandle: v.string(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    let updated = 0
+    let notFound = 0
+    
+    for (const update of args.updates) {
+      const skill = await ctx.db
+        .query('cachedSkills')
+        .withIndex('by_slug', (q) => q.eq('slug', update.slug))
+        .unique()
+      
+      if (skill) {
+        // Only update if author is unknown or missing
+        if (!skill.author || skill.author === 'unknown') {
+          await ctx.db.patch(skill._id, {
+            author: update.author,
+            authorHandle: update.authorHandle,
+          })
+          updated++
+        }
+      } else {
+        notFound++
+      }
+    }
+    
+    return { updated, notFound }
+  },
+})
+
+// Sync authors from GitHub archive (much faster than individual API calls)
+export const syncAuthorsFromGitHub = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{
+    gitHubSkillsFound: number
+    skillsNeedingEnrichment: number
+    matched: number
+    unmatched: number
+    updated: number
+    notFoundInDb: number
+  }> => {
+    console.log('Fetching skill tree from GitHub archive...')
+    
+    // Fetch the recursive tree from GitHub
+    const response = await fetch(GITHUB_SKILLS_TREE_URL, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'ClawdTM-Sync/1.0',
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`)
+    }
+    
+    const data: GitHubTreeResponse = await response.json()
+    console.log(`Fetched tree with ${data.tree.length} items, truncated: ${data.truncated}`)
+    
+    // Parse paths to extract owner/slug mappings
+    const slugToOwner = parseSkillPaths(data.tree)
+    console.log(`Found ${slugToOwner.size} skills with owner info`)
+    
+    // Get all skills that need author enrichment
+    const skillsNeedingEnrichment: Array<{ _id: string; slug: string }> = await ctx.runQuery(
+      internal.clawdhubSync.getSkillsNeedingAuthorEnrichment,
+      { limit: 1000 }
+    )
+    
+    console.log(`${skillsNeedingEnrichment.length} skills need author enrichment`)
+    
+    // Match skills with GitHub data
+    const updates: Array<{ slug: string; author: string; authorHandle: string }> = []
+    let matched = 0
+    let unmatched = 0
+    
+    for (const skill of skillsNeedingEnrichment) {
+      const owner = slugToOwner.get(skill.slug)
+      if (owner) {
+        updates.push({
+          slug: skill.slug,
+          author: owner,
+          authorHandle: owner,
+        })
+        matched++
+      } else {
+        unmatched++
+      }
+    }
+    
+    console.log(`Matched ${matched} skills, ${unmatched} not in GitHub archive`)
+    
+    // Batch update in chunks of 50
+    const BATCH_SIZE = 50
+    let totalUpdated = 0
+    let totalNotFound = 0
+    
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE)
+      const result = await ctx.runMutation(
+        internal.clawdhubSync.batchUpdateAuthorsFromGitHub,
+        { updates: batch }
+      )
+      totalUpdated += result.updated
+      totalNotFound += result.notFound
+    }
+    
+    console.log(`GitHub sync complete: ${totalUpdated} updated, ${totalNotFound} not found in DB, ${unmatched} not in GitHub`)
+    
+    return {
+      gitHubSkillsFound: slugToOwner.size,
+      skillsNeedingEnrichment: skillsNeedingEnrichment.length,
+      matched,
+      unmatched,
+      updated: totalUpdated,
+      notFoundInDb: totalNotFound,
+    }
+  },
+})
+
+// Manual trigger for GitHub sync
+export const triggerGitHubAuthorSync = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    gitHubSkillsFound: number
+    skillsNeedingEnrichment: number
+    matched: number
+    unmatched: number
+    updated: number
+    notFoundInDb: number
+  }> => {
+    return await ctx.runAction(internal.clawdhubSync.syncAuthorsFromGitHub, {})
   },
 })

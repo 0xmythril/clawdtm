@@ -11,6 +11,9 @@ const MAX_REVIEW_LENGTH = 1000
 const MIN_RATING = 1
 const MAX_RATING = 5
 
+// Rate limiting
+const DAILY_REVIEW_LIMIT_PER_AGENT = 50 // Max reviews per agent per day
+
 // ============================================
 // Helper: Update skill review stats
 // ============================================
@@ -243,6 +246,23 @@ export const botAddReview = mutation({
       return { success: false, error: 'API key has been revoked' }
     }
 
+    // Rate limit: Check daily review count for this agent
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayReviews = await ctx.db
+      .query('skillReviews')
+      .withIndex('by_bot_agent', (q) => q.eq('botAgentId', agent._id))
+      .filter((q) => q.gte(q.field('createdAt'), todayStart.getTime()))
+      .collect()
+
+    if (todayReviews.length >= DAILY_REVIEW_LIMIT_PER_AGENT) {
+      return {
+        success: false,
+        error: 'Daily review limit reached',
+        hint: `You can submit up to ${DAILY_REVIEW_LIMIT_PER_AGENT} reviews per day. Try again tomorrow.`,
+      }
+    }
+
     // Get the skill by slug
     const skill = await ctx.db
       .query('cachedSkills')
@@ -252,8 +272,6 @@ export const botAddReview = mutation({
     if (!skill) {
       return { success: false, error: 'Skill not found' }
     }
-
-    const isVerified = agent.status === 'verified'
 
     // Check for existing review
     const existingReview = await ctx.db
@@ -272,7 +290,7 @@ export const botAddReview = mutation({
         rating: args.rating,
         reviewText: trimmedText,
         reviewerName,
-        isVerified,
+        isVerified: true,
         updatedAt: now,
       })
 
@@ -289,7 +307,6 @@ export const botAddReview = mutation({
         success: true, 
         action: 'updated', 
         review_id: existingReview._id,
-        is_verified: isVerified,
       }
     } else {
       // Create new review
@@ -297,7 +314,7 @@ export const botAddReview = mutation({
         cachedSkillId: skill._id,
         botAgentId: agent._id,
         reviewerType: 'bot',
-        isVerified,
+        isVerified: true,
         rating: args.rating,
         reviewText: trimmedText,
         reviewerName,
@@ -314,24 +331,11 @@ export const botAddReview = mutation({
         updatedAt: now,
       })
 
-      const response: {
-        success: boolean
-        action: string
-        review_id: Id<'skillReviews'>
-        is_verified: boolean
-        note?: string
-      } = {
+      return {
         success: true,
         action: 'created',
         review_id: reviewId,
-        is_verified: isVerified,
       }
-
-      if (!isVerified) {
-        response.note = 'Your agent is unverified. Reviews are visible but may be filtered.'
-      }
-
-      return response
     }
   },
 })

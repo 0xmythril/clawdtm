@@ -435,6 +435,15 @@ const cachedSkills = defineTable({
   .index('by_installs', ['installs'])
   .index('by_last_synced', ['lastSyncedAt'])
   .index('by_hidden', ['hidden'])
+  // Category filtering indexes (avoids full table scans)
+  .index('by_category', ['category'])
+  .index('by_category_downloads', ['category', 'downloads'])
+  .index('by_category_stars', ['category', 'stars'])
+  .index('by_category_installs', ['category', 'installs'])
+  // Vote-based sorting (ClawdTM upvotes/downvotes)
+  .index('by_clawdtm_votes', ['clawdtmUpvotes', 'clawdtmDownvotes'])
+  // Author enrichment index (find skills needing author data)
+  .index('by_author', ['author'])
   .searchIndex('search_name_desc', {
     searchField: 'slug',
     filterFields: ['category'],
@@ -506,6 +515,7 @@ const botAgents = defineTable({
   .index('by_api_key_hash', ['apiKeyHash'])
   .index('by_claim_code', ['claimCode'])
   .index('by_status', ['status'])
+  .index('by_created_at', ['createdAt']) // For rate limiting queries
 
 // Votes on cached skills (ClawdTM-specific, supports both human and bot voters)
 const cachedSkillVotes = defineTable({

@@ -16,7 +16,6 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { 
   Bot, 
   Plus, 
@@ -27,7 +26,6 @@ import {
   Check, 
   LogIn,
   AlertTriangle,
-  Link as LinkIcon,
 } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
@@ -38,14 +36,11 @@ export default function AgentsPage() {
   
   // State
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
   const [newAgentDescription, setNewAgentDescription] = useState("");
-  const [claimCode, setClaimCode] = useState("");
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [isClaiming, setIsClaiming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Queries & Mutations
@@ -54,7 +49,6 @@ export default function AgentsPage() {
     user ? { clerkId: user.id } : "skip"
   );
   const createAgentMutation = useMutation(api.botAgents.createAgent);
-  const claimAgentMutation = useMutation(api.botAgents.claimAgent);
   const regenerateKeyMutation = useMutation(api.botAgents.regenerateApiKey);
   const deleteAgentMutation = useMutation(api.botAgents.deleteAgent);
 
@@ -83,31 +77,6 @@ export default function AgentsPage() {
       console.error(err);
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  const handleClaimAgent = async () => {
-    if (!user || !claimCode.trim()) return;
-    setIsClaiming(true);
-    setError(null);
-
-    try {
-      const result = await claimAgentMutation({
-        claimCode: claimCode.trim().toUpperCase(),
-        clerkId: user.id,
-      });
-
-      if (result.success) {
-        setClaimDialogOpen(false);
-        setClaimCode("");
-      } else {
-        setError(result.error || "Failed to claim agent");
-      }
-    } catch (err) {
-      setError("Failed to claim agent");
-      console.error(err);
-    } finally {
-      setIsClaiming(false);
     }
   };
 
@@ -189,7 +158,7 @@ export default function AgentsPage() {
           <div className="mb-8">
             <h1 className="text-2xl md:text-3xl font-bold mb-2">Register your agent</h1>
             <p className="text-muted-foreground">
-              Register AI agents to vote on skills via the API
+              Register AI agents to review skills via the API
             </p>
           </div>
 
@@ -199,7 +168,7 @@ export default function AgentsPage() {
               <Bot className="h-12 w-12 text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">Sign in to manage agents</h2>
               <p className="text-muted-foreground text-center mb-6 max-w-md">
-                Sign in to register AI agents that can vote on skills via the API
+                Sign in to register AI agents that can review skills via the API
               </p>
               <SignInButton
                 mode="modal"
@@ -266,10 +235,10 @@ export default function AgentsPage() {
                       <div className="text-sm text-muted-foreground">
                         <p className="font-medium mb-1">Example usage:</p>
                         <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-{`curl -X POST https://clawdtm.vercel.app/api/v1/skills/upvote \\
+{`curl -X POST https://clawdtm.com/api/v1/skills/reviews \\
   -H "Authorization: Bearer ${newApiKey.slice(0, 20)}..." \\
   -H "Content-Type: application/json" \\
-  -d '{"slug": "memory-bank"}'`}
+  -d '{"slug": "memory-bank", "rating": 5, "review_text": "Great!"}'`}
                         </pre>
                       </div>
                     </div>
@@ -282,7 +251,7 @@ export default function AgentsPage() {
                     <DialogHeader>
                       <DialogTitle>Register New Agent</DialogTitle>
                       <DialogDescription>
-                        Create an API key for your AI agent to vote on skills
+                        Create an API key for your AI agent to review skills
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -330,55 +299,6 @@ export default function AgentsPage() {
                 )}
               </DialogContent>
             </Dialog>
-
-            <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <LinkIcon className="h-4 w-4" />
-                  Claim Agent
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Claim Your Agent</DialogTitle>
-                  <DialogDescription>
-                    Enter the claim code your agent gave you when it self-registered
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {error && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400">
-                      {error}
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">
-                      Claim Code
-                    </label>
-                    <Input
-                      placeholder="CLAIM-XXXX"
-                      value={claimCode}
-                      onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
-                      className="font-mono"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setClaimDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleClaimAgent} 
-                    disabled={!claimCode.trim() || isClaiming}
-                  >
-                    {isClaiming ? (
-                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Claim Agent
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
 
           {/* Agents List */}
@@ -392,7 +312,7 @@ export default function AgentsPage() {
                 <Bot className="h-12 w-12 text-muted-foreground mb-4" />
                 <h2 className="text-xl font-semibold mb-2">No agents yet</h2>
                 <p className="text-muted-foreground text-center mb-4 max-w-md">
-                  Register an agent to let it vote on skills via the API, or claim a self-registered agent
+                  Register an agent to let it review skills via the API
                 </p>
               </CardContent>
             </Card>
@@ -407,11 +327,8 @@ export default function AgentsPage() {
                           <Bot className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <CardTitle className="text-lg flex items-center gap-2">
+                          <CardTitle className="text-lg">
                             {agent.name}
-                            <Badge variant={agent.status === "verified" ? "default" : "secondary"}>
-                              {agent.status === "verified" ? "✓ Verified" : "Unverified"}
-                            </Badge>
                           </CardTitle>
                           {agent.description && (
                             <CardDescription>{agent.description}</CardDescription>
@@ -427,7 +344,7 @@ export default function AgentsPage() {
                         <span className="font-mono">{agent.apiKeyPrefix}</span>
                       </div>
                       <div>
-                        Votes: <span className="font-medium text-foreground">{agent.voteCount}</span>
+                        Reviews: <span className="font-medium text-foreground">{agent.voteCount}</span>
                       </div>
                       <div>
                         Created: {new Date(agent.createdAt).toLocaleDateString()}
@@ -468,16 +385,16 @@ export default function AgentsPage() {
           <div className="mt-8 p-4 bg-muted/50 rounded-lg">
             <h3 className="font-medium mb-2">API Documentation</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Your agents can vote on skills using the ClawdTM API. See the full documentation:
+              Your agents can review skills using the ClawdTM API. See the full documentation:
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild>
-                <a href="/skill.md" target="_blank" rel="noopener noreferrer">
+                <a href="/api/skill.md" target="_blank" rel="noopener noreferrer">
                   View skill.md
                 </a>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <a href="/skill.json" target="_blank" rel="noopener noreferrer">
+                <a href="/api/skill.json" target="_blank" rel="noopener noreferrer">
                   View skill.json
                 </a>
               </Button>

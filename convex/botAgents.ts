@@ -1,6 +1,5 @@
 import { v } from 'convex/values'
 import { mutation, query, internalMutation } from './_generated/server'
-import type { Id } from './_generated/dataModel'
 
 // ============================================
 // Utility Functions
@@ -14,16 +13,6 @@ function generateApiKey(): string {
     key += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return key
-}
-
-// Generate a claim code (e.g., "CLAIM-7X9K")
-function generateClaimCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Avoid confusing chars like 0/O, 1/I
-  let code = 'CLAIM-'
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return code
 }
 
 // Simple hash function for API keys (for demo - in production use proper crypto)
@@ -45,7 +34,7 @@ function simpleHash(str: string): string {
 // Mutations - Human-initiated (via Clerk auth)
 // ============================================
 
-// Create a new bot agent (human creates via UI - verified from start)
+// Create a new bot agent (human creates via UI)
 export const createAgent = mutation({
   args: {
     name: v.string(),
@@ -82,7 +71,7 @@ export const createAgent = mutation({
       apiKeyHash,
       apiKeyPrefix,
       ownerClerkUserId: clerkUser._id,
-      status: 'verified',
+      status: 'verified', // All agents are treated equally now
       voteCount: 0,
       createdAt: now,
       updatedAt: now,
@@ -93,83 +82,10 @@ export const createAgent = mutation({
       agent: {
         id: agentId,
         name: args.name,
-        status: 'verified',
         apiKey, // Only returned once!
         apiKeyPrefix,
       },
       important: '⚠️ SAVE YOUR API KEY! You will not see it again.',
-    }
-  },
-})
-
-// Claim a self-registered bot agent
-export const claimAgent = mutation({
-  args: {
-    claimCode: v.string(),
-    clerkId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    // Get or create the clerk user
-    let clerkUser = await ctx.db
-      .query('clerkUsers')
-      .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId))
-      .unique()
-
-    if (!clerkUser) {
-      const now = Date.now()
-      const userId = await ctx.db.insert('clerkUsers', {
-        clerkId: args.clerkId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      clerkUser = await ctx.db.get(userId)
-      if (!clerkUser) throw new Error('Failed to create user')
-    }
-
-    // Find agent by claim code
-    const agent = await ctx.db
-      .query('botAgents')
-      .withIndex('by_claim_code', (q) => q.eq('claimCode', args.claimCode.toUpperCase()))
-      .unique()
-
-    if (!agent) {
-      return { success: false, error: 'Invalid claim code', hint: 'Check the code your agent gave you' }
-    }
-
-    if (agent.status === 'verified') {
-      return { success: false, error: 'Agent already claimed', hint: 'This agent is already verified' }
-    }
-
-    if (agent.revokedAt) {
-      return { success: false, error: 'Agent has been revoked', hint: 'This agent access was revoked' }
-    }
-
-    // Claim the agent
-    await ctx.db.patch(agent._id, {
-      ownerClerkUserId: clerkUser._id,
-      status: 'verified',
-      claimCode: undefined, // Clear claim code
-      updatedAt: Date.now(),
-    })
-
-    // Update any existing votes from this bot to be verified
-    const votes = await ctx.db
-      .query('cachedSkillVotes')
-      .withIndex('by_bot_agent', (q) => q.eq('botAgentId', agent._id))
-      .collect()
-
-    for (const vote of votes) {
-      await ctx.db.patch(vote._id, { isVerified: true })
-    }
-
-    return {
-      success: true,
-      agent: {
-        id: agent._id,
-        name: agent.name,
-        status: 'verified',
-      },
-      message: `Successfully claimed "${agent.name}"! Its votes are now verified.`,
     }
   },
 })
@@ -200,7 +116,6 @@ export const listMyAgents = query({
         id: a._id,
         name: a.name,
         description: a.description,
-        status: a.status,
         apiKeyPrefix: a.apiKeyPrefix,
         voteCount: a.voteCount ?? 0,
         lastActiveAt: a.lastActiveAt,
@@ -293,6 +208,10 @@ export const deleteAgent = mutation({
 // Mutations - Bot-initiated (via API key)
 // ============================================
 
+// Rate limit constants
+const REGISTRATION_RATE_LIMIT = 10 // Max registrations per minute globally
+const REGISTRATION_WINDOW_MS = 60_000 // 1 minute
+
 // Self-register a new bot agent (bot calls this directly)
 export const selfRegister = mutation({
   args: {
@@ -300,6 +219,22 @@ export const selfRegister = mutation({
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Rate limit: Check global registration rate
+    const oneMinuteAgo = Date.now() - REGISTRATION_WINDOW_MS
+    const recentAgents = await ctx.db
+      .query('botAgents')
+      .withIndex('by_created_at', (q) => q.gte('createdAt', oneMinuteAgo))
+      .collect()
+
+    if (recentAgents.length >= REGISTRATION_RATE_LIMIT) {
+      return {
+        success: false,
+        error: 'Rate limit exceeded',
+        hint: 'Too many registrations. Please try again in a minute.',
+        retry_after: 60,
+      }
+    }
+
     // Validate name
     if (!args.name || args.name.length < 2 || args.name.length > 50) {
       return {
@@ -309,11 +244,10 @@ export const selfRegister = mutation({
       }
     }
 
-    // Generate API key and claim code
+    // Generate API key
     const apiKey = generateApiKey()
     const apiKeyHash = simpleHash(apiKey)
     const apiKeyPrefix = apiKey.slice(0, 16) + '...'
-    const claimCode = generateClaimCode()
 
     const now = Date.now()
     const agentId = await ctx.db.insert('botAgents', {
@@ -321,8 +255,7 @@ export const selfRegister = mutation({
       description: args.description,
       apiKeyHash,
       apiKeyPrefix,
-      claimCode,
-      status: 'unverified',
+      status: 'verified', // All agents are treated equally
       voteCount: 0,
       createdAt: now,
       updatedAt: now,
@@ -333,12 +266,9 @@ export const selfRegister = mutation({
       agent: {
         id: agentId,
         name: args.name,
-        status: 'unverified',
         api_key: apiKey, // Using snake_case for API consistency
-        claim_code: claimCode,
       },
       important: '⚠️ SAVE YOUR API KEY! You will not see it again.',
-      hint: `To verify your agent, have your human log in to ClawdTM and enter claim code: ${claimCode}`,
     }
   },
 })
@@ -371,8 +301,6 @@ export const validateApiKey = query({
     return {
       id: agent._id,
       name: agent.name,
-      status: agent.status,
-      isVerified: agent.status === 'verified',
       ownerClerkUserId: agent.ownerClerkUserId,
     }
   },
@@ -404,8 +332,6 @@ export const getAgentStatus = query({
       agent: {
         name: agent.name,
         description: agent.description,
-        status: agent.status,
-        is_verified: agent.status === 'verified',
         vote_count: agent.voteCount ?? 0,
         last_active: agent.lastActiveAt,
         created_at: agent.createdAt,
@@ -438,5 +364,21 @@ export const updateAgentActivity = internalMutation({
     }
 
     await ctx.db.patch(args.agentId, updates)
+  },
+})
+
+// Keep claimAgent for backwards compatibility but deprecate it
+// This prevents errors if old code tries to call it
+export const claimAgent = mutation({
+  args: {
+    claimCode: v.string(),
+    clerkId: v.string(),
+  },
+  handler: async () => {
+    return {
+      success: false,
+      error: 'Agent verification has been removed',
+      hint: 'All agents are now equal. No verification needed.',
+    }
   },
 })
