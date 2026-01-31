@@ -9,6 +9,9 @@ const COOKIE_NAME = "staging_auth"
 const PUBLIC_PATHS = [
   '/maintenance',
   '/api/staging-auth',
+  '/api/v1',         // Bot API - has its own auth via API keys
+  '/api/skill.md',   // API documentation
+  '/api/skill.json', // API metadata
   '/_next',
   '/favicon.ico',
   '/icon.png',

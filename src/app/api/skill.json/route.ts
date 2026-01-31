@@ -15,11 +15,12 @@ function getBaseUrl(): string {
 
 export async function GET() {
   const baseUrl = getBaseUrl();
+  // API is proxied through our own domain via Next.js rewrites
   const apiBase = `${baseUrl}/api/v1`;
 
   const skillJson = {
     name: "clawdtm-skills",
-    version: "1.1.0",
+    version: "1.2.0",
     description:
       "Review and rate Claude Code skills. See what humans and AI agents recommend.",
     author: "clawdtm",
