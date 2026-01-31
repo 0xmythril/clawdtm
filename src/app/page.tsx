@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
-import { SearchBar, type SearchBarRef } from "@/components/search-bar";
+import { SearchBar, type SearchBarRef, type ReviewerFilter } from "@/components/search-bar";
 import { SkillCard, type Skill } from "@/components/skill-card";
 import { InstallModal } from "@/components/install-modal";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ function SkillsContent() {
   const urlQuery = searchParams.get("q") ?? "";
   const urlCategory = searchParams.get("category") ?? "all";
   const urlSort = (searchParams.get("sort") as SortOption) ?? "downloads";
+  const urlReviewerFilter = (searchParams.get("reviewer") as ReviewerFilter) ?? "all";
+  const urlMinRating = parseInt(searchParams.get("minRating") ?? "0", 10) || 0;
   const urlTags = useMemo(
     () => searchParams.get("tags")?.split(",").filter(Boolean) ?? [],
     [searchParams]
@@ -76,7 +78,7 @@ function SkillsContent() {
   }, [viewMode]);
 
   // Reset pagination when filters change
-  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}`;
+  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}-${urlReviewerFilter}-${urlMinRating}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
 
   if (filterKey !== lastFilterKey) {
@@ -96,11 +98,19 @@ function SkillsContent() {
     sortBy: urlSort,
     category: urlCategory === "all" ? undefined : urlCategory,
     tags: urlTags.length > 0 ? urlTags : undefined,
+    minRating: urlMinRating > 0 ? urlMinRating : undefined,
+    reviewerFilter: urlReviewerFilter !== "all" ? urlReviewerFilter : undefined,
   });
 
   const searchResult = useQuery(
     api.clawdhubSync.searchCachedSkills,
-    query.trim() ? { query: query.trim(), limit: 50, sortBy: urlSort } : "skip"
+    query.trim() ? { 
+      query: query.trim(), 
+      limit: 50, 
+      sortBy: urlSort,
+      minRating: urlMinRating > 0 ? urlMinRating : undefined,
+      reviewerFilter: urlReviewerFilter !== "all" ? urlReviewerFilter : undefined,
+    } : "skip"
   );
 
   // Get skill IDs for vote fetching
@@ -230,6 +240,20 @@ function SkillsContent() {
     [updateURL]
   );
 
+  const handleReviewerFilterChange = useCallback(
+    (newFilter: ReviewerFilter) => {
+      updateURL({ reviewer: newFilter === "all" ? undefined : newFilter });
+    },
+    [updateURL]
+  );
+
+  const handleMinRatingChange = useCallback(
+    (newRating: number) => {
+      updateURL({ minRating: newRating > 0 ? String(newRating) : undefined });
+    },
+    [updateURL]
+  );
+
   const handleTagToggle = useCallback(
     (tag: string) => {
       const isAdding = !urlTags.includes(tag);
@@ -273,6 +297,8 @@ function SkillsContent() {
         onCategoryChange={handleCategoryChange}
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
+        minRating={urlMinRating}
+        onMinRatingChange={handleMinRatingChange}
       />
 
       {/* Main content */}
@@ -315,6 +341,8 @@ function SkillsContent() {
               setViewMode(mode);
               trackViewModeChange(mode);
             }}
+            reviewerFilter={urlReviewerFilter}
+            onReviewerFilterChange={handleReviewerFilterChange}
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
           />
@@ -422,6 +450,8 @@ function SkillsContent() {
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
         onSearchFocus={handleSearchFocus}
+        minRating={urlMinRating}
+        onMinRatingChange={handleMinRatingChange}
       />
 
       {/* Install modal */}

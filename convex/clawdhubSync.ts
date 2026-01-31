@@ -679,6 +679,12 @@ export const searchCachedSkills = query({
       v.literal('installs'),
       v.literal('rating'),
     )),
+    minRating: v.optional(v.number()),
+    reviewerFilter: v.optional(v.union(
+      v.literal('all'),
+      v.literal('human'),
+      v.literal('bot')
+    )),
   },
   handler: async (ctx, args) => {
     const searchTerm = args.query.trim().toLowerCase()
@@ -688,6 +694,7 @@ export const searchCachedSkills = query({
     
     const limit = args.limit ?? 30
     const sortBy = args.sortBy ?? 'relevance'
+    const reviewerFilter = args.reviewerFilter ?? 'all'
     
     // OPTIMIZATION: Cap the scan to avoid excessive bandwidth
     // For comprehensive search on larger datasets, use Convex search index
@@ -736,32 +743,61 @@ export const searchCachedSkills = query({
       })
       .filter(({ score }) => score > 0)
     
+    // Filter by minimum rating
+    let filtered = scored
+    if (args.minRating !== undefined && args.minRating > 0) {
+      filtered = scored.filter(({ skill }) => {
+        const rating = reviewerFilter === 'human'
+          ? (skill.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (skill.avgRatingBot ?? 0)
+            : (skill.avgRating ?? 0)
+        return rating >= args.minRating!
+      })
+    }
+    
     // Sort based on sortBy parameter
-    let sorted: typeof scored
+    let sorted: typeof filtered
     switch (sortBy) {
       case 'downloads':
-        sorted = scored.sort((a, b) => b.skill.downloads - a.skill.downloads)
+        sorted = filtered.sort((a, b) => b.skill.downloads - a.skill.downloads)
         break
       case 'stars':
-        sorted = scored.sort((a, b) => b.skill.stars - a.skill.stars)
+        sorted = filtered.sort((a, b) => b.skill.stars - a.skill.stars)
         break
       case 'installs':
-        sorted = scored.sort((a, b) => b.skill.installs - a.skill.installs)
+        sorted = filtered.sort((a, b) => b.skill.installs - a.skill.installs)
         break
       case 'rating':
-        sorted = scored.sort((a, b) => {
-          const ratingA = a.skill.avgRating ?? 0
-          const ratingB = b.skill.avgRating ?? 0
+        sorted = filtered.sort((a, b) => {
+          const ratingA = reviewerFilter === 'human'
+            ? (a.skill.avgRatingHuman ?? 0)
+            : reviewerFilter === 'bot'
+              ? (a.skill.avgRatingBot ?? 0)
+              : (a.skill.avgRating ?? 0)
+          const ratingB = reviewerFilter === 'human'
+            ? (b.skill.avgRatingHuman ?? 0)
+            : reviewerFilter === 'bot'
+              ? (b.skill.avgRatingBot ?? 0)
+              : (b.skill.avgRating ?? 0)
           if (ratingB !== ratingA) return ratingB - ratingA
-          const countA = a.skill.reviewCount ?? 0
-          const countB = b.skill.reviewCount ?? 0
+          const countA = reviewerFilter === 'human'
+            ? (a.skill.humanReviewCount ?? 0)
+            : reviewerFilter === 'bot'
+              ? (a.skill.botReviewCount ?? 0)
+              : (a.skill.reviewCount ?? 0)
+          const countB = reviewerFilter === 'human'
+            ? (b.skill.humanReviewCount ?? 0)
+            : reviewerFilter === 'bot'
+              ? (b.skill.botReviewCount ?? 0)
+              : (b.skill.reviewCount ?? 0)
           if (countB !== countA) return countB - countA
           return b.skill.downloads - a.skill.downloads
         })
         break
       case 'relevance':
       default:
-        sorted = scored.sort((a, b) => b.score - a.score)
+        sorted = filtered.sort((a, b) => b.score - a.score)
         break
     }
     
@@ -880,14 +916,21 @@ export const listCachedSkillsWithFilters = query({
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     hasNix: v.optional(v.boolean()),
+    minRating: v.optional(v.number()), // Filter skills with avgRating >= minRating
+    reviewerFilter: v.optional(v.union(
+      v.literal('all'),
+      v.literal('human'),
+      v.literal('bot')
+    )),
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50
     const offset = args.cursor ?? 0
+    const reviewerFilter = args.reviewerFilter ?? 'all'
     
     // OPTIMIZATION: For simple cases (no filters, just sorting), use indexed queries
     // This avoids loading all skills into memory
-    const hasFilters = args.category || (args.tags && args.tags.length > 0) || args.hasNix !== undefined
+    const hasFilters = args.category || (args.tags && args.tags.length > 0) || args.hasNix !== undefined || args.minRating !== undefined
     const sortBy = args.sortBy ?? 'downloads'
     
     let skills
@@ -991,6 +1034,18 @@ export const listCachedSkillsWithFilters = query({
       skills = skills.filter(s => s.hasNix === args.hasNix)
     }
     
+    // Filter by minimum rating
+    if (args.minRating !== undefined && args.minRating > 0) {
+      skills = skills.filter(s => {
+        const rating = reviewerFilter === 'human' 
+          ? (s.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (s.avgRatingBot ?? 0)
+            : (s.avgRating ?? 0)
+        return rating >= args.minRating!
+      })
+    }
+    
     // Sort
     if (args.category === 'latest') {
       // Latest category: sort by most recently updated
@@ -1007,12 +1062,29 @@ export const listCachedSkillsWithFilters = query({
       skills = skills.sort((a, b) => b.installs - a.installs)
     } else if (args.sortBy === 'rating') {
       // Sort by avg rating (highest first), then by review count, then by downloads as tiebreaker
+      // Use the appropriate rating field based on reviewerFilter
       skills = skills.sort((a, b) => {
-        const ratingA = a.avgRating ?? 0
-        const ratingB = b.avgRating ?? 0
+        const ratingA = reviewerFilter === 'human'
+          ? (a.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (a.avgRatingBot ?? 0)
+            : (a.avgRating ?? 0)
+        const ratingB = reviewerFilter === 'human'
+          ? (b.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (b.avgRatingBot ?? 0)
+            : (b.avgRating ?? 0)
         if (ratingB !== ratingA) return ratingB - ratingA
-        const countA = a.reviewCount ?? 0
-        const countB = b.reviewCount ?? 0
+        const countA = reviewerFilter === 'human'
+          ? (a.humanReviewCount ?? 0)
+          : reviewerFilter === 'bot'
+            ? (a.botReviewCount ?? 0)
+            : (a.reviewCount ?? 0)
+        const countB = reviewerFilter === 'human'
+          ? (b.humanReviewCount ?? 0)
+          : reviewerFilter === 'bot'
+            ? (b.botReviewCount ?? 0)
+            : (b.reviewCount ?? 0)
         if (countB !== countA) return countB - countA
         return b.downloads - a.downloads
       })

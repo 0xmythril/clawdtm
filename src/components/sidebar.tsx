@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Logo } from "./logo";
 import { GettingStartedModal } from "./getting-started-modal";
-import { AgentVotingModal } from "./agent-voting-modal";
+import { AgentReviewsModal } from "./agent-reviews-modal";
 import Link from "next/link";
 
 // Tag color palette
@@ -64,6 +64,15 @@ function getTagColor(tag: string): string {
 
 type TagData = { tag: string; count: number };
 
+// Rating filter options
+const RATING_OPTIONS = [
+  { value: 0, label: "Any Rating", icon: null },
+  { value: 5, label: "5 🦞 only", icon: "🦞🦞🦞🦞🦞" },
+  { value: 4, label: "4+ 🦞", icon: "🦞🦞🦞🦞" },
+  { value: 3, label: "3+ 🦞", icon: "🦞🦞🦞" },
+  { value: 2, label: "2+ 🦞", icon: "🦞🦞" },
+];
+
 type SidebarProps = {
   tags: TagData[];
   activeCategory: string;
@@ -71,6 +80,8 @@ type SidebarProps = {
   onCategoryChange: (category: string) => void;
   onTagToggle: (tag: string) => void;
   onClearTags: () => void;
+  minRating?: number;
+  onMinRatingChange?: (rating: number) => void;
 };
 
 export function Sidebar({
@@ -80,6 +91,8 @@ export function Sidebar({
   onCategoryChange,
   onTagToggle,
   onClearTags,
+  minRating = 0,
+  onMinRatingChange,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
@@ -87,6 +100,7 @@ export function Sidebar({
     typeof window !== "undefined" ? window.location.origin : "/";
   const [collapsed, setCollapsed] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(true);
+  const [ratingsOpen, setRatingsOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
@@ -123,11 +137,9 @@ export function Sidebar({
     }
   }, [tagsOpen, mounted]);
 
-  // Fixed categories - no search needed
+  // Fixed categories - no search needed (Featured/Verified hidden until more content)
   const fixedCategories = [
     { name: "all", label: "All", icon: null },
-    { name: "featured", label: "Featured", icon: "⭐" },
-    { name: "verified", label: "Verified", icon: "✓" },
     { name: "latest", label: "Latest", icon: "🆕" },
   ];
 
@@ -215,7 +227,7 @@ export function Sidebar({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <AgentVotingModal
+              <AgentReviewsModal
                 trigger={
                   <button className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
                     collapsed ? "justify-center" : ""
@@ -226,7 +238,7 @@ export function Sidebar({
                 }
               />
             </TooltipTrigger>
-            {collapsed && <TooltipContent side="right">Agent Voting API</TooltipContent>}
+            {collapsed && <TooltipContent side="right">Agent Reviews</TooltipContent>}
           </Tooltip>
         </nav>
 
@@ -274,6 +286,40 @@ export function Sidebar({
                 ))}
               </CollapsibleContent>
             </Collapsible>
+
+            {/* Rating Filter Section */}
+            {onMinRatingChange && (
+              <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-4">
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm">🦞</span>
+                      Min Rating
+                    </span>
+                    {ratingsOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-0.5 mt-1">
+                  {RATING_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => onMinRatingChange(option.value)}
+                      className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                        minRating === option.value
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             {/* Tags Section */}
             <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-4">
