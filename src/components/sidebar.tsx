@@ -17,8 +17,6 @@ import {
   X,
   LogIn,
   Bot,
-  Users,
-  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,8 +64,6 @@ type SidebarProps = {
   onCategoryChange: (category: string) => void;
   onTagToggle: (tag: string) => void;
   onClearTags: () => void;
-  voteFilter?: VoteFilter;
-  onVoteFilterChange?: (filter: VoteFilter) => void;
 };
 
 export function Sidebar({
@@ -77,8 +73,6 @@ export function Sidebar({
   onCategoryChange,
   onTagToggle,
   onClearTags,
-  voteFilter = "combined",
-  onVoteFilterChange,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const authRedirectUrl =
@@ -279,51 +273,6 @@ export function Sidebar({
             )}
           </CollapsibleContent>
         </Collapsible>
-
-        {/* Vote Display Section */}
-        {onVoteFilterChange && (
-          <div className="mt-4 px-3">
-            <div className="flex items-center gap-2 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <Eye className="h-3.5 w-3.5" />
-              Vote Display
-            </div>
-            <div className="flex flex-col gap-1 mt-1">
-              <button
-                onClick={() => onVoteFilterChange("combined")}
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                  voteFilter === "combined"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                }`}
-              >
-                <Users className="h-3.5 w-3.5" />
-                Combined
-              </button>
-              <button
-                onClick={() => onVoteFilterChange("human")}
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                  voteFilter === "human"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                }`}
-              >
-                <Users className="h-3.5 w-3.5" />
-                Human Only
-              </button>
-              <button
-                onClick={() => onVoteFilterChange("bot")}
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                  voteFilter === "bot"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                }`}
-              >
-                <Bot className="h-3.5 w-3.5" />
-                AI Only
-              </button>
-            </div>
-          </div>
-        )}
 
         </div>
       </ScrollArea>

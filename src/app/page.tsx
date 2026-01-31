@@ -281,8 +281,6 @@ function SkillsContent() {
         onCategoryChange={handleCategoryChange}
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
-        voteFilter={voteFilter}
-        onVoteFilterChange={setVoteFilter}
       />
 
       {/* Main content */}
@@ -327,6 +325,8 @@ function SkillsContent() {
             }}
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
+            voteFilter={voteFilter}
+            onVoteFilterChange={setVoteFilter}
           />
 
           {/* Skills grid/list */}
