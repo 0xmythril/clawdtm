@@ -154,3 +154,155 @@
     padding-top: env(safe-area-inset-top, 0);
   }
 }
+
+/* Clerk theme overrides - Light mode (default) */
+.cl-card,
+.cl-modalContent,
+.cl-userButtonPopoverCard {
+  background-color: oklch(1 0 0) !important;
+  border-color: oklch(0.9 0 0) !important;
+}
+
+.cl-headerTitle,
+.cl-formFieldLabel,
+.cl-identityPreviewText,
+.cl-userButtonPopoverActionButtonText,
+.cl-userPreviewMainIdentifier,
+.cl-userPreviewSecondaryIdentifier,
+.cl-formFieldInputShowPasswordButton,
+.cl-otpCodeFieldInput,
+.cl-selectButton__countryCode,
+.cl-formFieldSuccessText {
+  color: oklch(0.145 0 0) !important;
+}
+
+.cl-headerSubtitle,
+.cl-footerActionText,
+.cl-dividerText,
+.cl-formFieldHintText {
+  color: oklch(0.5 0 0) !important;
+}
+
+.cl-socialButtonsBlockButton,
+.cl-identityPreview {
+  background-color: oklch(0.96 0 0) !important;
+  border-color: oklch(0.9 0 0) !important;
+  color: oklch(0.145 0 0) !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: oklch(0.94 0 0) !important;
+}
+
+.cl-socialButtonsBlockButtonText {
+  color: oklch(0.145 0 0) !important;
+}
+
+.cl-formFieldInput,
+.cl-phoneNumberInput {
+  background-color: oklch(0.985 0 0) !important;
+  border-color: oklch(0.9 0 0) !important;
+  color: oklch(0.145 0 0) !important;
+}
+
+.cl-formButtonPrimary {
+  background-color: oklch(0.55 0.2 260) !important;
+  color: oklch(0.985 0 0) !important;
+}
+
+.cl-formButtonPrimary:hover {
+  background-color: oklch(0.5 0.2 260) !important;
+}
+
+.cl-footerActionLink,
+.cl-identityPreviewEditButton {
+  color: oklch(0.55 0.2 260) !important;
+}
+
+.cl-dividerLine {
+  background-color: oklch(0.9 0 0) !important;
+}
+
+.cl-userButtonPopoverActionButton:hover {
+  background-color: oklch(0.96 0 0) !important;
+}
+
+.cl-internal-b3fm6y {
+  color: oklch(0.145 0 0) !important;
+}
+
+/* Clerk theme overrides - Dark mode */
+.dark .cl-card,
+.dark .cl-modalContent,
+.dark .cl-userButtonPopoverCard {
+  background-color: oklch(0.16 0.005 260) !important;
+  border-color: oklch(0.28 0.005 260) !important;
+}
+
+.dark .cl-headerTitle,
+.dark .cl-formFieldLabel,
+.dark .cl-identityPreviewText,
+.dark .cl-userButtonPopoverActionButtonText,
+.dark .cl-userPreviewMainIdentifier,
+.dark .cl-userPreviewSecondaryIdentifier,
+.dark .cl-formFieldInputShowPasswordButton,
+.dark .cl-otpCodeFieldInput,
+.dark .cl-selectButton__countryCode,
+.dark .cl-formFieldSuccessText {
+  color: oklch(0.95 0 0) !important;
+}
+
+.dark .cl-headerSubtitle,
+.dark .cl-footerActionText,
+.dark .cl-dividerText,
+.dark .cl-formFieldHintText {
+  color: oklch(0.65 0 0) !important;
+}
+
+.dark .cl-socialButtonsBlockButton,
+.dark .cl-identityPreview {
+  background-color: oklch(0.22 0.005 260) !important;
+  border-color: oklch(0.28 0.005 260) !important;
+  color: oklch(0.95 0 0) !important;
+}
+
+.dark .cl-socialButtonsBlockButton:hover {
+  background-color: oklch(0.25 0.005 260) !important;
+}
+
+.dark .cl-socialButtonsBlockButtonText {
+  color: oklch(0.95 0 0) !important;
+}
+
+.dark .cl-formFieldInput,
+.dark .cl-phoneNumberInput {
+  background-color: oklch(0.18 0.005 260) !important;
+  border-color: oklch(0.28 0.005 260) !important;
+  color: oklch(0.95 0 0) !important;
+}
+
+.dark .cl-formButtonPrimary {
+  background-color: oklch(0.65 0.2 260) !important;
+  color: oklch(0.98 0 0) !important;
+}
+
+.dark .cl-formButtonPrimary:hover {
+  background-color: oklch(0.6 0.2 260) !important;
+}
+
+.dark .cl-footerActionLink,
+.dark .cl-identityPreviewEditButton {
+  color: oklch(0.65 0.2 260) !important;
+}
+
+.dark .cl-dividerLine {
+  background-color: oklch(0.28 0.005 260) !important;
+}
+
+.dark .cl-userButtonPopoverActionButton:hover {
+  background-color: oklch(0.22 0.005 260) !important;
+}
+
+.dark .cl-internal-b3fm6y {
+  color: oklch(0.95 0 0) !important;
+}

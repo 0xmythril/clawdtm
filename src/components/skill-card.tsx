@@ -4,7 +4,9 @@ import { Star, Download, Terminal, ExternalLink, BadgeCheck } from "lucide-react
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { VoteButtons } from "@/components/vote-buttons";
 import { trackExternalLink } from "@/lib/analytics";
+import type { Id } from "../../convex/_generated/dataModel";
 
 // Tag color palette
 const TAG_COLORS = [
@@ -42,21 +44,40 @@ export type Skill = {
   category?: string;
   normalizedTags?: string[];
   isVerified?: boolean;
+  // ClawdTM vote counts
+  clawdtmUpvotes?: number;
+  clawdtmDownvotes?: number;
 };
 
 type SkillCardProps = {
   skill: Skill;
   onInstall: (skill: Skill) => void;
   variant?: "card" | "list";
+  // User's current vote for this skill
+  userVote?: "up" | "down" | null;
 };
 
-export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps) {
+export function SkillCard({ skill, onInstall, variant = "card", userVote }: SkillCardProps) {
   const tags = skill.normalizedTags?.slice(0, 3) ?? [];
+  const upvotes = skill.clawdtmUpvotes ?? 0;
+  const downvotes = skill.clawdtmDownvotes ?? 0;
 
   if (variant === "list") {
     return (
       <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20">
         <CardContent className="p-4 flex gap-4 items-start">
+          {/* Vote buttons */}
+          <div className="shrink-0">
+            <VoteButtons
+              skillId={skill._id as Id<"cachedSkills">}
+              upvotes={upvotes}
+              downvotes={downvotes}
+              userVote={userVote ?? null}
+              variant="vertical"
+              size="sm"
+            />
+          </div>
+
           {/* Left: Main content */}
           <div className="flex-1 min-w-0">
             {/* Header */}
@@ -145,85 +166,102 @@ export function SkillCard({ skill, onInstall, variant = "card" }: SkillCardProps
   return (
     <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20">
       <CardContent className="p-4">
-        {/* Header: Name + Category */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
-              {skill.name || skill.slug}
-              {skill.isVerified && (
-                <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-              )}
-            </h3>
-            <p className="text-xs text-muted-foreground truncate">
-              /{skill.slug} · by {skill.author}
-            </p>
-          </div>
-          {skill.category && (
-            <Badge variant="secondary" className="text-xs shrink-0">
-              {skill.category}
-            </Badge>
-          )}
-        </div>
-
-        {/* Description */}
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem]">
-          {skill.description || "Agent-ready skill pack for Claude Code."}
-        </p>
-
-        {/* Tags */}
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="outline"
-                className={`text-xs px-2 py-0.5 border-0 ${getTagColor(tag)}`}
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        {/* Stats row */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-          <div className="flex items-center gap-1" title="Stars">
-            <Star className="h-3.5 w-3.5" />
-            <span>{skill.stars}</span>
-          </div>
-          <div className="flex items-center gap-1" title="Downloads">
-            <Download className="h-3.5 w-3.5" />
-            <span>{skill.downloads}</span>
-          </div>
-          {skill.installs > 0 && (
-            <div className="flex items-center gap-1" title="Installs">
-              <Terminal className="h-3.5 w-3.5" />
-              <span>{skill.installs}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="flex-1"
-            onClick={() => onInstall(skill)}
-          >
-            Install
-          </Button>
-            <Button
+        <div className="flex gap-3">
+          {/* Vote buttons */}
+          <div className="shrink-0">
+            <VoteButtons
+              skillId={skill._id as Id<"cachedSkills">}
+              upvotes={upvotes}
+              downvotes={downvotes}
+              userVote={userVote ?? null}
+              variant="vertical"
               size="sm"
-              variant="outline"
-              onClick={() => {
-                trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "skill_detail");
-                window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
-              }}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
+            />
           </div>
-        </CardContent>
-      </Card>
-    );
-  }
+
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Header: Name + Category */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
+                  {skill.name || skill.slug}
+                  {skill.isVerified && (
+                    <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                  )}
+                </h3>
+                <p className="text-xs text-muted-foreground truncate">
+                  /{skill.slug} · by {skill.author}
+                </p>
+              </div>
+              {skill.category && (
+                <Badge variant="secondary" className="text-xs shrink-0">
+                  {skill.category}
+                </Badge>
+              )}
+            </div>
+
+            {/* Description */}
+            <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem]">
+              {skill.description || "Agent-ready skill pack for Claude Code."}
+            </p>
+
+            {/* Tags */}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className={`text-xs px-2 py-0.5 border-0 ${getTagColor(tag)}`}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Stats row */}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+              <div className="flex items-center gap-1" title="Stars">
+                <Star className="h-3.5 w-3.5" />
+                <span>{skill.stars}</span>
+              </div>
+              <div className="flex items-center gap-1" title="Downloads">
+                <Download className="h-3.5 w-3.5" />
+                <span>{skill.downloads}</span>
+              </div>
+              {skill.installs > 0 && (
+                <div className="flex items-center gap-1" title="Installs">
+                  <Terminal className="h-3.5 w-3.5" />
+                  <span>{skill.installs}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={() => onInstall(skill)}
+              >
+                Install
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "skill_detail");
+                  window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

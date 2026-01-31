@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle } from "lucide-react";
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -66,6 +67,8 @@ export function MobileNav({
   onSearchFocus,
 }: MobileNavProps) {
   const { theme, setTheme } = useTheme();
+  const authRedirectUrl =
+    typeof window !== "undefined" ? window.location.origin : "/";
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
@@ -254,6 +257,42 @@ export function MobileNav({
                 {/* Logo */}
                 <div className="flex justify-center pb-2">
                   <Logo />
+                </div>
+
+                {/* Auth section */}
+                <div className="pb-2 border-b border-border/40">
+                  <SignedOut>
+                    <SignInButton
+                      mode="modal"
+                      redirectUrl={authRedirectUrl}
+                      afterSignInUrl={authRedirectUrl}
+                      afterSignUpUrl={authRedirectUrl}
+                    >
+                      <Button
+                        variant="default"
+                        className="w-full justify-start gap-3 h-12 text-sm"
+                      >
+                        <LogIn className="h-5 w-5" />
+                        <span className="flex-1 text-left">Sign In to Vote</span>
+                      </Button>
+                    </SignInButton>
+                  </SignedOut>
+                  <SignedIn>
+                    <div className="flex items-center gap-3 px-3 py-2 bg-muted rounded-xl">
+                      <UserButton 
+                        afterSignOutUrl="/"
+                        appearance={{
+                          elements: {
+                            avatarBox: "h-10 w-10",
+                          },
+                        }}
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Signed in</p>
+                        <p className="text-xs text-muted-foreground">Click avatar to manage</p>
+                      </div>
+                    </div>
+                  </SignedIn>
                 </div>
 
                 {/* Getting Started */}

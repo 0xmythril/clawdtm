@@ -677,6 +677,7 @@ export const searchCachedSkills = query({
       v.literal('downloads'),
       v.literal('stars'),
       v.literal('installs'),
+      v.literal('votes'),
     )),
   },
   handler: async (ctx, args) => {
@@ -746,6 +747,14 @@ export const searchCachedSkills = query({
         break
       case 'installs':
         sorted = scored.sort((a, b) => b.skill.installs - a.skill.installs)
+        break
+      case 'votes':
+        sorted = scored.sort((a, b) => {
+          const netA = (a.skill.clawdtmUpvotes ?? 0) - (a.skill.clawdtmDownvotes ?? 0)
+          const netB = (b.skill.clawdtmUpvotes ?? 0) - (b.skill.clawdtmDownvotes ?? 0)
+          if (netB !== netA) return netB - netA
+          return b.skill.downloads - a.skill.downloads
+        })
         break
       case 'relevance':
       default:
@@ -880,7 +889,8 @@ export const listCachedSkillsWithFilters = query({
       v.literal('downloads'),
       v.literal('stars'),
       v.literal('installs'),
-      v.literal('recent')
+      v.literal('recent'),
+      v.literal('votes')
     )),
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -1010,6 +1020,14 @@ export const listCachedSkillsWithFilters = query({
       skills = skills.sort((a, b) => b.stars - a.stars)
     } else if (args.sortBy === 'installs') {
       skills = skills.sort((a, b) => b.installs - a.installs)
+    } else if (args.sortBy === 'votes') {
+      // Sort by net vote score (upvotes - downvotes), then by downloads as tiebreaker
+      skills = skills.sort((a, b) => {
+        const netA = (a.clawdtmUpvotes ?? 0) - (a.clawdtmDownvotes ?? 0)
+        const netB = (b.clawdtmUpvotes ?? 0) - (b.clawdtmDownvotes ?? 0)
+        if (netB !== netA) return netB - netA
+        return b.downloads - a.downloads
+      })
     }
     
     // Total count before pagination
