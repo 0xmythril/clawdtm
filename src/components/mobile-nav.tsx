@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, User, LogIn } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -264,9 +264,8 @@ export function MobileNav({
                   <SignedOut>
                     <SignInButton
                       mode="modal"
-                      redirectUrl={authRedirectUrl}
-                      afterSignInUrl={authRedirectUrl}
-                      afterSignUpUrl={authRedirectUrl}
+                      forceRedirectUrl={authRedirectUrl}
+                      signUpForceRedirectUrl={authRedirectUrl}
                     >
                       <Button
                         variant="default"
@@ -355,7 +354,7 @@ export function MobileNav({
                   asChild
                 >
                   <a
-                    href="https://discord.gg/openclaw"
+                    href="https://discord.gg/eTtG4rhbp6"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

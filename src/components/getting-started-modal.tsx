@@ -8,7 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { HelpCircle, Search, SlidersHorizontal, Download, ExternalLink, Terminal } from "lucide-react";
+import { Search, SlidersHorizontal, ExternalLink, Terminal } from "lucide-react";
 
 type GettingStartedModalProps = {
   trigger?: React.ReactNode;

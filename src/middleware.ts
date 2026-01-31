@@ -1,12 +1,8 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { clerkMiddleware } from '@clerk/nextjs/server'
 
-// All routes are public - users can browse without signing in
-// Auth is only required for voting
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)'])
-
-export default clerkMiddleware(async (auth, request) => {
-  // All routes are public, but auth state is available everywhere
-  // Protected actions (voting) check auth in the Convex mutations
+export default clerkMiddleware(() => {
+  // All routes are public; auth state is available for client components.
+  // Protected actions (voting) check auth in Convex mutations.
 })
 
 export const config = {
