@@ -15,6 +15,7 @@ const SORT_OPTIONS = [
   { value: "downloads", label: "Most Downloaded" },
   { value: "stars", label: "Most Starred" },
   { value: "installs", label: "Most Installed" },
+  { value: "votes", label: "Most Voted" },
 ] as const;
 
 type SortOption = (typeof SORT_OPTIONS)[number]["value"];

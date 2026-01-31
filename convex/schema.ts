@@ -405,6 +405,10 @@ const cachedSkills = defineTable({
   hidden: v.optional(v.boolean()),
   hiddenReason: v.optional(v.string()),
   hiddenAt: v.optional(v.number()),
+  
+  // ClawdTM-specific vote counts (separate from ClawdHub stats)
+  clawdtmUpvotes: v.optional(v.number()),
+  clawdtmDownvotes: v.optional(v.number()),
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -437,6 +441,29 @@ const clawdhubSyncState = defineTable({
   tagCounts: v.optional(v.any()), // [{ tag, count }]
   totalVisible: v.optional(v.number()),
 }).index('by_key', ['key'])
+
+// Clerk users (synced from Clerk via webhook)
+const clerkUsers = defineTable({
+  clerkId: v.string(),
+  email: v.optional(v.string()),
+  name: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index('by_clerk_id', ['clerkId'])
+
+// Votes on cached skills (ClawdTM-specific, requires Clerk auth)
+const cachedSkillVotes = defineTable({
+  cachedSkillId: v.id('cachedSkills'),
+  clerkUserId: v.id('clerkUsers'),
+  vote: v.union(v.literal('up'), v.literal('down')),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index('by_skill', ['cachedSkillId'])
+  .index('by_user', ['clerkUserId'])
+  .index('by_skill_user', ['cachedSkillId', 'clerkUserId'])
 
 // AI categorization logs
 const categorizationLogs = defineTable({
@@ -495,5 +522,7 @@ export default defineSchema({
   userSkillRootInstalls,
   cachedSkills,
   clawdhubSyncState,
+  clerkUsers,
+  cachedSkillVotes,
   categorizationLogs,
 })

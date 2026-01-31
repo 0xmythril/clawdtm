@@ -2,6 +2,7 @@
 
 import { useTheme } from "next-themes";
 import { useState, useEffect, useMemo } from "react";
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import {
   Sparkles,
   FileText,
@@ -16,6 +17,7 @@ import {
   HelpCircle,
   Search,
   X,
+  LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -290,6 +292,31 @@ export function Sidebar({
 
       {/* Footer */}
       <div className="p-3 border-t border-border/40 space-y-3 flex-shrink-0">
+        {/* Auth section */}
+        <div className="flex items-center gap-2">
+          <SignedOut>
+            <SignInButton mode="modal">
+              <Button variant="outline" size="sm" className="flex-1 justify-start gap-2 h-9">
+                <LogIn className="h-4 w-4" />
+                <span className="text-sm">Sign In to Vote</span>
+              </Button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <div className="flex items-center gap-2 flex-1">
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "h-8 w-8",
+                  },
+                }}
+              />
+              <span className="text-sm text-muted-foreground">Signed in</span>
+            </div>
+          </SignedIn>
+        </div>
+
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"

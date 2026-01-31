@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { Sidebar } from "@/components/sidebar";
@@ -12,6 +13,7 @@ import { InstallModal } from "@/components/install-modal";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Logo } from "@/components/logo";
+import type { Id } from "../../convex/_generated/dataModel";
 import {
   trackSearch,
   trackCategoryFilter,
@@ -23,7 +25,7 @@ import {
   trackExternalLink,
 } from "@/lib/analytics";
 
-type SortOption = "downloads" | "stars" | "installs";
+type SortOption = "downloads" | "stars" | "installs" | "votes";
 type ViewMode = "card" | "list";
 
 // Loading fallback for Suspense
@@ -43,6 +45,7 @@ function SkillsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchBarRef = useRef<SearchBarRef>(null);
+  const { user, isLoaded: userLoaded } = useUser();
 
   // URL state
   const urlQuery = searchParams.get("q") ?? "";
@@ -97,6 +100,22 @@ function SkillsContent() {
     query.trim() ? { query: query.trim(), limit: 50, sortBy: urlSort } : "skip"
   );
 
+  // Get skill IDs for vote fetching
+  const skillIds = useMemo(() => {
+    if (query.trim() && searchResult?.skills) {
+      return searchResult.skills.map((s) => s._id as Id<"cachedSkills">);
+    }
+    return allSkills.map((s) => s._id as Id<"cachedSkills">);
+  }, [allSkills, searchResult, query]);
+
+  // Fetch user votes for visible skills
+  const userVotes = useQuery(
+    api.voting.getUserVotesForSkills,
+    userLoaded && user && skillIds.length > 0
+      ? { cachedSkillIds: skillIds, clerkId: user.id }
+      : "skip"
+  );
+
   // Accumulate skills for infinite scroll
   useEffect(() => {
     if (!cachedResult?.skills) return;
@@ -116,6 +135,8 @@ function SkillsContent() {
       category: s.category,
       normalizedTags: s.normalizedTags,
       isVerified: VERIFIED_SLUGS.has(s.slug),
+      clawdtmUpvotes: s.clawdtmUpvotes,
+      clawdtmDownvotes: s.clawdtmDownvotes,
     }));
 
     if (cursor === 0) {
@@ -145,6 +166,8 @@ function SkillsContent() {
         stars: s.stars,
         installs: s.installs,
         isVerified: VERIFIED_SLUGS.has(s.slug),
+        clawdtmUpvotes: s.clawdtmUpvotes,
+        clawdtmDownvotes: s.clawdtmDownvotes,
       }));
     }
     return allSkills;
@@ -328,6 +351,7 @@ function SkillsContent() {
                       skill={skill}
                       onInstall={handleInstall}
                       variant={viewMode}
+                      userVote={userVotes?.[skill._id] ?? null}
                     />
                   ))}
                 </div>
