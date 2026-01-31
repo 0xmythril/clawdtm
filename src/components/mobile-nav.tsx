@@ -264,8 +264,8 @@ export function MobileNav({
                   <SignedOut>
                     <SignInButton
                       mode="modal"
-                      afterSignInUrl={authRedirectUrl}
-                      afterSignUpUrl={authRedirectUrl}
+                      forceRedirectUrl={authRedirectUrl}
+                      signUpForceRedirectUrl={authRedirectUrl}
                     >
                       <Button
                         variant="default"

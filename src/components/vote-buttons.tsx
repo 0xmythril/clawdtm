@@ -132,8 +132,8 @@ export function VoteButtons({
       )}>
         <SignInButton
           mode="modal"
-          afterSignInUrl={authRedirectUrl}
-          afterSignUpUrl={authRedirectUrl}
+          forceRedirectUrl={authRedirectUrl}
+          signUpForceRedirectUrl={authRedirectUrl}
         >
           <Button
             variant="ghost"
@@ -149,8 +149,8 @@ export function VoteButtons({
         </span>
         <SignInButton
           mode="modal"
-          afterSignInUrl={authRedirectUrl}
-          afterSignUpUrl={authRedirectUrl}
+          forceRedirectUrl={authRedirectUrl}
+          signUpForceRedirectUrl={authRedirectUrl}
         >
           <Button
             variant="ghost"

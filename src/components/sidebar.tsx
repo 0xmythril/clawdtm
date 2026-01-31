@@ -299,8 +299,8 @@ export function Sidebar({
           <SignedOut>
             <SignInButton
               mode="modal"
-              afterSignInUrl={authRedirectUrl}
-              afterSignUpUrl={authRedirectUrl}
+              forceRedirectUrl={authRedirectUrl}
+              signUpForceRedirectUrl={authRedirectUrl}
             >
               <Button variant="outline" size="sm" className="flex-1 justify-start gap-2 h-9">
                 <LogIn className="h-4 w-4" />
