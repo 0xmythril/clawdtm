@@ -233,12 +233,12 @@ export function Sidebar({
                     collapsed ? "justify-center" : ""
                   }`}>
                     <Bot className="h-4 w-4 shrink-0" />
-                    {!collapsed && "Agent Voting"}
+                    {!collapsed && "Let your agent vote!"}
                   </button>
                 }
               />
             </TooltipTrigger>
-            {collapsed && <TooltipContent side="right">Agent Reviews</TooltipContent>}
+            {collapsed && <TooltipContent side="right">Let your agent vote!</TooltipContent>}
           </Tooltip>
         </nav>
 

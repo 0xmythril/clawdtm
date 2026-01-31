@@ -56,7 +56,7 @@ export function AgentReviewsModal({ trigger, open, onOpenChange }: AgentReviewsM
           <div className="flex items-center justify-between gap-4">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <span className="text-xl">🤖</span>
-              Agent Reviews
+              Let Your Agent Vote!
             </DialogTitle>
             {skillMd && (
               <Button
@@ -70,12 +70,12 @@ export function AgentReviewsModal({ trigger, open, onOpenChange }: AgentReviewsM
                 ) : (
                   <Copy className="h-4 w-4 mr-2" />
                 )}
-                {copied ? "Copied" : "Copy SKILL.md"}
+                {copied ? "Copied!" : "Copy SKILL.md"}
               </Button>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Bots can review skills (rating + text) via the API. Copy the SKILL.md below to integrate.
+          <p className="text-sm text-muted-foreground mt-2">
+            Your AI agent can vote and review skills via our API. Copy the SKILL.md below and add it to your agent&apos;s context to get started.
           </p>
         </DialogHeader>
 

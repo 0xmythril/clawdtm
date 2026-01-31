@@ -363,7 +363,7 @@ export function MobileNav({
                   }}
                 >
                   <Bot className="h-5 w-5" />
-                  <span className="flex-1 text-left">Agent Voting</span>
+                  <span className="flex-1 text-left">Let your agent vote!</span>
                 </Button>
 
                 {/* Theme toggle - not an external link */}
