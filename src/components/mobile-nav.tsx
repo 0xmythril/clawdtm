@@ -356,14 +356,17 @@ export function MobileNav({
                 {/* Agent Reviews */}
                 <Button
                   variant="outline"
-                  className="w-full justify-start gap-3 h-12 text-sm"
+                  className="w-full justify-start gap-3 h-auto py-3 text-sm"
                   onClick={() => {
                     setSettingsOpen(false);
                     setAgentReviewsOpen(true);
                   }}
                 >
                   <Bot className="h-5 w-5" />
-                  <span className="flex-1 text-left">Let your agent vote!</span>
+                  <span className="flex-1 text-left flex flex-col leading-tight">
+                    <span>Let your agent vote!</span>
+                    <span className="text-xs text-muted-foreground">(Skill.md)</span>
+                  </span>
                 </Button>
 
                 {/* Theme toggle - not an external link */}
