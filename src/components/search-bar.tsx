@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, LayoutGrid, List, ChevronDown } from "lucide-react";
+import { Search, X, LayoutGrid, List, ChevronDown, Users, Bot, Globe } from "lucide-react";
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const SORT_OPTIONS = [
-  { value: "downloads", label: "Most Downloaded" },
-  { value: "stars", label: "Most Starred" },
-  { value: "installs", label: "Most Installed" },
-  { value: "votes", label: "Most Voted" },
+  { value: "downloads", label: "Downloads", symbol: "↓" },
+  { value: "stars", label: "Stars", symbol: "★" },
+  { value: "installs", label: "Installs", symbol: "⬇" },
+  { value: "rating", label: "Rating", symbol: "🦞" },
 ] as const;
 
-type SortOption = (typeof SORT_OPTIONS)[number]["value"];
+const REVIEWER_FILTER_OPTIONS = [
+  { value: "all", label: "All Reviews", symbol: "🌐", icon: Globe },
+  { value: "human", label: "Human", symbol: "👤", icon: Users },
+  { value: "bot", label: "AI", symbol: "🤖", icon: Bot },
+] as const;
+
+export type SortOption = (typeof SORT_OPTIONS)[number]["value"];
+export type ReviewerFilter = (typeof REVIEWER_FILTER_OPTIONS)[number]["value"];
 type ViewMode = "card" | "list";
 
 type SearchBarProps = {
@@ -28,6 +35,8 @@ type SearchBarProps = {
   onSortChange: (sort: SortOption) => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  reviewerFilter?: ReviewerFilter;
+  onReviewerFilterChange?: (filter: ReviewerFilter) => void;
   isSearching?: boolean;
   resultCount?: number;
 };
@@ -45,6 +54,8 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       onSortChange,
       viewMode,
       onViewModeChange,
+      reviewerFilter = "all",
+      onReviewerFilterChange,
       isSearching,
       resultCount,
     },
@@ -79,7 +90,8 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       inputRef.current?.focus();
     };
 
-    const activeSortLabel = SORT_OPTIONS.find((o) => o.value === activeSort)?.label;
+    const activeSort$ = SORT_OPTIONS.find((o) => o.value === activeSort);
+    const activeReviewerFilter$ = REVIEWER_FILTER_OPTIONS.find((o) => o.value === reviewerFilter);
 
     return (
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40 -mx-4 px-4 py-3 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -106,13 +118,38 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
             )}
           </div>
 
+          {/* Reviewer filter dropdown */}
+          {onReviewerFilterChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="shrink-0 gap-1 h-10 cursor-pointer px-2.5">
+                  <span>{activeReviewerFilter$?.symbol}</span>
+                  <span className="hidden sm:inline">{activeReviewerFilter$?.label}</span>
+                  <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {REVIEWER_FILTER_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => onReviewerFilterChange(option.value)}
+                    className={`cursor-pointer gap-2 ${reviewerFilter === option.value ? "bg-accent" : ""}`}
+                  >
+                    <span>{option.symbol}</span>
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Sort dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="shrink-0 gap-1.5 h-10">
-                <span className="hidden sm:inline">{activeSortLabel}</span>
-                <span className="sm:hidden">Sort</span>
-                <ChevronDown className="h-4 w-4 opacity-50" />
+              <Button variant="outline" className="shrink-0 gap-1 h-10 cursor-pointer px-2.5">
+                <span>{activeSort$?.symbol}</span>
+                <span className="hidden sm:inline">{activeSort$?.label}</span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -120,8 +157,9 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
                 <DropdownMenuItem
                   key={option.value}
                   onClick={() => onSortChange(option.value)}
-                  className={activeSort === option.value ? "bg-accent" : ""}
+                  className={`cursor-pointer gap-2 ${activeSort === option.value ? "bg-accent" : ""}`}
                 >
+                  <span>{option.symbol}</span>
                   {option.label}
                 </DropdownMenuItem>
               ))}

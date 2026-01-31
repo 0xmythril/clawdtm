@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, ArrowBigUp, ArrowBigDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -32,60 +32,65 @@ export function VoteButtons({
   const voteMutation = useMutation(api.voting.vote);
   const removeVoteMutation = useMutation(api.voting.removeVote);
 
-  // Optimistic state
-  const [optimisticVote, setOptimisticVote] = useState<"up" | "down" | null | undefined>(undefined);
-  const [optimisticDelta, setOptimisticDelta] = useState({ up: 0, down: 0 });
+  // Optimistic state - track pending vote only while request is in flight
+  const [pendingVote, setPendingVote] = useState<"up" | "down" | null | undefined>(undefined);
   const [isVoting, setIsVoting] = useState(false);
+  const lastUserVote = useRef(userVote);
 
-  const currentVote = optimisticVote !== undefined ? optimisticVote : userVote;
-  const netScore = upvotes - downvotes + optimisticDelta.up - optimisticDelta.down;
+  // Reset pending state when real data arrives from server
+  useEffect(() => {
+    if (userVote !== lastUserVote.current) {
+      // Server data updated, clear any pending optimistic state
+      setPendingVote(undefined);
+      setIsVoting(false);
+      lastUserVote.current = userVote;
+    }
+  }, [userVote]);
+
+  // Use pending vote if we're in the middle of a request, otherwise use server truth
+  const displayVote = pendingVote !== undefined ? pendingVote : userVote;
+  
+  // Calculate score based on server data, only adjust if we have a pending change
+  let netScore = upvotes - downvotes;
+  if (pendingVote !== undefined && pendingVote !== userVote) {
+    // We have a pending change that differs from server state
+    if (userVote === "up") netScore -= 1;
+    if (userVote === "down") netScore += 1;
+    if (pendingVote === "up") netScore += 1;
+    if (pendingVote === "down") netScore -= 1;
+  }
 
   const handleVote = async (voteType: "up" | "down") => {
     if (!user || !isLoaded) return;
     if (isVoting) return;
 
     setIsVoting(true);
+    
+    // Determine the new vote state
+    const newVote = displayVote === voteType ? null : voteType;
+    setPendingVote(newVote);
 
     try {
-      if (currentVote === voteType) {
+      if (newVote === null) {
         // Remove vote (clicking same button again)
-        setOptimisticVote(null);
-        setOptimisticDelta((prev) => ({
-          up: voteType === "up" ? prev.up - 1 : prev.up,
-          down: voteType === "down" ? prev.down - 1 : prev.down,
-        }));
-
         await removeVoteMutation({
           cachedSkillId: skillId,
           clerkId: user.id,
         });
       } else {
         // Add or change vote
-        const oldVote = currentVote;
-        setOptimisticVote(voteType);
-        setOptimisticDelta((prev) => ({
-          up:
-            prev.up +
-            (voteType === "up" ? 1 : 0) -
-            (oldVote === "up" ? 1 : 0),
-          down:
-            prev.down +
-            (voteType === "down" ? 1 : 0) -
-            (oldVote === "down" ? 1 : 0),
-        }));
-
         await voteMutation({
           cachedSkillId: skillId,
           clerkId: user.id,
-          vote: voteType,
+          vote: newVote,
         });
       }
+      // Note: we don't clear pendingVote here - the useEffect will do it
+      // when the real userVote prop updates from the server
     } catch (error) {
       // Revert optimistic updates on error
       console.error("Vote failed:", error);
-      setOptimisticVote(undefined);
-      setOptimisticDelta({ up: 0, down: 0 });
-    } finally {
+      setPendingVote(undefined);
       setIsVoting(false);
     }
   };
@@ -138,7 +143,7 @@ export function VoteButtons({
           <Button
             variant="ghost"
             size="icon"
-            className={cn(buttonSize, "text-muted-foreground hover:text-green-500")}
+            className={cn(buttonSize, "cursor-pointer text-muted-foreground hover:text-green-500 hover:bg-green-500/10 transition-colors")}
             title="Sign in to upvote"
           >
             <ChevronUp className={iconSize} />
@@ -155,7 +160,7 @@ export function VoteButtons({
           <Button
             variant="ghost"
             size="icon"
-            className={cn(buttonSize, "text-muted-foreground hover:text-red-500")}
+            className={cn(buttonSize, "cursor-pointer text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors")}
             title="Sign in to downvote"
           >
             <ChevronDown className={iconSize} />
@@ -164,6 +169,10 @@ export function VoteButtons({
       </div>
     );
   }
+
+  // Use filled arrows when voted for clearer visual feedback (like Reddit)
+  const UpIcon = displayVote === "up" ? ArrowBigUp : ChevronUp;
+  const DownIcon = displayVote === "down" ? ArrowBigDown : ChevronDown;
 
   return (
     <div className={cn(
@@ -175,20 +184,21 @@ export function VoteButtons({
         size="icon"
         className={cn(
           buttonSize,
-          currentVote === "up"
-            ? "text-green-500 bg-green-500/10"
+          "cursor-pointer transition-all duration-150",
+          displayVote === "up"
+            ? "text-green-500 bg-green-500/20 scale-110"
             : "text-muted-foreground hover:text-green-500 hover:bg-green-500/10"
         )}
         onClick={() => handleVote("up")}
         disabled={isVoting}
-        title="Upvote"
+        title={displayVote === "up" ? "Click to remove upvote" : "Upvote"}
       >
-        <ChevronUp className={iconSize} />
+        <UpIcon className={cn(iconSize, displayVote === "up" && "fill-current")} />
       </Button>
       <span
         className={cn(
           scoreSize,
-          "font-medium tabular-nums min-w-[1.5rem] text-center",
+          "font-medium tabular-nums min-w-[1.5rem] text-center transition-colors",
           netScore > 0 && "text-green-500",
           netScore < 0 && "text-red-500",
           netScore === 0 && "text-muted-foreground"
@@ -201,15 +211,16 @@ export function VoteButtons({
         size="icon"
         className={cn(
           buttonSize,
-          currentVote === "down"
-            ? "text-red-500 bg-red-500/10"
+          "cursor-pointer transition-all duration-150",
+          displayVote === "down"
+            ? "text-red-500 bg-red-500/20 scale-110"
             : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
         )}
         onClick={() => handleVote("down")}
         disabled={isVoting}
-        title="Downvote"
+        title={displayVote === "down" ? "Click to remove downvote" : "Downvote"}
       >
-        <ChevronDown className={iconSize} />
+        <DownIcon className={cn(iconSize, displayVote === "down" && "fill-current")} />
       </Button>
     </div>
   );

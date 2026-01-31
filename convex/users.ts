@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { internalMutation, internalQuery, query } from './_generated/server'
+import { internalMutation, internalQuery, mutation, query } from './_generated/server'
 
 // ============================================
 // Internal Mutations (called by webhook)
@@ -58,7 +58,7 @@ export const deleteByClerkId = internalMutation({
       // Also delete their votes
       const votes = await ctx.db
         .query('cachedSkillVotes')
-        .withIndex('by_user', (q) => q.eq('clerkUserId', user._id))
+        .withIndex('by_human_user', (q) => q.eq('clerkUserId', user._id))
         .collect()
 
       for (const vote of votes) {
@@ -133,5 +133,76 @@ export const ensureUser = internalMutation({
     })
 
     return await ctx.db.get(id)
+  },
+})
+
+// ============================================
+// Display Name Functions
+// ============================================
+
+// Get user's display name
+export const getDisplayName = query({
+  args: { clerkId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId))
+      .unique()
+
+    if (!user) {
+      return null
+    }
+
+    return {
+      displayName: user.displayName ?? null,
+      name: user.name ?? null,
+      hasDisplayName: !!user.displayName,
+    }
+  },
+})
+
+// Set user's display name
+export const setDisplayName = mutation({
+  args: {
+    clerkId: v.string(),
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Validate display name
+    const trimmed = args.displayName.trim()
+    if (trimmed.length < 2) {
+      throw new Error('Display name must be at least 2 characters')
+    }
+    if (trimmed.length > 50) {
+      throw new Error('Display name must be 50 characters or less')
+    }
+
+    // Check for disallowed characters (basic sanitization)
+    if (!/^[\w\s\-'.]+$/u.test(trimmed)) {
+      throw new Error('Display name contains invalid characters')
+    }
+
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId))
+      .unique()
+
+    if (!user) {
+      // Create user if not exists
+      const now = Date.now()
+      await ctx.db.insert('clerkUsers', {
+        clerkId: args.clerkId,
+        displayName: trimmed,
+        createdAt: now,
+        updatedAt: now,
+      })
+    } else {
+      await ctx.db.patch(user._id, {
+        displayName: trimmed,
+        updatedAt: Date.now(),
+      })
+    }
+
+    return { success: true, displayName: trimmed }
   },
 })

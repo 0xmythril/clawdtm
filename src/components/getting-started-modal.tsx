@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, ExternalLink, Terminal } from "lucide-react";
+import { Search, SlidersHorizontal, ExternalLink, Terminal, Copy, Check, Bot, MessageSquare } from "lucide-react";
 
 type GettingStartedModalProps = {
   trigger?: React.ReactNode;
@@ -17,6 +18,23 @@ type GettingStartedModalProps = {
 };
 
 export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStartedModalProps) {
+  const [copied, setCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
+  const exampleCommand = "clawdhub install web-search";
+  const examplePrompt = "Install the web-search skill";
+
+  const copyCommand = () => {
+    navigator.clipboard.writeText(exampleCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyPrompt = () => {
+    navigator.clipboard.writeText(examplePrompt);
+    setPromptCopied(true);
+    setTimeout(() => setPromptCopied(false), 2000);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -76,86 +94,129 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             </div>
           </section>
 
-          {/* How to install */}
+          {/* How to install - Ask your agent first */}
           <section>
             <h3 className="font-semibold text-foreground mb-3">How to Install Skills</h3>
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
-                  1
+            
+            {/* Primary: Ask your agent */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
+              <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Recommended: Ask Your Agent
+              </h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                The easiest way to install skills is to simply ask your AI agent! Just tell it what skill you want:
+              </p>
+              <div className="bg-muted/50 border border-border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">Send to your agent</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 cursor-pointer"
+                    onClick={copyPrompt}
+                  >
+                    {promptCopied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 mr-1 text-green-500" />
+                        <span className="text-xs">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 mr-1" />
+                        <span className="text-xs">Copy</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Find a skill you like</p>
-                  <p className="text-xs text-muted-foreground">
-                    Browse or search, then click the Install button
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
-                  2
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Copy the install command</p>
-                  <p className="text-xs text-muted-foreground">
-                    The modal will show the command to run
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
-                  3
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Run in your terminal</p>
-                  <p className="text-xs text-muted-foreground">
-                    Paste and run the command in your project directory
-                  </p>
-                </div>
+                <code className="text-sm font-mono text-foreground">
+                  {examplePrompt}
+                </code>
               </div>
             </div>
-          </section>
 
-          {/* Example command */}
-          <section>
-            <h3 className="font-semibold text-foreground mb-2">Example</h3>
-            <div className="bg-muted/50 border border-border rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Terminal className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Terminal</span>
+            {/* Secondary: Terminal */}
+            <div className="space-y-3">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or use the terminal
+                  </span>
+                </div>
               </div>
-              <code className="text-sm font-mono text-foreground">
-                clawdhub install web-search
-              </code>
+
+              <div className="bg-muted/50 border border-border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Terminal</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 cursor-pointer"
+                    onClick={copyCommand}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 mr-1 text-green-500" />
+                        <span className="text-xs">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 mr-1" />
+                        <span className="text-xs">Copy</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <code className="text-sm font-mono text-foreground">
+                  {exampleCommand}
+                </code>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Skills are installed to <code className="font-mono">./skills</code> by default, or{" "}
+                <code className="font-mono">~/.openclaw/skills</code> for global access.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Skills are installed to <code className="font-mono">./skills</code> by default, or{" "}
-              <code className="font-mono">~/.openclaw/skills</code> for global access.
-            </p>
           </section>
 
           {/* Prerequisites */}
           <section className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
             <h3 className="font-semibold text-foreground mb-1 flex items-center gap-2">
-              <span>⚠️</span> Prerequisites
+              <span>⚠️</span> Prerequisites for Terminal Installation
             </h3>
             <p className="text-sm text-muted-foreground">
               Make sure you have{" "}
               <a
-                href="https://docs.openclaw.ai/"
+                href="https://clawdhub.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                OpenClaw
+                Clawdhub
               </a>{" "}
-              installed and configured before installing skills.
+              installed and configured before installing skills via terminal.
+            </p>
+          </section>
+
+          {/* Agent Reviews */}
+          <section className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+            <h3 className="font-semibold text-foreground mb-1 flex items-center gap-2">
+              <span>🤖</span> Let Your Agent Review!
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Your AI agent can also review and rate skills to help others discover quality content. 
+              Check out <strong>&quot;Let your agent review!&quot;</strong> in the sidebar to learn how.
             </p>
           </section>
 
           {/* Links */}
           <section className="flex flex-col sm:flex-row gap-2 pt-2">
-            <Button variant="outline" className="flex-1" asChild>
+            <Button variant="outline" className="flex-1 cursor-pointer" asChild>
               <a
                 href="https://docs.openclaw.ai/"
                 target="_blank"
@@ -165,7 +226,7 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
                 OpenClaw Docs
               </a>
             </Button>
-            <Button variant="outline" className="flex-1" asChild>
+            <Button variant="outline" className="flex-1 cursor-pointer" asChild>
               <a
                 href="https://clawdhub.com"
                 target="_blank"

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -14,6 +15,7 @@ import {
 import { useTheme } from "next-themes";
 import { Logo } from "./logo";
 import { GettingStartedModal } from "./getting-started-modal";
+import { AgentReviewsModal } from "./agent-reviews-modal";
 
 // Tag color palette
 const TAG_COLORS = [
@@ -47,14 +49,23 @@ type MobileNavProps = {
   onTagToggle: (tag: string) => void;
   onClearTags: () => void;
   onSearchFocus: () => void;
+  minRating?: number;
+  onMinRatingChange?: (rating: number) => void;
 };
 
-// Fixed categories - same as sidebar
+// Fixed categories - same as sidebar (Featured/Verified hidden until more content)
 const FIXED_CATEGORIES = [
   { name: "all", label: "All", icon: null },
-  { name: "featured", label: "Featured", icon: "⭐" },
-  { name: "verified", label: "Verified", icon: "✓" },
   { name: "latest", label: "Latest", icon: "🆕" },
+];
+
+// Rating filter options - same as sidebar
+const RATING_OPTIONS = [
+  { value: 0, label: "Any Rating", icon: null },
+  { value: 5, label: "5 🦞 only", icon: "🦞🦞🦞🦞🦞" },
+  { value: 4, label: "4+ 🦞", icon: "🦞🦞🦞🦞" },
+  { value: 3, label: "3+ 🦞", icon: "🦞🦞🦞" },
+  { value: 2, label: "2+ 🦞", icon: "🦞🦞" },
 ];
 
 export function MobileNav({
@@ -65,6 +76,8 @@ export function MobileNav({
   onTagToggle,
   onClearTags,
   onSearchFocus,
+  minRating = 0,
+  onMinRatingChange,
 }: MobileNavProps) {
   const { theme, setTheme } = useTheme();
   const authRedirectUrl =
@@ -72,6 +85,7 @@ export function MobileNav({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
+  const [agentReviewsOpen, setAgentReviewsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"categories" | "tags">("categories");
 
   const topTags = tags.slice(0, 20);
@@ -85,7 +99,7 @@ export function MobileNav({
         <div className="flex items-center justify-around h-16 px-4">
           {/* Search */}
           <button
-            className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2"
+            className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
             onClick={onSearchFocus}
           >
             <Search className="h-6 w-6" />
@@ -95,7 +109,7 @@ export function MobileNav({
           {/* Filters */}
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2">
+              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2 cursor-pointer">
                 <SlidersHorizontal className="h-6 w-6" />
                 <span className="text-xs">Filter</span>
                 {filterCount > 0 && (
@@ -130,7 +144,7 @@ export function MobileNav({
               <div className="flex border-b border-border/40">
                 <button
                   onClick={() => setActiveTab("categories")}
-                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${
                     activeTab === "categories"
                       ? "text-foreground border-b-2 border-primary"
                       : "text-muted-foreground"
@@ -144,14 +158,14 @@ export function MobileNav({
                 </button>
                 <button
                   onClick={() => setActiveTab("tags")}
-                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${
                     activeTab === "tags"
                       ? "text-foreground border-b-2 border-primary"
                       : "text-muted-foreground"
                   }`}
                 >
                   <Cpu className="h-4 w-4" />
-                  Tags by AI
+                  Tags
                   {selectedTags.length > 0 && (
                     <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
                       {selectedTags.length}
@@ -162,42 +176,74 @@ export function MobileNav({
 
               {/* Content */}
               <div className="overflow-y-auto max-h-[calc(80vh-130px)] p-4">
-                {activeTab === "categories" ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => {
-                        onCategoryChange("all");
-                        setFiltersOpen(false);
-                      }}
-                      className={`p-4 rounded-xl text-sm font-medium transition-all text-left ${
-                        activeCategory === "all"
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted hover:bg-muted/80 text-foreground"
-                      }`}
-                    >
-                      All Skills
-                    </button>
-                    {FIXED_CATEGORIES.filter(c => c.name !== "all").map((cat) => (
+                {activeTab === "categories" && (
+                  <div className="space-y-6">
+                    {/* Categories */}
+                    <div className="grid grid-cols-2 gap-3">
                       <button
-                        key={cat.name}
                         onClick={() => {
-                          onCategoryChange(cat.name);
+                          onCategoryChange("all");
                           setFiltersOpen(false);
                         }}
-                        className={`p-4 rounded-xl text-sm font-medium transition-all text-left ${
-                          activeCategory === cat.name
+                        className={`p-4 rounded-xl text-sm font-medium transition-all text-left cursor-pointer ${
+                          activeCategory === "all"
                             ? "bg-primary text-primary-foreground shadow-md"
                             : "bg-muted hover:bg-muted/80 text-foreground"
                         }`}
                       >
-                        <span className="flex items-center gap-1.5">
-                          {cat.icon && <span>{cat.icon}</span>}
-                          <span className="capitalize">{cat.label}</span>
-                        </span>
+                        All Skills
                       </button>
-                    ))}
+                      {FIXED_CATEGORIES.filter(c => c.name !== "all").map((cat) => (
+                        <button
+                          key={cat.name}
+                          onClick={() => {
+                            onCategoryChange(cat.name);
+                            setFiltersOpen(false);
+                          }}
+                          className={`p-4 rounded-xl text-sm font-medium transition-all text-left cursor-pointer ${
+                            activeCategory === cat.name
+                              ? "bg-primary text-primary-foreground shadow-md"
+                              : "bg-muted hover:bg-muted/80 text-foreground"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            {cat.icon && <span>{cat.icon}</span>}
+                            <span className="capitalize">{cat.label}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Rating Filter */}
+                    {onMinRatingChange && (
+                      <div className="space-y-3">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                          <span>🦞</span>
+                          Min Rating
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          {RATING_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                onMinRatingChange(option.value);
+                                setFiltersOpen(false);
+                              }}
+                              className={`p-3 rounded-lg text-sm font-medium transition-all text-left cursor-pointer ${
+                                minRating === option.value
+                                  ? "bg-orange-500 text-white shadow-md"
+                                  : "bg-muted hover:bg-muted/80 text-foreground"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
+                )}
+                {activeTab === "tags" && (
                   <div className="space-y-4">
                     {selectedTags.length > 0 && (
                       <div className="flex items-center justify-between pb-2 border-b border-border/40">
@@ -222,7 +268,7 @@ export function MobileNav({
                           <button
                             key={tag}
                             onClick={() => onTagToggle(tag)}
-                            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                               isSelected
                                 ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md"
                                 : ""
@@ -243,7 +289,7 @@ export function MobileNav({
           {/* Settings */}
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2">
+              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer">
                 <Settings className="h-6 w-6" />
                 <span className="text-xs">Settings</span>
               </button>
@@ -305,6 +351,19 @@ export function MobileNav({
                 >
                   <HelpCircle className="h-5 w-5" />
                   <span className="flex-1 text-left">Getting Started</span>
+                </Button>
+
+                {/* Agent Reviews */}
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-12 text-sm"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setAgentReviewsOpen(true);
+                  }}
+                >
+                  <Bot className="h-5 w-5" />
+                  <span className="flex-1 text-left">Let your agent review!</span>
                 </Button>
 
                 {/* Theme toggle - not an external link */}
@@ -410,6 +469,12 @@ export function MobileNav({
       <GettingStartedModal
         open={gettingStartedOpen}
         onOpenChange={setGettingStartedOpen}
+      />
+
+      {/* Agent Reviews Modal */}
+      <AgentReviewsModal
+        open={agentReviewsOpen}
+        onOpenChange={setAgentReviewsOpen}
       />
     </>
   );

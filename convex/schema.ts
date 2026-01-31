@@ -407,8 +407,26 @@ const cachedSkills = defineTable({
   hiddenAt: v.optional(v.number()),
   
   // ClawdTM-specific vote counts (separate from ClawdHub stats)
+  // Legacy combined counts (kept for backwards compatibility)
   clawdtmUpvotes: v.optional(v.number()),
   clawdtmDownvotes: v.optional(v.number()),
+  
+  // Separate human/bot vote counts
+  clawdtmHumanUpvotes: v.optional(v.number()),
+  clawdtmHumanDownvotes: v.optional(v.number()),
+  clawdtmBotUpvotes: v.optional(v.number()),
+  clawdtmBotDownvotes: v.optional(v.number()),
+  // Verified bot votes (bots with claimed owners)
+  clawdtmVerifiedBotUpvotes: v.optional(v.number()),
+  clawdtmVerifiedBotDownvotes: v.optional(v.number()),
+  
+  // Review aggregates (ClawdTM-specific)
+  reviewCount: v.optional(v.number()),
+  humanReviewCount: v.optional(v.number()),
+  botReviewCount: v.optional(v.number()),
+  avgRating: v.optional(v.number()), // Average rating (all reviews)
+  avgRatingHuman: v.optional(v.number()), // Average rating (human only)
+  avgRatingBot: v.optional(v.number()), // Average rating (bot only)
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -417,6 +435,15 @@ const cachedSkills = defineTable({
   .index('by_installs', ['installs'])
   .index('by_last_synced', ['lastSyncedAt'])
   .index('by_hidden', ['hidden'])
+  // Category filtering indexes (avoids full table scans)
+  .index('by_category', ['category'])
+  .index('by_category_downloads', ['category', 'downloads'])
+  .index('by_category_stars', ['category', 'stars'])
+  .index('by_category_installs', ['category', 'installs'])
+  // Vote-based sorting (ClawdTM upvotes/downvotes)
+  .index('by_clawdtm_votes', ['clawdtmUpvotes', 'clawdtmDownvotes'])
+  // Author enrichment index (find skills needing author data)
+  .index('by_author', ['author'])
   .searchIndex('search_name_desc', {
     searchField: 'slug',
     filterFields: ['category'],
@@ -448,22 +475,107 @@ const clerkUsers = defineTable({
   email: v.optional(v.string()),
   name: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
+  // User-chosen display name for public display in reviews
+  displayName: v.optional(v.string()),
   createdAt: v.number(),
   updatedAt: v.number(),
 })
   .index('by_clerk_id', ['clerkId'])
 
-// Votes on cached skills (ClawdTM-specific, requires Clerk auth)
+// Bot agents registered to vote on skills
+const botAgents = defineTable({
+  // Agent identity
+  name: v.string(),
+  description: v.optional(v.string()),
+  
+  // API key (hashed for security, prefix for identification)
+  apiKeyHash: v.string(),
+  apiKeyPrefix: v.string(), // e.g., "clawdtm_sk_abc..." (first 12 chars for display)
+  
+  // Ownership - either created by human (verified) or self-registered (needs claim)
+  ownerClerkUserId: v.optional(v.id('clerkUsers')), // Set when human creates or claims
+  claimCode: v.optional(v.string()), // For self-registered bots to be claimed
+  
+  // Status
+  status: v.union(
+    v.literal('verified'),   // Human created or claimed this agent
+    v.literal('unverified')  // Self-registered, not yet claimed
+  ),
+  
+  // Activity tracking
+  lastActiveAt: v.optional(v.number()),
+  voteCount: v.optional(v.number()),
+  
+  // Timestamps
+  createdAt: v.number(),
+  updatedAt: v.number(),
+  revokedAt: v.optional(v.number()), // Soft delete / revoke access
+})
+  .index('by_owner', ['ownerClerkUserId'])
+  .index('by_api_key_hash', ['apiKeyHash'])
+  .index('by_claim_code', ['claimCode'])
+  .index('by_status', ['status'])
+  .index('by_created_at', ['createdAt']) // For rate limiting queries
+
+// Votes on cached skills (ClawdTM-specific, supports both human and bot voters)
 const cachedSkillVotes = defineTable({
   cachedSkillId: v.id('cachedSkills'),
-  clerkUserId: v.id('clerkUsers'),
+  
+  // Voter identity - one of these will be set
+  clerkUserId: v.optional(v.id('clerkUsers')), // Human voter
+  botAgentId: v.optional(v.id('botAgents')),   // Bot voter
+  
+  // Voter type for easy filtering (optional for backwards compat with old votes)
+  voterType: v.optional(v.union(v.literal('human'), v.literal('bot'))),
+  
+  // Is this a verified voter? (optional for backwards compat - defaults to true for human votes)
+  isVerified: v.optional(v.boolean()),
+  
   vote: v.union(v.literal('up'), v.literal('down')),
   createdAt: v.number(),
   updatedAt: v.number(),
 })
   .index('by_skill', ['cachedSkillId'])
-  .index('by_user', ['clerkUserId'])
-  .index('by_skill_user', ['cachedSkillId', 'clerkUserId'])
+  .index('by_human_user', ['clerkUserId'])
+  .index('by_bot_agent', ['botAgentId'])
+  .index('by_skill_human_user', ['cachedSkillId', 'clerkUserId'])
+  .index('by_skill_bot_agent', ['cachedSkillId', 'botAgentId'])
+  .index('by_voter_type', ['voterType'])
+  .index('by_skill_voter_type', ['cachedSkillId', 'voterType'])
+
+// Skill reviews (supports both human and bot reviewers)
+const skillReviews = defineTable({
+  cachedSkillId: v.id('cachedSkills'),
+  
+  // Reviewer identity - one of these will be set
+  clerkUserId: v.optional(v.id('clerkUsers')), // Human reviewer
+  botAgentId: v.optional(v.id('botAgents')),   // Bot reviewer
+  
+  // Reviewer type for easy filtering
+  reviewerType: v.union(v.literal('human'), v.literal('bot')),
+  
+  // Is this a verified reviewer? (verified bots have human owners)
+  isVerified: v.optional(v.boolean()),
+  
+  // Review content
+  rating: v.number(), // 1-5 stars
+  reviewText: v.string(), // 10-1000 chars
+  
+  // Cached display name for efficient rendering
+  reviewerName: v.optional(v.string()),
+  
+  // Timestamps
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index('by_skill', ['cachedSkillId'])
+  .index('by_skill_reviewer_type', ['cachedSkillId', 'reviewerType'])
+  .index('by_skill_human_user', ['cachedSkillId', 'clerkUserId'])
+  .index('by_skill_bot_agent', ['cachedSkillId', 'botAgentId'])
+  .index('by_human_user', ['clerkUserId'])
+  .index('by_bot_agent', ['botAgentId'])
+  .index('by_created', ['createdAt'])
+  .index('by_skill_created', ['cachedSkillId', 'createdAt'])
 
 // AI categorization logs
 const categorizationLogs = defineTable({
@@ -523,6 +635,8 @@ export default defineSchema({
   cachedSkills,
   clawdhubSyncState,
   clerkUsers,
+  botAgents,
   cachedSkillVotes,
+  skillReviews,
   categorizationLogs,
 })
