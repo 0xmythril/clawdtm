@@ -9,11 +9,15 @@ const nextConfig: NextConfig = {
       return [];
     }
 
+    // Convex HTTP routes are served at .convex.site, not .convex.cloud
+    // Convert: https://xyz.convex.cloud -> https://xyz.convex.site
+    const convexHttpUrl = convexUrl.replace('.convex.cloud', '.convex.site');
+
     return [
       {
         // Proxy all /api/v1/* requests to Convex HTTP router
         source: "/api/v1/:path*",
-        destination: `${convexUrl}/api/v1/:path*`,
+        destination: `${convexHttpUrl}/api/v1/:path*`,
       },
     ];
   },
