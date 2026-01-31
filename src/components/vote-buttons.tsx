@@ -27,6 +27,8 @@ export function VoteButtons({
   size = "sm",
 }: VoteButtonsProps) {
   const { user, isLoaded } = useUser();
+  const authRedirectUrl =
+    typeof window !== "undefined" ? window.location.origin : "/";
   const voteMutation = useMutation(api.voting.vote);
   const removeVoteMutation = useMutation(api.voting.removeVote);
 
@@ -128,7 +130,12 @@ export function VoteButtons({
         "flex items-center gap-1",
         variant === "vertical" ? "flex-col" : "flex-row"
       )}>
-        <SignInButton mode="modal">
+        <SignInButton
+          mode="modal"
+          redirectUrl={authRedirectUrl}
+          afterSignInUrl={authRedirectUrl}
+          afterSignUpUrl={authRedirectUrl}
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -141,7 +148,12 @@ export function VoteButtons({
         <span className={cn(scoreSize, "font-medium text-muted-foreground tabular-nums")}>
           {netScore}
         </span>
-        <SignInButton mode="modal">
+        <SignInButton
+          mode="modal"
+          redirectUrl={authRedirectUrl}
+          afterSignInUrl={authRedirectUrl}
+          afterSignUpUrl={authRedirectUrl}
+        >
           <Button
             variant="ghost"
             size="icon"

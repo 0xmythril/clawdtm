@@ -67,6 +67,8 @@ export function MobileNav({
   onSearchFocus,
 }: MobileNavProps) {
   const { theme, setTheme } = useTheme();
+  const authRedirectUrl =
+    typeof window !== "undefined" ? window.location.origin : "/";
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
@@ -260,7 +262,12 @@ export function MobileNav({
                 {/* Auth section */}
                 <div className="pb-2 border-b border-border/40">
                   <SignedOut>
-                    <SignInButton mode="modal">
+                    <SignInButton
+                      mode="modal"
+                      redirectUrl={authRedirectUrl}
+                      afterSignInUrl={authRedirectUrl}
+                      afterSignUpUrl={authRedirectUrl}
+                    >
                       <Button
                         variant="default"
                         className="w-full justify-start gap-3 h-12 text-sm"

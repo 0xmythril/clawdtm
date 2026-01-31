@@ -74,6 +74,8 @@ export function Sidebar({
   onClearTags,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
+  const authRedirectUrl =
+    typeof window !== "undefined" ? window.location.origin : "/";
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -295,7 +297,12 @@ export function Sidebar({
         {/* Auth section */}
         <div className="flex items-center gap-2">
           <SignedOut>
-            <SignInButton mode="modal">
+            <SignInButton
+              mode="modal"
+              redirectUrl={authRedirectUrl}
+              afterSignInUrl={authRedirectUrl}
+              afterSignUpUrl={authRedirectUrl}
+            >
               <Button variant="outline" size="sm" className="flex-1 justify-start gap-2 h-9">
                 <LogIn className="h-4 w-4" />
                 <span className="text-sm">Sign In to Vote</span>
