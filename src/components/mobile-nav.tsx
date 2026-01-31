@@ -354,7 +354,7 @@ export function MobileNav({
                   asChild
                 >
                   <a
-                    href="https://discord.gg/openclaw"
+                    href="https://discord.gg/eTtG4rhbp6"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
