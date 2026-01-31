@@ -1,6 +1,7 @@
 "use client";
 
-import { Star, Download, Terminal, ExternalLink, BadgeCheck } from "lucide-react";
+import Link from "next/link";
+import { Star, Download, Terminal, ExternalLink, BadgeCheck, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,6 +48,9 @@ export type Skill = {
   // ClawdTM vote counts
   clawdtmUpvotes?: number;
   clawdtmDownvotes?: number;
+  // Review stats
+  reviewCount?: number;
+  avgRating?: number;
 };
 
 type SkillCardProps = {
@@ -82,12 +86,14 @@ export function SkillCard({ skill, onInstall, variant = "card", userVote }: Skil
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-start gap-2 mb-1">
-              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
-                {skill.name || skill.slug}
-                {skill.isVerified && (
-                  <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-                )}
-              </h3>
+              <Link href={`/skills/${skill.slug}`} className="min-w-0">
+                <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
+                  {skill.name || skill.slug}
+                  {skill.isVerified && (
+                    <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                  )}
+                </h3>
+              </Link>
               {skill.category && (
                 <Badge variant="secondary" className="text-xs shrink-0">
                   {skill.category}
@@ -132,6 +138,15 @@ export function SkillCard({ skill, onInstall, variant = "card", userVote }: Skil
                   <span className="flex items-center gap-1">
                     <Terminal className="h-3 w-3" />
                     {skill.installs}
+                  </span>
+                )}
+                {(skill.reviewCount ?? 0) > 0 && (
+                  <span className="flex items-center gap-1" title={`${skill.avgRating?.toFixed(1) ?? '-'} avg rating`}>
+                    <MessageSquare className="h-3 w-3" />
+                    {skill.reviewCount}
+                    {skill.avgRating && (
+                      <span className="text-amber-500">★{skill.avgRating.toFixed(1)}</span>
+                    )}
                   </span>
                 )}
               </div>
@@ -184,12 +199,14 @@ export function SkillCard({ skill, onInstall, variant = "card", userVote }: Skil
             {/* Header: Name + Category */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
-                  {skill.name || skill.slug}
-                  {skill.isVerified && (
-                    <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-                  )}
-                </h3>
+                <Link href={`/skills/${skill.slug}`}>
+                  <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
+                    {skill.name || skill.slug}
+                    {skill.isVerified && (
+                      <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                    )}
+                  </h3>
+                </Link>
                 <p className="text-xs text-muted-foreground truncate">
                   /{skill.slug} · by {skill.author}
                 </p>
@@ -235,6 +252,15 @@ export function SkillCard({ skill, onInstall, variant = "card", userVote }: Skil
                 <div className="flex items-center gap-1" title="Installs">
                   <Terminal className="h-3.5 w-3.5" />
                   <span>{skill.installs}</span>
+                </div>
+              )}
+              {(skill.reviewCount ?? 0) > 0 && (
+                <div className="flex items-center gap-1" title={`${skill.reviewCount} reviews, ${skill.avgRating?.toFixed(1) ?? '-'} avg`}>
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span>{skill.reviewCount}</span>
+                  {skill.avgRating && (
+                    <span className="text-amber-500">★{skill.avgRating.toFixed(1)}</span>
+                  )}
                 </div>
               )}
             </div>

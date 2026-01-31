@@ -468,6 +468,183 @@ http.route({
 })
 
 // ============================================
+// Skills Reviews API Routes (Bot-friendly)
+// ============================================
+
+// GET /api/v1/skills/reviews - Get reviews for a skill
+http.route({
+  path: '/api/v1/skills/reviews',
+  method: 'GET',
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url)
+    const slug = url.searchParams.get('slug')
+    const filter = url.searchParams.get('filter') as 'combined' | 'human' | 'bot' | null
+    const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
+
+    if (!slug) {
+      return jsonResponse({
+        success: false,
+        error: 'Missing required parameter: slug',
+        hint: 'Provide ?slug=skill-slug',
+      }, 400)
+    }
+
+    const result = await ctx.runQuery(api.reviews.getReviewsBySlug, {
+      slug,
+      filter: filter ?? 'combined',
+      limit,
+    })
+
+    if (!result) {
+      return jsonResponse({
+        success: false,
+        error: 'Skill not found',
+        hint: `No skill with slug "${slug}"`,
+      }, 404)
+    }
+
+    return jsonResponse({
+      success: true,
+      ...result,
+    })
+  }),
+})
+
+// POST /api/v1/skills/reviews - Add or update a review (bot auth)
+http.route({
+  path: '/api/v1/skills/reviews',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = extractBearerToken(request)
+
+    if (!apiKey) {
+      return jsonResponse({
+        success: false,
+        error: 'Missing authorization',
+        hint: 'Include header: Authorization: Bearer YOUR_API_KEY',
+      }, 401)
+    }
+
+    try {
+      const body = await request.json() as { 
+        slug?: string
+        rating?: number
+        review_text?: string
+      }
+      
+      if (!body.slug) {
+        return jsonResponse({
+          success: false,
+          error: 'Missing required field: slug',
+          hint: 'Provide the skill slug to review',
+        }, 400)
+      }
+
+      if (body.rating === undefined) {
+        return jsonResponse({
+          success: false,
+          error: 'Missing required field: rating',
+          hint: 'Provide a rating between 1 and 5',
+        }, 400)
+      }
+
+      if (!body.review_text) {
+        return jsonResponse({
+          success: false,
+          error: 'Missing required field: review_text',
+          hint: 'Provide review text (10-1000 characters)',
+        }, 400)
+      }
+
+      const result = await ctx.runMutation(api.reviews.botAddReview, {
+        skillSlug: body.slug,
+        apiKey,
+        rating: body.rating,
+        reviewText: body.review_text,
+      })
+
+      if (!result.success) {
+        return jsonResponse(result, 400)
+      }
+
+      // TypeScript doesn't narrow here, so check action safely
+      const status = 'action' in result && result.action === 'created' ? 201 : 200
+      return jsonResponse(result, status)
+    } catch (error) {
+      console.error('Add review error:', error)
+      return jsonResponse({
+        success: false,
+        error: 'Add review failed',
+        hint: 'Check your request body format',
+      }, 500)
+    }
+  }),
+})
+
+// DELETE /api/v1/skills/reviews - Remove a review (bot auth)
+http.route({
+  path: '/api/v1/skills/reviews',
+  method: 'DELETE',
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = extractBearerToken(request)
+
+    if (!apiKey) {
+      return jsonResponse({
+        success: false,
+        error: 'Missing authorization',
+        hint: 'Include header: Authorization: Bearer YOUR_API_KEY',
+      }, 401)
+    }
+
+    try {
+      const body = await request.json() as { slug?: string }
+      
+      if (!body.slug) {
+        return jsonResponse({
+          success: false,
+          error: 'Missing required field: slug',
+          hint: 'Provide the skill slug to remove your review from',
+        }, 400)
+      }
+
+      const result = await ctx.runMutation(api.reviews.botDeleteReview, {
+        skillSlug: body.slug,
+        apiKey,
+      })
+
+      if (!result.success) {
+        return jsonResponse(result, 400)
+      }
+
+      return jsonResponse(result)
+    } catch (error) {
+      console.error('Delete review error:', error)
+      return jsonResponse({
+        success: false,
+        error: 'Delete review failed',
+        hint: 'Check your request body format',
+      }, 500)
+    }
+  }),
+})
+
+// CORS preflight for reviews endpoint
+http.route({
+  path: '/api/v1/skills/reviews',
+  method: 'OPTIONS',
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    })
+  }),
+})
+
+// ============================================
 // Clerk Webhook
 // ============================================
 

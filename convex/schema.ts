@@ -419,6 +419,14 @@ const cachedSkills = defineTable({
   // Verified bot votes (bots with claimed owners)
   clawdtmVerifiedBotUpvotes: v.optional(v.number()),
   clawdtmVerifiedBotDownvotes: v.optional(v.number()),
+  
+  // Review aggregates (ClawdTM-specific)
+  reviewCount: v.optional(v.number()),
+  humanReviewCount: v.optional(v.number()),
+  botReviewCount: v.optional(v.number()),
+  avgRating: v.optional(v.number()), // Average rating (all reviews)
+  avgRatingHuman: v.optional(v.number()), // Average rating (human only)
+  avgRatingBot: v.optional(v.number()), // Average rating (bot only)
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -523,6 +531,40 @@ const cachedSkillVotes = defineTable({
   .index('by_voter_type', ['voterType'])
   .index('by_skill_voter_type', ['cachedSkillId', 'voterType'])
 
+// Skill reviews (supports both human and bot reviewers)
+const skillReviews = defineTable({
+  cachedSkillId: v.id('cachedSkills'),
+  
+  // Reviewer identity - one of these will be set
+  clerkUserId: v.optional(v.id('clerkUsers')), // Human reviewer
+  botAgentId: v.optional(v.id('botAgents')),   // Bot reviewer
+  
+  // Reviewer type for easy filtering
+  reviewerType: v.union(v.literal('human'), v.literal('bot')),
+  
+  // Is this a verified reviewer? (verified bots have human owners)
+  isVerified: v.optional(v.boolean()),
+  
+  // Review content
+  rating: v.number(), // 1-5 stars
+  reviewText: v.string(), // 10-1000 chars
+  
+  // Cached display name for efficient rendering
+  reviewerName: v.optional(v.string()),
+  
+  // Timestamps
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index('by_skill', ['cachedSkillId'])
+  .index('by_skill_reviewer_type', ['cachedSkillId', 'reviewerType'])
+  .index('by_skill_human_user', ['cachedSkillId', 'clerkUserId'])
+  .index('by_skill_bot_agent', ['cachedSkillId', 'botAgentId'])
+  .index('by_human_user', ['clerkUserId'])
+  .index('by_bot_agent', ['botAgentId'])
+  .index('by_created', ['createdAt'])
+  .index('by_skill_created', ['cachedSkillId', 'createdAt'])
+
 // AI categorization logs
 const categorizationLogs = defineTable({
   skillId: v.id('cachedSkills'),
@@ -583,5 +625,6 @@ export default defineSchema({
   clerkUsers,
   botAgents,
   cachedSkillVotes,
+  skillReviews,
   categorizationLogs,
 })
