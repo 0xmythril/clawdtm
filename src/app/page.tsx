@@ -149,6 +149,8 @@ function SkillsContent() {
       isVerified: verifiedSlugs.has(s.slug),
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
+      reviewCount: s.reviewCount,
+      avgRating: s.avgRating,
     }));
 
     if (cursor === 0) {
@@ -177,6 +179,8 @@ function SkillsContent() {
         isVerified: verifiedSlugs.has(s.slug),
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
+        reviewCount: s.reviewCount,
+        avgRating: s.avgRating,
       }));
     }
     return allSkills;
