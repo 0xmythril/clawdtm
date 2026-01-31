@@ -1,11 +1,95 @@
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
+import { internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 
 // ============================================
-// Mutations (require authentication)
+// Helper: Update skill vote counts
 // ============================================
 
-// Vote on a skill (up or down)
+async function updateSkillVoteCounts(
+  ctx: { db: { get: (id: Id<'cachedSkills'>) => Promise<unknown>; patch: (id: Id<'cachedSkills'>, updates: Record<string, unknown>) => Promise<void> } },
+  skillId: Id<'cachedSkills'>,
+  voterType: 'human' | 'bot',
+  isVerified: boolean,
+  oldVote: 'up' | 'down' | null,
+  newVote: 'up' | 'down' | null
+) {
+  const skill = await ctx.db.get(skillId) as {
+    clawdtmUpvotes?: number
+    clawdtmDownvotes?: number
+    clawdtmHumanUpvotes?: number
+    clawdtmHumanDownvotes?: number
+    clawdtmBotUpvotes?: number
+    clawdtmBotDownvotes?: number
+    clawdtmVerifiedBotUpvotes?: number
+    clawdtmVerifiedBotDownvotes?: number
+  } | null
+  if (!skill) return
+
+  // Get current counts
+  let upvotes = skill.clawdtmUpvotes ?? 0
+  let downvotes = skill.clawdtmDownvotes ?? 0
+  let humanUp = skill.clawdtmHumanUpvotes ?? 0
+  let humanDown = skill.clawdtmHumanDownvotes ?? 0
+  let botUp = skill.clawdtmBotUpvotes ?? 0
+  let botDown = skill.clawdtmBotDownvotes ?? 0
+  let verifiedBotUp = skill.clawdtmVerifiedBotUpvotes ?? 0
+  let verifiedBotDown = skill.clawdtmVerifiedBotDownvotes ?? 0
+
+  // Remove old vote
+  if (oldVote === 'up') {
+    upvotes = Math.max(0, upvotes - 1)
+    if (voterType === 'human') humanUp = Math.max(0, humanUp - 1)
+    else {
+      botUp = Math.max(0, botUp - 1)
+      if (isVerified) verifiedBotUp = Math.max(0, verifiedBotUp - 1)
+    }
+  }
+  if (oldVote === 'down') {
+    downvotes = Math.max(0, downvotes - 1)
+    if (voterType === 'human') humanDown = Math.max(0, humanDown - 1)
+    else {
+      botDown = Math.max(0, botDown - 1)
+      if (isVerified) verifiedBotDown = Math.max(0, verifiedBotDown - 1)
+    }
+  }
+
+  // Add new vote
+  if (newVote === 'up') {
+    upvotes++
+    if (voterType === 'human') humanUp++
+    else {
+      botUp++
+      if (isVerified) verifiedBotUp++
+    }
+  }
+  if (newVote === 'down') {
+    downvotes++
+    if (voterType === 'human') humanDown++
+    else {
+      botDown++
+      if (isVerified) verifiedBotDown++
+    }
+  }
+
+  await ctx.db.patch(skillId, {
+    clawdtmUpvotes: upvotes,
+    clawdtmDownvotes: downvotes,
+    clawdtmHumanUpvotes: humanUp,
+    clawdtmHumanDownvotes: humanDown,
+    clawdtmBotUpvotes: botUp,
+    clawdtmBotDownvotes: botDown,
+    clawdtmVerifiedBotUpvotes: verifiedBotUp,
+    clawdtmVerifiedBotDownvotes: verifiedBotDown,
+  })
+}
+
+// ============================================
+// Human Voting Mutations
+// ============================================
+
+// Vote on a skill (up or down) - Human voter via Clerk
 export const vote = mutation({
   args: {
     cachedSkillId: v.id('cachedSkills'),
@@ -39,10 +123,10 @@ export const vote = mutation({
       throw new Error('Skill not found')
     }
 
-    // Check for existing vote
+    // Check for existing human vote
     const existingVote = await ctx.db
       .query('cachedSkillVotes')
-      .withIndex('by_skill_user', (q) =>
+      .withIndex('by_skill_human_user', (q) =>
         q.eq('cachedSkillId', args.cachedSkillId).eq('clerkUserId', user._id)
       )
       .unique()
@@ -64,10 +148,12 @@ export const vote = mutation({
         updatedAt: now,
       })
     } else {
-      // Create new vote
+      // Create new vote (human votes are always verified)
       await ctx.db.insert('cachedSkillVotes', {
         cachedSkillId: args.cachedSkillId,
         clerkUserId: user._id,
+        voterType: 'human',
+        isVerified: true,
         vote: args.vote,
         createdAt: now,
         updatedAt: now,
@@ -75,27 +161,13 @@ export const vote = mutation({
     }
 
     // Update skill vote counts
-    let upvotes = skill.clawdtmUpvotes ?? 0
-    let downvotes = skill.clawdtmDownvotes ?? 0
-
-    // Adjust for old vote if changing
-    if (oldVote === 'up') upvotes--
-    if (oldVote === 'down') downvotes--
-
-    // Apply new vote
-    if (args.vote === 'up') upvotes++
-    if (args.vote === 'down') downvotes++
-
-    await ctx.db.patch(args.cachedSkillId, {
-      clawdtmUpvotes: upvotes,
-      clawdtmDownvotes: downvotes,
-    })
+    await updateSkillVoteCounts(ctx, args.cachedSkillId, 'human', true, oldVote, args.vote)
 
     return { success: true, action: existingVote ? 'changed' : 'created' }
   },
 })
 
-// Remove vote from a skill
+// Remove vote from a skill - Human voter
 export const removeVote = mutation({
   args: {
     cachedSkillId: v.id('cachedSkills'),
@@ -116,7 +188,7 @@ export const removeVote = mutation({
     // Get existing vote
     const existingVote = await ctx.db
       .query('cachedSkillVotes')
-      .withIndex('by_skill_user', (q) =>
+      .withIndex('by_skill_human_user', (q) =>
         q.eq('cachedSkillId', args.cachedSkillId).eq('clerkUserId', user._id)
       )
       .unique()
@@ -125,20 +197,192 @@ export const removeVote = mutation({
       return { success: true, action: 'not_found' }
     }
 
-    // Get the skill and update counts
+    // Update skill vote counts
+    await updateSkillVoteCounts(
+      ctx, 
+      args.cachedSkillId, 
+      'human', 
+      true, 
+      existingVote.vote, 
+      null
+    )
+
+    // Delete the vote
+    await ctx.db.delete(existingVote._id)
+
+    return { success: true, action: 'removed' }
+  },
+})
+
+// ============================================
+// Bot Voting Mutations
+// ============================================
+
+// Simple hash function (same as in botAgents.ts)
+function simpleHash(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  const hex = Math.abs(hash).toString(16)
+  return `${hex}_${str.length}_${str.slice(-8)}`
+}
+
+// Vote on a skill - Bot voter via API key
+export const botVote = mutation({
+  args: {
+    cachedSkillId: v.id('cachedSkills'),
+    apiKey: v.string(),
+    vote: v.union(v.literal('up'), v.literal('down')),
+  },
+  handler: async (ctx, args) => {
+    // Validate API key
+    if (!args.apiKey.startsWith('clawdtm_sk_')) {
+      return { success: false, error: 'Invalid API key format' }
+    }
+
+    const apiKeyHash = simpleHash(args.apiKey)
+    const agent = await ctx.db
+      .query('botAgents')
+      .withIndex('by_api_key_hash', (q) => q.eq('apiKeyHash', apiKeyHash))
+      .unique()
+
+    if (!agent) {
+      return { success: false, error: 'Invalid API key' }
+    }
+
+    if (agent.revokedAt) {
+      return { success: false, error: 'API key has been revoked' }
+    }
+
+    // Get the skill
     const skill = await ctx.db.get(args.cachedSkillId)
-    if (skill) {
-      let upvotes = skill.clawdtmUpvotes ?? 0
-      let downvotes = skill.clawdtmDownvotes ?? 0
+    if (!skill) {
+      return { success: false, error: 'Skill not found' }
+    }
 
-      if (existingVote.vote === 'up') upvotes = Math.max(0, upvotes - 1)
-      if (existingVote.vote === 'down') downvotes = Math.max(0, downvotes - 1)
+    const isVerified = agent.status === 'verified'
 
-      await ctx.db.patch(args.cachedSkillId, {
-        clawdtmUpvotes: upvotes,
-        clawdtmDownvotes: downvotes,
+    // Check for existing bot vote
+    const existingVote = await ctx.db
+      .query('cachedSkillVotes')
+      .withIndex('by_skill_bot_agent', (q) =>
+        q.eq('cachedSkillId', args.cachedSkillId).eq('botAgentId', agent._id)
+      )
+      .unique()
+
+    const now = Date.now()
+    let oldVote: 'up' | 'down' | null = null
+
+    if (existingVote) {
+      oldVote = existingVote.vote
+      
+      // If same vote, do nothing
+      if (existingVote.vote === args.vote) {
+        return { success: true, action: 'unchanged', vote: args.vote }
+      }
+
+      // Update the vote
+      await ctx.db.patch(existingVote._id, {
+        vote: args.vote,
+        isVerified, // Update in case agent was claimed since last vote
+        updatedAt: now,
+      })
+    } else {
+      // Create new vote
+      await ctx.db.insert('cachedSkillVotes', {
+        cachedSkillId: args.cachedSkillId,
+        botAgentId: agent._id,
+        voterType: 'bot',
+        isVerified,
+        vote: args.vote,
+        createdAt: now,
+        updatedAt: now,
       })
     }
+
+    // Update skill vote counts
+    await updateSkillVoteCounts(ctx, args.cachedSkillId, 'bot', isVerified, oldVote, args.vote)
+
+    // Update agent activity
+    await ctx.db.patch(agent._id, {
+      lastActiveAt: now,
+      voteCount: (agent.voteCount ?? 0) + (existingVote ? 0 : 1),
+      updatedAt: now,
+    })
+
+    const response: {
+      success: boolean
+      action: string
+      vote: 'up' | 'down'
+      is_verified: boolean
+      note?: string
+    } = {
+      success: true,
+      action: existingVote ? 'changed' : 'created',
+      vote: args.vote,
+      is_verified: isVerified,
+    }
+
+    if (!isVerified) {
+      response.note = 'Your agent is unverified. Votes count but may be filtered. Have your human claim you!'
+    }
+
+    return response
+  },
+})
+
+// Remove vote from a skill - Bot voter
+export const botRemoveVote = mutation({
+  args: {
+    cachedSkillId: v.id('cachedSkills'),
+    apiKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Validate API key
+    if (!args.apiKey.startsWith('clawdtm_sk_')) {
+      return { success: false, error: 'Invalid API key format' }
+    }
+
+    const apiKeyHash = simpleHash(args.apiKey)
+    const agent = await ctx.db
+      .query('botAgents')
+      .withIndex('by_api_key_hash', (q) => q.eq('apiKeyHash', apiKeyHash))
+      .unique()
+
+    if (!agent) {
+      return { success: false, error: 'Invalid API key' }
+    }
+
+    if (agent.revokedAt) {
+      return { success: false, error: 'API key has been revoked' }
+    }
+
+    // Get existing vote
+    const existingVote = await ctx.db
+      .query('cachedSkillVotes')
+      .withIndex('by_skill_bot_agent', (q) =>
+        q.eq('cachedSkillId', args.cachedSkillId).eq('botAgentId', agent._id)
+      )
+      .unique()
+
+    if (!existingVote) {
+      return { success: true, action: 'not_found' }
+    }
+
+    const isVerified = agent.status === 'verified'
+
+    // Update skill vote counts
+    await updateSkillVoteCounts(
+      ctx, 
+      args.cachedSkillId, 
+      'bot', 
+      isVerified, 
+      existingVote.vote, 
+      null
+    )
 
     // Delete the vote
     await ctx.db.delete(existingVote._id)
@@ -174,7 +418,7 @@ export const getUserVoteForSkill = query({
 
     const vote = await ctx.db
       .query('cachedSkillVotes')
-      .withIndex('by_skill_user', (q) =>
+      .withIndex('by_skill_human_user', (q) =>
         q.eq('cachedSkillId', args.cachedSkillId).eq('clerkUserId', user._id)
       )
       .unique()
@@ -204,10 +448,10 @@ export const getUserVotesForSkills = query({
       return {}
     }
 
-    // Get all votes for this user
+    // Get all votes for this user (human votes only)
     const allVotes = await ctx.db
       .query('cachedSkillVotes')
-      .withIndex('by_user', (q) => q.eq('clerkUserId', user._id))
+      .withIndex('by_human_user', (q) => q.eq('clerkUserId', user._id))
       .collect()
 
     // Build a map of skillId -> vote
@@ -223,6 +467,7 @@ export const getUserVotesForSkills = query({
 })
 
 // Get vote counts for a skill (public, no auth required)
+// Returns breakdown by human/bot voters
 export const getSkillVoteCounts = query({
   args: {
     cachedSkillId: v.id('cachedSkills'),
@@ -230,16 +475,101 @@ export const getSkillVoteCounts = query({
   handler: async (ctx, args) => {
     const skill = await ctx.db.get(args.cachedSkillId)
     if (!skill) {
-      return { upvotes: 0, downvotes: 0, netScore: 0 }
+      return { 
+        upvotes: 0, 
+        downvotes: 0, 
+        netScore: 0,
+        human: { upvotes: 0, downvotes: 0, netScore: 0 },
+        bot: { upvotes: 0, downvotes: 0, netScore: 0 },
+        verifiedBot: { upvotes: 0, downvotes: 0, netScore: 0 },
+      }
     }
 
     const upvotes = skill.clawdtmUpvotes ?? 0
     const downvotes = skill.clawdtmDownvotes ?? 0
+    const humanUp = skill.clawdtmHumanUpvotes ?? 0
+    const humanDown = skill.clawdtmHumanDownvotes ?? 0
+    const botUp = skill.clawdtmBotUpvotes ?? 0
+    const botDown = skill.clawdtmBotDownvotes ?? 0
+    const verifiedBotUp = skill.clawdtmVerifiedBotUpvotes ?? 0
+    const verifiedBotDown = skill.clawdtmVerifiedBotDownvotes ?? 0
 
     return {
+      // Combined totals
       upvotes,
       downvotes,
       netScore: upvotes - downvotes,
+      // Human votes
+      human: {
+        upvotes: humanUp,
+        downvotes: humanDown,
+        netScore: humanUp - humanDown,
+      },
+      // All bot votes
+      bot: {
+        upvotes: botUp,
+        downvotes: botDown,
+        netScore: botUp - botDown,
+      },
+      // Only verified bot votes (claimed by humans)
+      verifiedBot: {
+        upvotes: verifiedBotUp,
+        downvotes: verifiedBotDown,
+        netScore: verifiedBotUp - verifiedBotDown,
+      },
+    }
+  },
+})
+
+// Get vote counts for a skill by slug (for bot API)
+export const getSkillVoteCountsBySlug = query({
+  args: {
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const skill = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_slug', (q) => q.eq('slug', args.slug))
+      .unique()
+
+    if (!skill) {
+      return null
+    }
+
+    const upvotes = skill.clawdtmUpvotes ?? 0
+    const downvotes = skill.clawdtmDownvotes ?? 0
+    const humanUp = skill.clawdtmHumanUpvotes ?? 0
+    const humanDown = skill.clawdtmHumanDownvotes ?? 0
+    const botUp = skill.clawdtmBotUpvotes ?? 0
+    const botDown = skill.clawdtmBotDownvotes ?? 0
+    const verifiedBotUp = skill.clawdtmVerifiedBotUpvotes ?? 0
+    const verifiedBotDown = skill.clawdtmVerifiedBotDownvotes ?? 0
+
+    return {
+      skill_id: skill._id,
+      slug: skill.slug,
+      votes: {
+        combined: {
+          upvotes,
+          downvotes,
+          net_score: upvotes - downvotes,
+        },
+        human: {
+          upvotes: humanUp,
+          downvotes: humanDown,
+          net_score: humanUp - humanDown,
+        },
+        bot: {
+          upvotes: botUp,
+          downvotes: botDown,
+          net_score: botUp - botDown,
+        },
+        verified_bot: {
+          upvotes: verifiedBotUp,
+          downvotes: verifiedBotDown,
+          net_score: verifiedBotUp - verifiedBotDown,
+        },
+      },
     }
   },
 })

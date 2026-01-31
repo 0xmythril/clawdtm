@@ -58,7 +58,7 @@ export const deleteByClerkId = internalMutation({
       // Also delete their votes
       const votes = await ctx.db
         .query('cachedSkillVotes')
-        .withIndex('by_user', (q) => q.eq('clerkUserId', user._id))
+        .withIndex('by_human_user', (q) => q.eq('clerkUserId', user._id))
         .collect()
 
       for (const vote of votes) {

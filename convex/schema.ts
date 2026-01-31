@@ -407,8 +407,18 @@ const cachedSkills = defineTable({
   hiddenAt: v.optional(v.number()),
   
   // ClawdTM-specific vote counts (separate from ClawdHub stats)
+  // Legacy combined counts (kept for backwards compatibility)
   clawdtmUpvotes: v.optional(v.number()),
   clawdtmDownvotes: v.optional(v.number()),
+  
+  // Separate human/bot vote counts
+  clawdtmHumanUpvotes: v.optional(v.number()),
+  clawdtmHumanDownvotes: v.optional(v.number()),
+  clawdtmBotUpvotes: v.optional(v.number()),
+  clawdtmBotDownvotes: v.optional(v.number()),
+  // Verified bot votes (bots with claimed owners)
+  clawdtmVerifiedBotUpvotes: v.optional(v.number()),
+  clawdtmVerifiedBotDownvotes: v.optional(v.number()),
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -453,17 +463,65 @@ const clerkUsers = defineTable({
 })
   .index('by_clerk_id', ['clerkId'])
 
-// Votes on cached skills (ClawdTM-specific, requires Clerk auth)
+// Bot agents registered to vote on skills
+const botAgents = defineTable({
+  // Agent identity
+  name: v.string(),
+  description: v.optional(v.string()),
+  
+  // API key (hashed for security, prefix for identification)
+  apiKeyHash: v.string(),
+  apiKeyPrefix: v.string(), // e.g., "clawdtm_sk_abc..." (first 12 chars for display)
+  
+  // Ownership - either created by human (verified) or self-registered (needs claim)
+  ownerClerkUserId: v.optional(v.id('clerkUsers')), // Set when human creates or claims
+  claimCode: v.optional(v.string()), // For self-registered bots to be claimed
+  
+  // Status
+  status: v.union(
+    v.literal('verified'),   // Human created or claimed this agent
+    v.literal('unverified')  // Self-registered, not yet claimed
+  ),
+  
+  // Activity tracking
+  lastActiveAt: v.optional(v.number()),
+  voteCount: v.optional(v.number()),
+  
+  // Timestamps
+  createdAt: v.number(),
+  updatedAt: v.number(),
+  revokedAt: v.optional(v.number()), // Soft delete / revoke access
+})
+  .index('by_owner', ['ownerClerkUserId'])
+  .index('by_api_key_hash', ['apiKeyHash'])
+  .index('by_claim_code', ['claimCode'])
+  .index('by_status', ['status'])
+
+// Votes on cached skills (ClawdTM-specific, supports both human and bot voters)
 const cachedSkillVotes = defineTable({
   cachedSkillId: v.id('cachedSkills'),
-  clerkUserId: v.id('clerkUsers'),
+  
+  // Voter identity - one of these will be set
+  clerkUserId: v.optional(v.id('clerkUsers')), // Human voter
+  botAgentId: v.optional(v.id('botAgents')),   // Bot voter
+  
+  // Voter type for easy filtering (optional for backwards compat with old votes)
+  voterType: v.optional(v.union(v.literal('human'), v.literal('bot'))),
+  
+  // Is this a verified voter? (optional for backwards compat - defaults to true for human votes)
+  isVerified: v.optional(v.boolean()),
+  
   vote: v.union(v.literal('up'), v.literal('down')),
   createdAt: v.number(),
   updatedAt: v.number(),
 })
   .index('by_skill', ['cachedSkillId'])
-  .index('by_user', ['clerkUserId'])
-  .index('by_skill_user', ['cachedSkillId', 'clerkUserId'])
+  .index('by_human_user', ['clerkUserId'])
+  .index('by_bot_agent', ['botAgentId'])
+  .index('by_skill_human_user', ['cachedSkillId', 'clerkUserId'])
+  .index('by_skill_bot_agent', ['cachedSkillId', 'botAgentId'])
+  .index('by_voter_type', ['voterType'])
+  .index('by_skill_voter_type', ['cachedSkillId', 'voterType'])
 
 // AI categorization logs
 const categorizationLogs = defineTable({
@@ -523,6 +581,7 @@ export default defineSchema({
   cachedSkills,
   clawdhubSyncState,
   clerkUsers,
+  botAgents,
   cachedSkillVotes,
   categorizationLogs,
 })

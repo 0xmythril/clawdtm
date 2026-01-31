@@ -5,7 +5,6 @@ import { useState, useEffect, useMemo } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import {
   Sparkles,
-  ExternalLink,
   Moon,
   Sun,
   Github,
@@ -17,6 +16,9 @@ import {
   Search,
   X,
   LogIn,
+  Bot,
+  Users,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +57,8 @@ function getTagColor(tag: string): string {
 
 type TagData = { tag: string; count: number };
 
+export type VoteFilter = "combined" | "human" | "bot";
+
 type SidebarProps = {
   tags: TagData[];
   activeCategory: string;
@@ -62,6 +66,8 @@ type SidebarProps = {
   onCategoryChange: (category: string) => void;
   onTagToggle: (tag: string) => void;
   onClearTags: () => void;
+  voteFilter?: VoteFilter;
+  onVoteFilterChange?: (filter: VoteFilter) => void;
 };
 
 export function Sidebar({
@@ -71,6 +77,8 @@ export function Sidebar({
   onCategoryChange,
   onTagToggle,
   onClearTags,
+  voteFilter = "combined",
+  onVoteFilterChange,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const authRedirectUrl =
@@ -139,9 +147,16 @@ export function Sidebar({
             <Sparkles className="h-4 w-4" />
             Skills
           </Link>
+          <Link
+            href="/agents"
+            className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"
+          >
+            <Bot className="h-4 w-4" />
+            My Agents
+          </Link>
           <GettingStartedModal
             trigger={
-              <button className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full">
+              <button className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer">
                 <HelpCircle className="h-4 w-4" />
                 Getting Started
               </button>
@@ -152,7 +167,7 @@ export function Sidebar({
         {/* Categories Section */}
         <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
           <CollapsibleTrigger asChild>
-            <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+            <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
               <span className="flex items-center gap-2">
                 <FolderOpen className="h-3.5 w-3.5" />
                 Categories
@@ -169,7 +184,7 @@ export function Sidebar({
               <button
                 key={cat.name}
                 onClick={() => onCategoryChange(cat.name)}
-                className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors ${
+                className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
                   activeCategory === cat.name
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
@@ -187,7 +202,7 @@ export function Sidebar({
         {/* Tags Section */}
         <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-4">
           <CollapsibleTrigger asChild>
-            <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+            <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
               <span className="flex items-center gap-2">
                 <Cpu className="h-3.5 w-3.5" />
                 Tags by AI
@@ -213,7 +228,7 @@ export function Sidebar({
               {tagSearch && (
                 <button
                   onClick={() => setTagSearch("")}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -265,19 +280,51 @@ export function Sidebar({
           </CollapsibleContent>
         </Collapsible>
 
-        {/* External Links */}
-        <div className="mt-6 space-y-1">
-          <a
-            href="https://clawdhub.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"
-          >
-            <Sparkles className="h-4 w-4" />
-            Clawdhub
-            <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
-          </a>
-        </div>
+        {/* Vote Display Section */}
+        {onVoteFilterChange && (
+          <div className="mt-4 px-3">
+            <div className="flex items-center gap-2 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Eye className="h-3.5 w-3.5" />
+              Vote Display
+            </div>
+            <div className="flex flex-col gap-1 mt-1">
+              <button
+                onClick={() => onVoteFilterChange("combined")}
+                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                  voteFilter === "combined"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Combined
+              </button>
+              <button
+                onClick={() => onVoteFilterChange("human")}
+                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                  voteFilter === "human"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Human Only
+              </button>
+              <button
+                onClick={() => onVoteFilterChange("bot")}
+                className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                  voteFilter === "bot"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                }`}
+              >
+                <Bot className="h-3.5 w-3.5" />
+                AI Only
+              </button>
+            </div>
+          </div>
+        )}
+
         </div>
       </ScrollArea>
 

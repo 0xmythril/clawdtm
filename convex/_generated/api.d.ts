@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as botAgents from "../botAgents.js";
 import type * as categorization from "../categorization.js";
 import type * as clawdhubSync from "../clawdhubSync.js";
 import type * as crons from "../crons.js";
@@ -23,6 +24,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  botAgents: typeof botAgents;
   categorization: typeof categorization;
   clawdhubSync: typeof clawdhubSync;
   crons: typeof crons;

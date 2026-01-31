@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot, Users, Eye } from "lucide-react";
+import Link from "next/link";
+import type { VoteFilter } from "./sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -47,6 +49,8 @@ type MobileNavProps = {
   onTagToggle: (tag: string) => void;
   onClearTags: () => void;
   onSearchFocus: () => void;
+  voteFilter?: VoteFilter;
+  onVoteFilterChange?: (filter: VoteFilter) => void;
 };
 
 // Fixed categories - same as sidebar
@@ -65,6 +69,8 @@ export function MobileNav({
   onTagToggle,
   onClearTags,
   onSearchFocus,
+  voteFilter = "combined",
+  onVoteFilterChange,
 }: MobileNavProps) {
   const { theme, setTheme } = useTheme();
   const authRedirectUrl =
@@ -72,7 +78,7 @@ export function MobileNav({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"categories" | "tags">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "tags" | "votes">("categories");
 
   const topTags = tags.slice(0, 20);
   const hasActiveFilters = activeCategory !== "all" || selectedTags.length > 0;
@@ -85,7 +91,7 @@ export function MobileNav({
         <div className="flex items-center justify-around h-16 px-4">
           {/* Search */}
           <button
-            className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2"
+            className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
             onClick={onSearchFocus}
           >
             <Search className="h-6 w-6" />
@@ -95,7 +101,7 @@ export function MobileNav({
           {/* Filters */}
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2">
+              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2 cursor-pointer">
                 <SlidersHorizontal className="h-6 w-6" />
                 <span className="text-xs">Filter</span>
                 {filterCount > 0 && (
@@ -130,7 +136,7 @@ export function MobileNav({
               <div className="flex border-b border-border/40">
                 <button
                   onClick={() => setActiveTab("categories")}
-                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${
                     activeTab === "categories"
                       ? "text-foreground border-b-2 border-primary"
                       : "text-muted-foreground"
@@ -144,20 +150,36 @@ export function MobileNav({
                 </button>
                 <button
                   onClick={() => setActiveTab("tags")}
-                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${
                     activeTab === "tags"
                       ? "text-foreground border-b-2 border-primary"
                       : "text-muted-foreground"
                   }`}
                 >
                   <Cpu className="h-4 w-4" />
-                  Tags by AI
+                  Tags
                   {selectedTags.length > 0 && (
                     <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
                       {selectedTags.length}
                     </span>
                   )}
                 </button>
+                {onVoteFilterChange && (
+                  <button
+                    onClick={() => setActiveTab("votes")}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+                      activeTab === "votes"
+                        ? "text-foreground border-b-2 border-primary"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Votes
+                    {voteFilter !== "combined" && (
+                      <span className="h-2 w-2 bg-primary rounded-full" />
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Content */}
@@ -169,7 +191,7 @@ export function MobileNav({
                         onCategoryChange("all");
                         setFiltersOpen(false);
                       }}
-                      className={`p-4 rounded-xl text-sm font-medium transition-all text-left ${
+                      className={`p-4 rounded-xl text-sm font-medium transition-all text-left cursor-pointer ${
                         activeCategory === "all"
                           ? "bg-primary text-primary-foreground shadow-md"
                           : "bg-muted hover:bg-muted/80 text-foreground"
@@ -184,7 +206,7 @@ export function MobileNav({
                           onCategoryChange(cat.name);
                           setFiltersOpen(false);
                         }}
-                        className={`p-4 rounded-xl text-sm font-medium transition-all text-left ${
+                        className={`p-4 rounded-xl text-sm font-medium transition-all text-left cursor-pointer ${
                           activeCategory === cat.name
                             ? "bg-primary text-primary-foreground shadow-md"
                             : "bg-muted hover:bg-muted/80 text-foreground"
@@ -197,7 +219,7 @@ export function MobileNav({
                       </button>
                     ))}
                   </div>
-                ) : (
+                ) : activeTab === "tags" ? (
                   <div className="space-y-4">
                     {selectedTags.length > 0 && (
                       <div className="flex items-center justify-between pb-2 border-b border-border/40">
@@ -222,7 +244,7 @@ export function MobileNav({
                           <button
                             key={tag}
                             onClick={() => onTagToggle(tag)}
-                            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                               isSelected
                                 ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md"
                                 : ""
@@ -235,6 +257,64 @@ export function MobileNav({
                       })}
                     </div>
                   </div>
+                ) : (
+                  /* Votes tab */
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Choose which votes to display
+                    </p>
+                    <button
+                      onClick={() => {
+                        onVoteFilterChange?.("combined");
+                        setFiltersOpen(false);
+                      }}
+                      className={`w-full p-4 rounded-xl text-sm font-medium transition-all text-left flex items-center gap-3 cursor-pointer ${
+                        voteFilter === "combined"
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "bg-muted hover:bg-muted/80 text-foreground"
+                      }`}
+                    >
+                      <Users className="h-5 w-5" />
+                      <div>
+                        <div>Combined</div>
+                        <div className="text-xs opacity-70">Human + AI votes</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onVoteFilterChange?.("human");
+                        setFiltersOpen(false);
+                      }}
+                      className={`w-full p-4 rounded-xl text-sm font-medium transition-all text-left flex items-center gap-3 cursor-pointer ${
+                        voteFilter === "human"
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "bg-muted hover:bg-muted/80 text-foreground"
+                      }`}
+                    >
+                      <Users className="h-5 w-5" />
+                      <div>
+                        <div>Human Only</div>
+                        <div className="text-xs opacity-70">Votes from logged-in users</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onVoteFilterChange?.("bot");
+                        setFiltersOpen(false);
+                      }}
+                      className={`w-full p-4 rounded-xl text-sm font-medium transition-all text-left flex items-center gap-3 cursor-pointer ${
+                        voteFilter === "bot"
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "bg-muted hover:bg-muted/80 text-foreground"
+                      }`}
+                    >
+                      <Bot className="h-5 w-5" />
+                      <div>
+                        <div>AI Only</div>
+                        <div className="text-xs opacity-70">Votes from AI agents</div>
+                      </div>
+                    </button>
+                  </div>
                 )}
               </div>
             </SheetContent>
@@ -243,7 +323,7 @@ export function MobileNav({
           {/* Settings */}
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2">
+              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer">
                 <Settings className="h-6 w-6" />
                 <span className="text-xs">Settings</span>
               </button>
@@ -305,6 +385,18 @@ export function MobileNav({
                 >
                   <HelpCircle className="h-5 w-5" />
                   <span className="flex-1 text-left">Getting Started</span>
+                </Button>
+
+                {/* My Agents */}
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-12 text-sm"
+                  asChild
+                >
+                  <Link href="/agents" onClick={() => setSettingsOpen(false)}>
+                    <Bot className="h-5 w-5" />
+                    <span className="flex-1 text-left">My Agents</span>
+                  </Link>
                 </Button>
 
                 {/* Theme toggle - not an external link */}
