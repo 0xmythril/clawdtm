@@ -299,7 +299,6 @@ export function Sidebar({
           <SignedOut>
             <SignInButton
               mode="modal"
-              redirectUrl={authRedirectUrl}
               afterSignInUrl={authRedirectUrl}
               afterSignUpUrl={authRedirectUrl}
             >
