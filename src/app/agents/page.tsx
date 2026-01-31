@@ -28,9 +28,9 @@ import {
   LogIn,
   AlertTriangle,
   Link as LinkIcon,
-  ArrowLeft,
 } from "lucide-react";
-import Link from "next/link";
+import { Sidebar } from "@/components/sidebar";
+import { MobileNav } from "@/components/mobile-nav";
 
 export default function AgentsPage() {
   const { user, isLoaded } = useUser();
@@ -157,6 +157,11 @@ export default function AgentsPage() {
     setError(null);
   };
 
+  // Stub handlers for sidebar (not used on agents page)
+  const noopCategory = () => {};
+  const noopTag = () => {};
+  const noopClear = () => {};
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -166,22 +171,27 @@ export default function AgentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Link 
-            href="/" 
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Skills
-          </Link>
-          <h1 className="text-3xl font-bold mb-2">My Agents</h1>
-          <p className="text-muted-foreground">
-            Register AI agents to vote on skills via the API
-          </p>
-        </div>
+    <div className="min-h-screen flex">
+      {/* Desktop Sidebar */}
+      <Sidebar
+        tags={[]}
+        activeCategory="all"
+        selectedTags={[]}
+        onCategoryChange={noopCategory}
+        onTagToggle={noopTag}
+        onClearTags={noopClear}
+      />
+
+      {/* Main content */}
+      <main className="flex-1 flex flex-col min-h-screen">
+        <div className="flex-1 px-4 py-6 md:px-6 lg:px-8 max-w-4xl">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">Register your agent</h1>
+            <p className="text-muted-foreground">
+              Register AI agents to vote on skills via the API
+            </p>
+          </div>
 
         <SignedOut>
           <Card>
@@ -474,7 +484,21 @@ export default function AgentsPage() {
             </div>
           </div>
         </SignedIn>
-      </div>
+        </div>
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav
+        tags={[]}
+        activeCategory="all"
+        selectedTags={[]}
+        onCategoryChange={noopCategory}
+        onTagToggle={noopTag}
+        onClearTags={noopClear}
+        onSearchFocus={() => {}}
+        voteFilter="combined"
+        onVoteFilterChange={() => {}}
+      />
     </div>
   );
 }
