@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, ExternalLink, Terminal } from "lucide-react";
+import { Search, SlidersHorizontal, ExternalLink, Terminal, Copy, Check, Bot } from "lucide-react";
 
 type GettingStartedModalProps = {
   trigger?: React.ReactNode;
@@ -17,6 +18,15 @@ type GettingStartedModalProps = {
 };
 
 export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStartedModalProps) {
+  const [copied, setCopied] = useState(false);
+  const exampleCommand = "clawdhub install web-search";
+
+  const copyCommand = () => {
+    navigator.clipboard.writeText(exampleCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -116,16 +126,48 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             </div>
           </section>
 
+          {/* AI Agent tip */}
+          <section className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <h3 className="font-semibold text-foreground mb-1 flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              Tip: Ask Your AI Agent
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              You can also ask your AI agent to install skills for you! Just tell it the skill 
+              name and it can run the install command.
+            </p>
+          </section>
+
           {/* Example command */}
           <section>
             <h3 className="font-semibold text-foreground mb-2">Example</h3>
             <div className="bg-muted/50 border border-border rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Terminal className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Terminal</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Terminal</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 cursor-pointer"
+                  onClick={copyCommand}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1 text-green-500" />
+                      <span className="text-xs">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      <span className="text-xs">Copy</span>
+                    </>
+                  )}
+                </Button>
               </div>
               <code className="text-sm font-mono text-foreground">
-                clawdhub install web-search
+                {exampleCommand}
               </code>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -155,7 +197,7 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
 
           {/* Links */}
           <section className="flex flex-col sm:flex-row gap-2 pt-2">
-            <Button variant="outline" className="flex-1" asChild>
+            <Button variant="outline" className="flex-1 cursor-pointer" asChild>
               <a
                 href="https://docs.openclaw.ai/"
                 target="_blank"
@@ -165,7 +207,7 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
                 OpenClaw Docs
               </a>
             </Button>
-            <Button variant="outline" className="flex-1" asChild>
+            <Button variant="outline" className="flex-1 cursor-pointer" asChild>
               <a
                 href="https://clawdhub.com"
                 target="_blank"

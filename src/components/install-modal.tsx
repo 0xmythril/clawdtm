@@ -68,9 +68,21 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
               Install Command
             </p>
             <div className="relative">
-              <pre className="bg-muted/50 border border-border rounded-lg p-3 text-xs sm:text-sm overflow-x-auto font-mono whitespace-pre-wrap break-all">
+              <pre className="bg-muted/50 border border-border rounded-lg p-3 pr-12 text-xs sm:text-sm overflow-x-auto font-mono whitespace-pre-wrap break-all">
                 <code className="text-foreground">{installCommand}</code>
               </pre>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 cursor-pointer"
+                onClick={handleCopy}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
             </div>
           </div>
 
@@ -89,7 +101,7 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 cursor-pointer"
                 onClick={handlePromptCopy}
               >
                 {promptCopied ? (
@@ -133,26 +145,10 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <Button 
-              className="flex-1 h-10" 
-              onClick={handleCopy}
-            >
-              {copied ? (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy Command
-                </>
-              )}
-            </Button>
+          <div className="pt-2">
             <Button
               variant="outline"
-              className="h-10"
+              className="w-full h-10 cursor-pointer"
               onClick={() => {
                 trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "install_modal");
                 window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");

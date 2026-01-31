@@ -16,9 +16,9 @@ import {
   Search,
   X,
   LogIn,
-  Bot,
   PanelLeftClose,
   PanelLeft,
+  Bot,
 } from "lucide-react";
 import {
   Tooltip,
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Logo } from "./logo";
 import { GettingStartedModal } from "./getting-started-modal";
+import { AgentVotingModal } from "./agent-voting-modal";
 import Link from "next/link";
 
 // Tag color palette
@@ -94,7 +95,6 @@ export function Sidebar({
 
   // Determine current page
   const isSkillsPage = pathname === "/" || pathname === "";
-  const isAgentsPage = pathname === "/agents";
 
   useEffect(() => {
     setMounted(true);
@@ -177,6 +177,10 @@ export function Sidebar({
             <TooltipTrigger asChild>
               <Link
                 href="/"
+                onClick={() => {
+                  // Expand sidebar when clicking Skills while collapsed
+                  if (collapsed) setCollapsed(false);
+                }}
                 className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors relative ${
                   collapsed ? "justify-center" : ""
                 } ${
@@ -192,32 +196,40 @@ export function Sidebar({
                 {!collapsed && "Skills"}
               </Link>
             </TooltipTrigger>
-            {collapsed && <TooltipContent side="right">Skills</TooltipContent>}
+            {collapsed && <TooltipContent side="right">Skills (click to expand)</TooltipContent>}
           </Tooltip>
           
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <GettingStartedModal
-                  trigger={
-                    <button className="flex items-center justify-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer">
-                      <HelpCircle className="h-4 w-4 shrink-0" />
-                    </button>
-                  }
-                />
-              </TooltipTrigger>
-              <TooltipContent side="right">Getting Started</TooltipContent>
-            </Tooltip>
-          ) : (
-            <GettingStartedModal
-              trigger={
-                <button className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer">
-                  <HelpCircle className="h-4 w-4 shrink-0" />
-                  Getting Started
-                </button>
-              }
-            />
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <GettingStartedModal
+                trigger={
+                  <button className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
+                    collapsed ? "justify-center" : ""
+                  }`}>
+                    <HelpCircle className="h-4 w-4 shrink-0" />
+                    {!collapsed && "Getting Started"}
+                  </button>
+                }
+              />
+            </TooltipTrigger>
+            {collapsed && <TooltipContent side="right">Getting Started</TooltipContent>}
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AgentVotingModal
+                trigger={
+                  <button className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
+                    collapsed ? "justify-center" : ""
+                  }`}>
+                    <Bot className="h-4 w-4 shrink-0" />
+                    {!collapsed && "Agent Voting"}
+                  </button>
+                }
+              />
+            </TooltipTrigger>
+            {collapsed && <TooltipContent side="right">Agent Voting API</TooltipContent>}
+          </Tooltip>
         </nav>
 
         {/* Skill Filters - Only shown on Skills page and when not collapsed */}
@@ -353,31 +365,6 @@ export function Sidebar({
 
       {/* Footer */}
       <div className={`border-t border-border/40 space-y-2 flex-shrink-0 ${collapsed ? "p-2" : "p-3"}`}>
-        {/* Register your agent - always visible */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link
-              href="/agents"
-              className={`flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors relative ${
-                collapsed ? "justify-center" : ""
-              } ${
-                isAgentsPage
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              }`}
-            >
-              {isAgentsPage && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
-              )}
-              <Bot className="h-4 w-4 shrink-0" />
-              {!collapsed && "Register your agent"}
-            </Link>
-          </TooltipTrigger>
-          {collapsed && <TooltipContent side="right">Register your agent</TooltipContent>}
-        </Tooltip>
-
-        {/* Divider */}
-        <div className="border-t border-border/40 my-2" />
 
         {/* User section - at bottom */}
         <SignedOut>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot, Users, Eye } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Users, Eye, Bot } from "lucide-react";
 import Link from "next/link";
 import type { VoteFilter } from "./sidebar";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { useTheme } from "next-themes";
 import { Logo } from "./logo";
 import { GettingStartedModal } from "./getting-started-modal";
+import { AgentVotingModal } from "./agent-voting-modal";
 
 // Tag color palette
 const TAG_COLORS = [
@@ -78,6 +79,7 @@ export function MobileNav({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
+  const [agentVotingOpen, setAgentVotingOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"categories" | "tags" | "votes">("categories");
 
   const topTags = tags.slice(0, 20);
@@ -387,16 +389,17 @@ export function MobileNav({
                   <span className="flex-1 text-left">Getting Started</span>
                 </Button>
 
-                {/* Register your agent */}
+                {/* Agent Voting */}
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-3 h-12 text-sm"
-                  asChild
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setAgentVotingOpen(true);
+                  }}
                 >
-                  <Link href="/agents" onClick={() => setSettingsOpen(false)}>
-                    <Bot className="h-5 w-5" />
-                    <span className="flex-1 text-left">Register your agent</span>
-                  </Link>
+                  <Bot className="h-5 w-5" />
+                  <span className="flex-1 text-left">Agent Voting</span>
                 </Button>
 
                 {/* Theme toggle - not an external link */}
@@ -502,6 +505,12 @@ export function MobileNav({
       <GettingStartedModal
         open={gettingStartedOpen}
         onOpenChange={setGettingStartedOpen}
+      />
+
+      {/* Agent Voting Modal */}
+      <AgentVotingModal
+        open={agentVotingOpen}
+        onOpenChange={setAgentVotingOpen}
       />
     </>
   );
