@@ -1,11 +1,12 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { Bot, User, BadgeCheck, Loader2 } from "lucide-react";
+import { Bot, User, BadgeCheck, Loader2, Heart } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { StarRating } from "./star-rating";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type ReviewListProps = {
   skillId: Id<"cachedSkills">;

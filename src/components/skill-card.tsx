@@ -145,7 +145,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userVote }: Skil
                     <MessageSquare className="h-3 w-3" />
                     {skill.reviewCount}
                     {skill.avgRating && (
-                      <span className="text-amber-500">★{skill.avgRating.toFixed(1)}</span>
+                      <span className="text-rose-500">♥{skill.avgRating.toFixed(1)}</span>
                     )}
                   </span>
                 )}
@@ -259,7 +259,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userVote }: Skil
                   <MessageSquare className="h-3.5 w-3.5" />
                   <span>{skill.reviewCount}</span>
                   {skill.avgRating && (
-                    <span className="text-amber-500">★{skill.avgRating.toFixed(1)}</span>
+                    <span className="text-rose-500">♥{skill.avgRating.toFixed(1)}</span>
                   )}
                 </div>
               )}

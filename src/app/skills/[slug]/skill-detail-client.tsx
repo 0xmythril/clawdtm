@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Bot,
   User,
+  Heart,
 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -305,7 +306,7 @@ function SkillContent({
               <div className="flex items-center justify-center gap-1 text-lg font-semibold">
                 {skill.avgRating !== null ? (
                   <>
-                    <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                    <Heart className="h-4 w-4 text-rose-500 fill-rose-500" />
                     {skill.avgRating.toFixed(1)}
                   </>
                 ) : (
@@ -369,7 +370,7 @@ function SkillContent({
               </Badge>
               {displayedAvgRating !== null && (
                 <span className="flex items-center gap-1 text-sm font-normal text-muted-foreground">
-                  <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                  <Heart className="h-4 w-4 text-rose-500 fill-rose-500" />
                   {displayedAvgRating.toFixed(1)}
                 </span>
               )}

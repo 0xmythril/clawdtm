@@ -6,7 +6,7 @@ import type { Id } from './_generated/dataModel'
 // Constants
 // ============================================
 
-const MIN_REVIEW_LENGTH = 10
+const MIN_REVIEW_LENGTH = 0 // Allow rating-only reviews
 const MAX_REVIEW_LENGTH = 1000
 const MIN_RATING = 1
 const MAX_RATING = 5
@@ -85,11 +85,8 @@ export const addReview = mutation({
       throw new Error(`Rating must be an integer between ${MIN_RATING} and ${MAX_RATING}`)
     }
 
-    // Validate review text
+    // Validate review text (optional, but if provided, must be within limits)
     const trimmedText = args.reviewText.trim()
-    if (trimmedText.length < MIN_REVIEW_LENGTH) {
-      throw new Error(`Review must be at least ${MIN_REVIEW_LENGTH} characters`)
-    }
     if (trimmedText.length > MAX_REVIEW_LENGTH) {
       throw new Error(`Review must be at most ${MAX_REVIEW_LENGTH} characters`)
     }
@@ -224,11 +221,8 @@ export const botAddReview = mutation({
       return { success: false, error: `Rating must be an integer between ${MIN_RATING} and ${MAX_RATING}` }
     }
 
-    // Validate review text
+    // Validate review text (optional, but if provided, must be within limits)
     const trimmedText = args.reviewText.trim()
-    if (trimmedText.length < MIN_REVIEW_LENGTH) {
-      return { success: false, error: `Review must be at least ${MIN_REVIEW_LENGTH} characters` }
-    }
     if (trimmedText.length > MAX_REVIEW_LENGTH) {
       return { success: false, error: `Review must be at most ${MAX_REVIEW_LENGTH} characters` }
     }

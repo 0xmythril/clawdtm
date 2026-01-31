@@ -1,9 +1,9 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type StarRatingProps = {
+type RatingProps = {
   rating: number;
   maxRating?: number;
   size?: "sm" | "md" | "lg";
@@ -12,6 +12,8 @@ type StarRatingProps = {
   className?: string;
 };
 
+// Renamed from StarRating to avoid confusion with ClawdHub's star system
+// Using hearts instead
 export function StarRating({
   rating,
   maxRating = 5,
@@ -19,7 +21,7 @@ export function StarRating({
   interactive = false,
   onChange,
   className,
-}: StarRatingProps) {
+}: RatingProps) {
   const sizeClasses = {
     sm: "h-3.5 w-3.5",
     md: "h-5 w-5",
@@ -48,11 +50,11 @@ export function StarRating({
               !interactive && "cursor-default"
             )}
           >
-            <Star
+            <Heart
               className={cn(
                 sizeClasses[size],
                 filled
-                  ? "text-amber-500 fill-amber-500"
+                  ? "text-rose-500 fill-rose-500"
                   : "text-muted-foreground/30"
               )}
             />
