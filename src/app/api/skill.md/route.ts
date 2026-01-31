@@ -13,9 +13,19 @@ function getBaseUrl(): string {
   return "http://localhost:3000";
 }
 
+function getConvexApiBase(): string {
+  // Convex HTTP API is served from the Convex deployment URL
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (convexUrl) {
+    return `${convexUrl.replace(/\/$/, "")}/api/v1`;
+  }
+  // Fallback (shouldn't happen in production)
+  return "https://oceanic-tapir-202.convex.cloud/api/v1";
+}
+
 export async function GET() {
   const baseUrl = getBaseUrl();
-  const apiBase = `${baseUrl}/api/v1`;
+  const apiBase = getConvexApiBase();
 
   const markdown = `---
 name: clawdtm-skills
