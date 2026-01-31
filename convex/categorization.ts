@@ -90,7 +90,7 @@ function categorizeSkillLogic(skill: {
   slug: string
   description?: string | null
   summary?: string | null
-  tags?: any
+  tags?: string[] | Record<string, unknown> | null
 }): { category: SkillCategory; tags: string[] } {
   const text = [
     skill.name,

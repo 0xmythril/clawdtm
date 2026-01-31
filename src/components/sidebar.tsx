@@ -5,7 +5,6 @@ import { useState, useEffect, useMemo } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import {
   Sparkles,
-  FileText,
   ExternalLink,
   Moon,
   Sun,
@@ -269,16 +268,6 @@ export function Sidebar({
         {/* External Links */}
         <div className="mt-6 space-y-1">
           <a
-            href="https://docs.openclaw.ai/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"
-          >
-            <FileText className="h-4 w-4" />
-            OpenClaw Docs
-            <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
-          </a>
-          <a
             href="https://clawdhub.com"
             target="_blank"
             rel="noopener noreferrer"
@@ -299,9 +288,8 @@ export function Sidebar({
           <SignedOut>
             <SignInButton
               mode="modal"
-              redirectUrl={authRedirectUrl}
-              afterSignInUrl={authRedirectUrl}
-              afterSignUpUrl={authRedirectUrl}
+              forceRedirectUrl={authRedirectUrl}
+              signUpForceRedirectUrl={authRedirectUrl}
             >
               <Button variant="outline" size="sm" className="flex-1 justify-start gap-2 h-9">
                 <LogIn className="h-4 w-4" />

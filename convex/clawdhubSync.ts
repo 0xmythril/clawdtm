@@ -843,24 +843,6 @@ export const getCategories = query({
   },
 })
 
-// Get all unique tags from cached skills
-// Tags to exclude (version info, not real tags)
-const EXCLUDED_TAGS = new Set(['latest', 'stable', 'beta', 'alpha', 'dev', 'main', 'master'])
-
-function isVersionTag(tag: string): boolean {
-  // Match version patterns like "1.0.0", "v1.0.0", "0.1.0"
-  return /^v?\d+\.\d+(\.\d+)?(-.*)?$/.test(tag)
-}
-
-function isValidTag(tag: string): boolean {
-  if (!tag || typeof tag !== 'string') return false
-  const normalized = tag.toLowerCase().trim()
-  if (normalized.length < 2 || normalized.length > 30) return false
-  if (EXCLUDED_TAGS.has(normalized)) return false
-  if (isVersionTag(normalized)) return false
-  return true
-}
-
 export const getTags = query({
   args: {},
   handler: async (ctx) => {

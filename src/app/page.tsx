@@ -51,7 +51,10 @@ function SkillsContent() {
   const urlQuery = searchParams.get("q") ?? "";
   const urlCategory = searchParams.get("category") ?? "all";
   const urlSort = (searchParams.get("sort") as SortOption) ?? "downloads";
-  const urlTags = searchParams.get("tags")?.split(",").filter(Boolean) ?? [];
+  const urlTags = useMemo(
+    () => searchParams.get("tags")?.split(",").filter(Boolean) ?? [],
+    [searchParams]
+  );
 
   // Local state
   const [query, setQuery] = useState(urlQuery);
@@ -116,12 +119,11 @@ function SkillsContent() {
       : "skip"
   );
 
+  const verifiedSlugs = useMemo(() => new Set(["gog"]), []);
+
   // Accumulate skills for infinite scroll
   useEffect(() => {
     if (!cachedResult?.skills) return;
-
-    // Verified skills list (curated/tested)
-    const VERIFIED_SLUGS = new Set(["gog"]);
 
     const newSkills: Skill[] = cachedResult.skills.map((s) => ({
       _id: s._id,
@@ -134,7 +136,7 @@ function SkillsContent() {
       installs: s.installs,
       category: s.category,
       normalizedTags: s.normalizedTags,
-      isVerified: VERIFIED_SLUGS.has(s.slug),
+      isVerified: verifiedSlugs.has(s.slug),
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
     }));
@@ -148,10 +150,7 @@ function SkillsContent() {
         return [...prev, ...unique];
       });
     }
-  }, [cachedResult, cursor]);
-
-  // Verified skills list (curated/tested)
-  const VERIFIED_SLUGS = new Set(["gog"]);
+  }, [cachedResult, cursor, verifiedSlugs]);
 
   // Determine which data to show
   const skills: Skill[] = useMemo(() => {
@@ -165,13 +164,13 @@ function SkillsContent() {
         downloads: s.downloads,
         stars: s.stars,
         installs: s.installs,
-        isVerified: VERIFIED_SLUGS.has(s.slug),
+        isVerified: verifiedSlugs.has(s.slug),
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
       }));
     }
     return allSkills;
-  }, [allSkills, searchResult, query]);
+  }, [allSkills, searchResult, query, verifiedSlugs]);
 
   // Better loading detection - show loading only if we're actually waiting for initial data
   // If categories/tags loaded but skills haven't, we're connected - just waiting for skills
@@ -318,7 +317,6 @@ function SkillsContent() {
             }}
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
-            totalCount={totalCount}
           />
 
           {/* Skills grid/list */}
@@ -380,16 +378,26 @@ function SkillsContent() {
         <footer className="hidden md:block border-t border-border/40 py-4 px-4 md:px-6 mt-auto">
           <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
             <a
-              href="https://discord.gg/openclaw"
+              href="https://discord.gg/eTtG4rhbp6"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors flex items-center gap-1.5"
-              onClick={() => trackExternalLink("https://discord.gg/openclaw", "footer_discord")}
+              onClick={() => trackExternalLink("https://discord.gg/eTtG4rhbp6", "footer_discord")}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
               </svg>
               Join the Community
+            </a>
+            <span className="text-border">•</span>
+            <a
+              href="https://docs.openclaw.ai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+              onClick={() => trackExternalLink("https://docs.openclaw.ai/", "footer_docs")}
+            >
+              OpenClaw Docs
             </a>
             <span className="text-border">•</span>
             <a
