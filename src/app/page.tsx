@@ -390,6 +390,18 @@ function SkillsContent() {
                 <div className="mt-8 flex flex-col items-center gap-4">
                   <p className="text-sm text-muted-foreground">
                     Showing {skills.length} of {totalCount} skills
+                    <span className="mx-1.5">·</span>
+                    <span className="text-muted-foreground/70">
+                      Skill data from{" "}
+                      <a 
+                        href="https://clawdhub.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:underline hover:text-foreground transition-colors"
+                      >
+                        Clawdhub
+                      </a>
+                    </span>
                   </p>
                   {hasMore && !query.trim() && (
                     <Button
