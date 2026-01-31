@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, LayoutGrid, List, ChevronDown, Users, Bot } from "lucide-react";
+import { Search, X, LayoutGrid, List, ChevronDown } from "lucide-react";
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,16 @@ import {
 import type { VoteFilter } from "./sidebar";
 
 const SORT_OPTIONS = [
-  { value: "downloads", label: "Most Downloaded" },
-  { value: "stars", label: "Most Starred" },
-  { value: "installs", label: "Most Installed" },
-  { value: "votes", label: "Most Voted" },
+  { value: "downloads", label: "Downloads", symbol: "↓" },
+  { value: "stars", label: "Stars", symbol: "★" },
+  { value: "installs", label: "Installs", symbol: "⬇" },
+  { value: "votes", label: "Votes", symbol: "▲" },
 ] as const;
 
 const VOTE_FILTER_OPTIONS = [
-  { value: "combined", label: "All Votes", shortLabel: "All", icon: Users },
-  { value: "human", label: "Human Only", shortLabel: "Human", icon: Users },
-  { value: "bot", label: "AI Only", shortLabel: "AI", icon: Bot },
+  { value: "combined", label: "All", emoji: "👥" },
+  { value: "human", label: "Human", emoji: "🧑" },
+  { value: "bot", label: "AI", emoji: "🤖" },
 ] as const;
 
 type SortOption = (typeof SORT_OPTIONS)[number]["value"];
@@ -90,9 +90,8 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       inputRef.current?.focus();
     };
 
-    const activeSortLabel = SORT_OPTIONS.find((o) => o.value === activeSort)?.label;
+    const activeSort$ = SORT_OPTIONS.find((o) => o.value === activeSort);
     const activeVoteFilter = VOTE_FILTER_OPTIONS.find((o) => o.value === voteFilter);
-    const ActiveVoteIcon = activeVoteFilter?.icon ?? Users;
 
     return (
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40 -mx-4 px-4 py-3 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -122,10 +121,10 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
           {/* Sort dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="shrink-0 gap-1.5 h-10 cursor-pointer">
-                <span className="hidden sm:inline">{activeSortLabel}</span>
-                <span className="sm:hidden">Sort</span>
-                <ChevronDown className="h-4 w-4 opacity-50" />
+              <Button variant="outline" className="shrink-0 gap-1 h-10 cursor-pointer px-2.5">
+                <span>{activeSort$?.symbol}</span>
+                <span className="hidden sm:inline">{activeSort$?.label}</span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -133,8 +132,9 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
                 <DropdownMenuItem
                   key={option.value}
                   onClick={() => onSortChange(option.value)}
-                  className={`cursor-pointer ${activeSort === option.value ? "bg-accent" : ""}`}
+                  className={`cursor-pointer gap-2 ${activeSort === option.value ? "bg-accent" : ""}`}
                 >
+                  <span>{option.symbol}</span>
                   {option.label}
                 </DropdownMenuItem>
               ))}
@@ -147,32 +147,28 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="outline" 
-                  className={`shrink-0 gap-1.5 h-10 cursor-pointer ${
+                  className={`shrink-0 gap-1 h-10 cursor-pointer px-2.5 ${
                     voteFilter !== "combined" 
                       ? "border-primary/50 bg-primary/5" 
                       : ""
                   }`}
                 >
-                  <ActiveVoteIcon className="h-4 w-4" />
+                  <span>{activeVoteFilter?.emoji}</span>
                   <span className="hidden sm:inline">{activeVoteFilter?.label}</span>
-                  <span className="sm:hidden">{activeVoteFilter?.shortLabel}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50" />
+                  <ChevronDown className="h-3.5 w-3.5 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {VOTE_FILTER_OPTIONS.map((option) => {
-                  const Icon = option.icon;
-                  return (
-                    <DropdownMenuItem
-                      key={option.value}
-                      onClick={() => onVoteFilterChange(option.value as VoteFilter)}
-                      className={`cursor-pointer gap-2 ${voteFilter === option.value ? "bg-accent" : ""}`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {option.label}
-                    </DropdownMenuItem>
-                  );
-                })}
+                {VOTE_FILTER_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => onVoteFilterChange(option.value as VoteFilter)}
+                    className={`cursor-pointer gap-2 ${voteFilter === option.value ? "bg-accent" : ""}`}
+                  >
+                    <span>{option.emoji}</span>
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
