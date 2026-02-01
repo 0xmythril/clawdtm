@@ -99,6 +99,7 @@ export function MobileNav({
         <div className="flex items-center justify-around h-16 px-4">
           {/* Search */}
           <button
+            data-tour="mobile-search"
             className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
             onClick={onSearchFocus}
           >
@@ -109,7 +110,10 @@ export function MobileNav({
           {/* Filters */}
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2 cursor-pointer">
+              <button 
+                data-tour="mobile-filters"
+                className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2 cursor-pointer"
+              >
                 <SlidersHorizontal className="h-6 w-6" />
                 <span className="text-xs">Filter</span>
                 {filterCount > 0 && (
@@ -289,7 +293,10 @@ export function MobileNav({
           {/* Settings */}
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer">
+              <button 
+                data-tour="mobile-settings"
+                className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
+              >
                 <Settings className="h-6 w-6" />
                 <span className="text-xs">Settings</span>
               </button>

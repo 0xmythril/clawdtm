@@ -12,7 +12,8 @@ import {
   trackTourSkipped,
 } from "@/lib/analytics";
 
-const TOUR_STEPS: Step[] = [
+// Desktop tour steps - targets sidebar elements
+const DESKTOP_TOUR_STEPS: Step[] = [
   {
     target: '[data-tour="logo"]',
     content: (
@@ -100,13 +101,95 @@ const TOUR_STEPS: Step[] = [
   },
 ];
 
-// Step names for analytics (matches TOUR_STEPS order)
-const STEP_NAMES = ["welcome", "search", "skill_card", "rating", "filters", "agent_reviews", "signin"];
+// Mobile tour steps - targets bottom nav and visible elements
+const MOBILE_TOUR_STEPS: Step[] = [
+  {
+    target: '[data-tour="mobile-logo"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          Welcome! Discover skills for your Claude agent and see what the community recommends. 🎉
+        </p>
+      </div>
+    ),
+    title: "Hey there! 👋",
+    placement: "bottom",
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="skill-card"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          Each card shows ratings, installs, and feedback at a glance. Tap any card for more details!
+        </p>
+      </div>
+    ),
+    title: "✨ Skill Cards",
+    placement: "top",
+  },
+  {
+    target: '[data-tour="rating"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          Tap the lobsters to rate! Your feedback helps others find great tools.
+        </p>
+      </div>
+    ),
+    title: "🦞 Rate Skills",
+    placement: "top",
+  },
+  {
+    target: '[data-tour="mobile-search"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          Looking for something specific? Tap here to search by name, description, or author.
+        </p>
+      </div>
+    ),
+    title: "🔍 Find Skills",
+    placement: "top",
+  },
+  {
+    target: '[data-tour="mobile-filters"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          Filter by category, set a minimum rating, or explore AI-generated tags to find the perfect skill.
+        </p>
+      </div>
+    ),
+    title: "🎛️ Skill Filters",
+    placement: "top",
+  },
+  {
+    target: '[data-tour="mobile-settings"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          Sign in to rate skills, let your AI agent leave reviews, and customize your experience!
+        </p>
+      </div>
+    ),
+    title: "⚙️ Settings & Account",
+    placement: "top",
+  },
+];
+
+// Step names for analytics
+const DESKTOP_STEP_NAMES = ["welcome", "search", "skill_card", "rating", "filters", "agent_reviews", "signin"];
+const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "filters", "settings"];
 
 export function OnboardingTour() {
   const { resolvedTheme } = useTheme();
-  const { runTour, setRunTour, completeTour } = useOnboarding();
+  const { runTour, completeTour, isMobile } = useOnboarding();
   const [mounted, setMounted] = useState(false);
+  
+  // Select appropriate steps based on device type
+  const tourSteps = isMobile ? MOBILE_TOUR_STEPS : DESKTOP_TOUR_STEPS;
+  const stepNames = isMobile ? MOBILE_STEP_NAMES : DESKTOP_STEP_NAMES;
   
   // Tracking state
   const tourStartTime = useRef<number | null>(null);
@@ -122,13 +205,13 @@ export function OnboardingTour() {
     if (runTour && !hasTrackedStart.current) {
       hasTrackedStart.current = true;
       tourStartTime.current = Date.now();
-      trackTourStarted();
+      trackTourStarted(isMobile ? "mobile" : "desktop");
     }
-  }, [runTour]);
+  }, [runTour, isMobile]);
 
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status, action, type, index } = data;
-    const stepName = STEP_NAMES[index] || `step_${index}`;
+    const stepName = stepNames[index] || `step_${index}`;
 
     // Track step views
     if (type === EVENTS.STEP_AFTER && !stepsViewed.current.has(index)) {
@@ -176,7 +259,7 @@ export function OnboardingTour() {
 
   return (
     <Joyride
-      steps={TOUR_STEPS}
+      steps={tourSteps}
       run={runTour}
       continuous
       showProgress

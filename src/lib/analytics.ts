@@ -111,9 +111,10 @@ export function trackLoadMore(currentCount: number) {
 /**
  * Track tour started
  */
-export function trackTourStarted() {
+export function trackTourStarted(deviceType: "mobile" | "desktop" = "desktop") {
   trackEvent("tour_started", {
     timestamp: Date.now(),
+    device_type: deviceType,
   });
 }
 
