@@ -163,7 +163,7 @@ export function Sidebar({
         }`}
       >
         {/* Logo & Collapse Toggle */}
-        <div className={`p-3 border-b border-border/40 flex-shrink-0 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`}>
+        <div className={`p-3 border-b border-border/40 flex-shrink-0 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`} data-tour="logo">
           {!collapsed && <Logo />}
           <Button
             variant="ghost"
@@ -229,7 +229,9 @@ export function Sidebar({
             <TooltipTrigger asChild>
               <AgentReviewsModal
                 trigger={
-                  <button className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
+                  <button 
+                    data-tour="agent-reviews"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
                     collapsed ? "justify-center" : ""
                   }`}>
                     <Bot className="h-4 w-4 shrink-0" />
@@ -253,7 +255,7 @@ export function Sidebar({
             </div>
 
             {/* Categories Section */}
-            <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
+            <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen} data-tour="categories">
               <CollapsibleTrigger asChild>
                 <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
                   <span className="flex items-center gap-2">
@@ -412,7 +414,7 @@ export function Sidebar({
 
         {/* User section - at bottom */}
         <SignedOut>
-          <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2"}`}>
+          <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2"}`} data-tour="signin">
             <Tooltip>
               <TooltipTrigger asChild>
                 <SignInButton

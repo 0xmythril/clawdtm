@@ -54,20 +54,23 @@ type SkillCardProps = {
   variant?: "card" | "list";
   // User's current rating for this skill (1-5 or null)
   userRating?: number | null;
+  // For onboarding tour - marks first card
+  isFirstCard?: boolean;
 };
 
 // Rating display component using lobster emoji
-function RatingDisplay({ avgRating, reviewCount, userRating, size = "sm" }: {
+function RatingDisplay({ avgRating, reviewCount, userRating, size = "sm", dataTour }: {
   avgRating: number | null;
   reviewCount: number;
   userRating?: number | null;
   size?: "sm" | "md";
+  dataTour?: string;
 }) {
   const hasRating = avgRating !== null && reviewCount > 0;
   const iconSize = size === "sm" ? "text-sm" : "text-base";
   
   return (
-    <div className="flex items-center gap-1" title={hasRating ? `${avgRating?.toFixed(1)} avg from ${reviewCount} reviews` : "No reviews yet"}>
+    <div className="flex items-center gap-1" title={hasRating ? `${avgRating?.toFixed(1)} avg from ${reviewCount} reviews` : "No reviews yet"} {...(dataTour ? { "data-tour": dataTour } : {})}>
       <span className={iconSize}>🦞</span>
       {hasRating ? (
         <span className="font-medium text-orange-600 dark:text-orange-400">
@@ -86,12 +89,12 @@ function RatingDisplay({ avgRating, reviewCount, userRating, size = "sm" }: {
   );
 }
 
-export function SkillCard({ skill, onInstall, variant = "card", userRating }: SkillCardProps) {
+export function SkillCard({ skill, onInstall, variant = "card", userRating, isFirstCard }: SkillCardProps) {
   const tags = skill.normalizedTags?.slice(0, 3) ?? [];
 
   if (variant === "list") {
     return (
-      <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20">
+      <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}
         <CardContent className="p-4">
           <div className="flex gap-4 items-start">
             {/* Main content */}
@@ -187,7 +190,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating }: Sk
 
   // Default card variant
   return (
-    <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20">
+    <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}>
       <CardContent className="p-4">
         {/* Header: Name + Category */}
         <div className="flex items-start justify-between gap-2 mb-2">
@@ -252,6 +255,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating }: Sk
             reviewCount={skill.reviewCount ?? 0}
             userRating={userRating}
             size="sm"
+            dataTour={isFirstCard ? "rating" : undefined}
           />
         </div>
 
