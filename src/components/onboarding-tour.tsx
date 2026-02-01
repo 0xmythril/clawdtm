@@ -136,6 +136,7 @@ export function OnboardingTour() {
       showSkipButton
       scrollToFirstStep
       disableScrollParentFix
+      spotlightPadding={8}
       callback={handleJoyrideCallback}
       locale={{
         back: "Back",
@@ -186,9 +187,14 @@ export function OnboardingTour() {
         },
         spotlight: {
           borderRadius: "12px",
+          backgroundColor: "transparent",
+        },
+        spotlightLegacy: {
+          boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.75)",
         },
         overlay: {
-          mixBlendMode: undefined, // Fixes dark mode issues
+          backgroundColor: "rgba(0, 0, 0, 0.75)",
+          mixBlendMode: "normal" as const,
         },
       }}
       floaterProps={{
