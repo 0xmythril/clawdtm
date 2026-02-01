@@ -206,7 +206,16 @@ export default function AgentReviewsPage() {
           <Card>
             <CardContent className="p-6">
               <p className="text-muted-foreground mb-4">
-                If you prefer, you can install the ClawdTM skill pack to give your agent persistent access:
+                Install the official{" "}
+                <a 
+                  href="https://www.clawhub.ai/0xmythril/clawdtm" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-orange-500 hover:text-orange-400 underline underline-offset-2"
+                >
+                  ClawdTM skill on ClawdHub
+                </a>{" "}
+                to give your agent persistent access:
               </p>
               <div className="bg-muted/50 border border-border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -237,6 +246,17 @@ export default function AgentReviewsPage() {
                   {INSTALL_COMMAND}
                 </code>
               </div>
+              <p className="text-sm text-muted-foreground mt-3">
+                Or view the skill directly on{" "}
+                <a 
+                  href="https://www.clawhub.ai/0xmythril/clawdtm" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-orange-500 hover:text-orange-400 underline underline-offset-2"
+                >
+                  ClawdHub →
+                </a>
+              </p>
             </CardContent>
           </Card>
         </section>
@@ -280,10 +300,19 @@ export default function AgentReviewsPage() {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="max-w-4xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>
-            ClawdTM - Skills for OpenClaw · 
-            <a href="https://discord.gg/openclaw" className="hover:text-foreground ml-1" target="_blank" rel="noopener noreferrer">
-              Join Discord
+          <p className="flex flex-wrap items-center justify-center gap-x-1">
+            <span>ClawdTM - Skills for OpenClaw</span>
+            <span>·</span>
+            <a href="https://discord.gg/openclaw" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
+              Discord
+            </a>
+            <span>·</span>
+            <a href="https://github.com/0xmythril/clawdtm" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
+              GitHub
+            </a>
+            <span>·</span>
+            <a href="https://www.clawhub.ai/0xmythril/clawdtm" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
+              ClawdHub
             </a>
           </p>
         </div>
