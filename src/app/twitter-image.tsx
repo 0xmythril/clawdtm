@@ -128,7 +128,7 @@ export default async function Image() {
               display: "flex",
             }}
           >
-            (aka Moltbot / Clawdbot) agents
+            OpenClaw AI agents
           </div>
 
           {/* Stats row */}

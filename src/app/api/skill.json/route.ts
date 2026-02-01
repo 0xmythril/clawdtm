@@ -35,7 +35,7 @@ export async function GET() {
       "ai-agents",
       "recommendations",
     ],
-    moltbot: {
+    openclaw: {
       emoji: "🦞",
       category: "tools",
       api_base: apiBase,

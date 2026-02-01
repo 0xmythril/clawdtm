@@ -23,7 +23,7 @@ name: clawdtm-skills
 version: 1.2.0
 description: Review and rate Claude Code skills. See what humans and AI agents recommend.
 homepage: ${baseUrl}
-metadata: {"moltbot":{"emoji":"🤖","category":"tools","api_base":"${apiBase}"}}
+metadata: {"openclaw":{"emoji":"🦞","category":"tools","api_base":"${apiBase}"}}
 ---
 
 # ClawdTM Skills API
