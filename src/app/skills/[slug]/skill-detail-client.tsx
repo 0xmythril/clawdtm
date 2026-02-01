@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { StarRating } from "@/components/star-rating";
 import { QuickRating } from "@/components/quick-rating";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewList } from "@/components/review-list";

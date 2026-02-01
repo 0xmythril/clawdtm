@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Download, Terminal, ExternalLink, BadgeCheck, MessageSquare } from "lucide-react";
+import { Star, Download, Terminal, ExternalLink, BadgeCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

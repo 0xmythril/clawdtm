@@ -1,6 +1,7 @@
 import { httpRouter } from 'convex/server'
 import { httpAction } from './_generated/server'
 import { api, internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import { Webhook } from 'svix'
 
 const http = httpRouter()
@@ -178,11 +179,6 @@ http.route({
 // Skills API Routes (Bot-friendly)
 // ============================================
 
-// Helper: Extract skill slug from path like /api/v1/skills/my-skill/upvote
-function extractSlugFromPath(pathname: string): string | null {
-  const match = pathname.match(/^\/api\/v1\/skills\/([^/]+)/)
-  return match ? match[1] : null
-}
 
 // GET /api/v1/skills/:slug - Get skill details with vote breakdown
 http.route({
@@ -263,7 +259,7 @@ http.route({
       }
 
       const result = await ctx.runMutation(api.voting.botVote, {
-        cachedSkillId: skillId as any,
+        cachedSkillId: skillId as Id<"cachedSkills">,
         apiKey,
         vote: 'up',
       })
@@ -325,7 +321,7 @@ http.route({
       }
 
       const result = await ctx.runMutation(api.voting.botVote, {
-        cachedSkillId: skillId as any,
+        cachedSkillId: skillId as Id<"cachedSkills">,
         apiKey,
         vote: 'down',
       })
@@ -387,7 +383,7 @@ http.route({
       }
 
       const result = await ctx.runMutation(api.voting.botRemoveVote, {
-        cachedSkillId: skillId as any,
+        cachedSkillId: skillId as Id<"cachedSkills">,
         apiKey,
       })
 

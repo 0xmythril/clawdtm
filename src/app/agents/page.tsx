@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUser, SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,7 @@ export default function AgentsPage() {
 
     try {
       const result = await regenerateKeyMutation({
-        agentId: agentId as any,
+        agentId: agentId as Id<"botAgents">,
         clerkId: user.id,
       });
 
@@ -104,7 +105,7 @@ export default function AgentsPage() {
 
     try {
       await deleteAgentMutation({
-        agentId: agentId as any,
+        agentId: agentId as Id<"botAgents">,
         clerkId: user.id,
       });
     } catch (err) {

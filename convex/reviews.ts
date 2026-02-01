@@ -6,7 +6,7 @@ import type { Id } from './_generated/dataModel'
 // Constants
 // ============================================
 
-const MIN_REVIEW_LENGTH = 0 // Allow rating-only reviews
+// MIN_REVIEW_LENGTH = 0 - Allow rating-only reviews (not enforced)
 const MAX_REVIEW_LENGTH = 1000
 const MIN_RATING = 1
 const MAX_RATING = 5

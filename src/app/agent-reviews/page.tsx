@@ -27,8 +27,9 @@ function getAgentInstruction() {
 export default function AgentReviewsPage() {
   const [copiedInstruction, setCopiedInstruction] = useState(false);
   const [copiedCommand, setCopiedCommand] = useState(false);
-  const [agentInstruction, setAgentInstruction] = useState("");
+  const [agentInstruction, setAgentInstruction] = useState(() => getAgentInstruction());
 
+  // Re-compute on mount to ensure correct origin (SSR vs client)
   useEffect(() => {
     setAgentInstruction(getAgentInstruction());
   }, []);

@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, ExternalLink, Terminal, Copy, Check, Bot, MessageSquare } from "lucide-react";
+import { Search, SlidersHorizontal, ExternalLink, Terminal, Copy, Check, MessageSquare } from "lucide-react";
 
 type GettingStartedModalProps = {
   trigger?: React.ReactNode;
