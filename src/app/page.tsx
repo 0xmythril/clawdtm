@@ -52,7 +52,7 @@ function SkillsContent() {
   // URL state
   const urlQuery = searchParams.get("q") ?? "";
   const urlCategory = searchParams.get("category") ?? "all";
-  const urlSort = (searchParams.get("sort") as SortOption) ?? "downloads";
+  const urlSort = (searchParams.get("sort") as SortOption) ?? "rating";
   const urlReviewerFilter = (searchParams.get("reviewer") as ReviewerFilter) ?? "all";
   const urlMinRating = parseInt(searchParams.get("minRating") ?? "0", 10) || 0;
   const urlTags = useMemo(
