@@ -201,37 +201,63 @@ export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: Revi
     }
   };
 
+  // Check if user rated but didn't leave a written review
+  const hasExistingText = existingReview?.reviewText && existingReview.reviewText.trim().length > 0;
+
   // Render collapsible for existing reviews
   if (isEditing) {
     return (
       <>
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
+          <Card className={hasExistingText 
+            ? "border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20"
+            : "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20"
+          }>
             {/* Collapsed header - always visible */}
             <CollapsibleTrigger asChild>
-              <button className="w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-orange-100/50 dark:hover:bg-orange-900/20 transition-colors rounded-t-lg">
+              <button className={`w-full p-4 flex items-center justify-between gap-3 text-left transition-colors rounded-t-lg ${
+                hasExistingText 
+                  ? "hover:bg-orange-100/50 dark:hover:bg-orange-900/20"
+                  : "hover:bg-blue-100/50 dark:hover:bg-blue-900/20"
+              }`}>
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex items-center gap-1">
                     <span className="text-lg">🦞</span>
-                    <span className="font-semibold text-orange-700 dark:text-orange-300">
+                    <span className={`font-semibold ${
+                      hasExistingText 
+                        ? "text-orange-700 dark:text-orange-300"
+                        : "text-blue-700 dark:text-blue-300"
+                    }`}>
                       {existingReview.rating}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-orange-700 dark:text-orange-300">
-                      Your review
+                    <p className={`text-sm font-medium ${
+                      hasExistingText 
+                        ? "text-orange-700 dark:text-orange-300"
+                        : "text-blue-700 dark:text-blue-300"
+                    }`}>
+                      {hasExistingText ? "Your review" : "You rated this skill!"}
                     </p>
-                    {existingReview.reviewText && (
+                    {hasExistingText ? (
                       <p className="text-xs text-muted-foreground truncate">
                         {existingReview.reviewText}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Add a few words to help others discover this skill
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="outline" className="text-xs border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
+                  <Badge variant="outline" className={`text-xs ${
+                    hasExistingText 
+                      ? "border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400"
+                      : "border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400"
+                  }`}>
                     <Pencil className="h-3 w-3 mr-1" />
-                    Edit
+                    {hasExistingText ? "Edit" : "Add review"}
                   </Badge>
                   {isExpanded ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -244,11 +270,15 @@ export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: Revi
 
             {/* Expanded content */}
             <CollapsibleContent>
-              <div className="px-4 pb-4 pt-0 border-t border-orange-200 dark:border-orange-800">
+              <div className={`px-4 pb-4 pt-0 border-t ${
+                hasExistingText 
+                  ? "border-orange-200 dark:border-orange-800"
+                  : "border-blue-200 dark:border-blue-800"
+              }`}>
                 <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">
-                      Update your rating
+                      {hasExistingText ? "Update your rating" : "Your rating"}
                     </label>
                     <StarRating
                       rating={rating}
@@ -261,7 +291,7 @@ export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: Revi
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium">
-                        Update your review{" "}
+                        {hasExistingText ? "Update your review" : "Add a written review"}{" "}
                         <span className="text-muted-foreground font-normal">(optional)</span>
                       </label>
                       <span
@@ -275,7 +305,10 @@ export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: Revi
                     <Textarea
                       value={reviewText}
                       onChange={(e) => setReviewText(e.target.value)}
-                      placeholder="Share your experience with this skill..."
+                      placeholder={hasExistingText 
+                        ? "Share your experience with this skill..." 
+                        : "What did you like about this skill? How did it help you?"
+                      }
                       rows={3}
                       maxLength={MAX_LENGTH + 100}
                       className="resize-none"
@@ -294,17 +327,25 @@ export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: Revi
                     <Button
                       type="submit"
                       disabled={!hasRating || !isValidLength || isSubmitting || !hasChanges}
-                      className="flex-1 bg-orange-600 hover:bg-orange-700"
+                      className={`flex-1 ${
+                        hasExistingText 
+                          ? "bg-orange-600 hover:bg-orange-700"
+                          : "bg-blue-600 hover:bg-blue-700"
+                      }`}
                     >
                       {isSubmitting ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Updating...
+                          {hasExistingText ? "Updating..." : "Submitting..."}
                         </>
                       ) : (
                         <>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Update Review
+                          {hasExistingText ? (
+                            <Pencil className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Send className="h-4 w-4 mr-2" />
+                          )}
+                          {hasExistingText ? "Update Review" : "Add Review"}
                         </>
                       )}
                     </Button>
@@ -325,7 +366,7 @@ export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: Revi
                     </Button>
                   </div>
 
-                  {!hasChanges && (
+                  {!hasChanges && hasExistingText && (
                     <p className="text-xs text-muted-foreground text-center">
                       Make changes to update your review
                     </p>

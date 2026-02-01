@@ -72,7 +72,7 @@ export function SkillDetailClient({ slug, initialSkill }: Props) {
   );
 
   // Install command
-  const installCommand = `npx openclaw@latest install ${skill.slug}`;
+  const installCommand = `clawhub install ${skill.slug}`;
 
   const copyCommand = () => {
     navigator.clipboard.writeText(installCommand);
@@ -297,14 +297,14 @@ function SkillContent({
       </Card>
 
       {/* Install Command */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="gap-3 py-4">
+        <CardHeader className="pb-0">
           <CardTitle className="text-lg flex items-center gap-2">
             <Terminal className="h-5 w-5" />
             Install
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
             <code className="flex-1 text-sm font-mono overflow-x-auto">
               {installCommand}
@@ -322,6 +322,18 @@ function SkillContent({
               )}
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Requires the ClawHub CLI. Installation is covered in the{" "}
+            <a
+              href="https://docs.openclaw.ai/tools/clawhub"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              ClawHub docs
+            </a>
+            .
+          </p>
           <Button variant="outline" className="w-full" asChild>
             <a
               href={`https://www.clawhub.ai/${skill.authorHandle}/${skill.slug}`}
