@@ -97,11 +97,6 @@ export function QuickRating({
             : "border-dashed border-muted-foreground/30 bg-muted/20"
         )}
       >
-        {/* Prompt for unrated state */}
-        {!hasUserRated && user && !hoveredRating && (
-          <span className="text-xs text-muted-foreground">Click to rate</span>
-        )}
-        
         {/* Lobster rating row */}
         <div
           className="flex items-center gap-0.5"
