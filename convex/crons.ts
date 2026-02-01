@@ -20,10 +20,10 @@ crons.interval(
   { limit: 100 },
 )
 
-// Enrich skills with author info every 2 hours (reduced from 30 min)
+// Enrich skills with author info every 6 hours (new skills are rare)
 crons.interval(
   'clawdhub-author-enrichment',
-  { hours: 2 },
+  { hours: 6 },
   internal.clawdhubSync.enrichSkillAuthors,
   { limit: 50 },
 )
