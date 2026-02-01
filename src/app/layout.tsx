@@ -22,11 +22,13 @@ export const metadata: Metadata = {
     url: "https://clawdtm.com",
     siteName: "ClawdTM",
     locale: "en_US",
+    images: ["/twitter-image"],
   },
   twitter: {
     card: "summary_large_image",
     site: "@0xmythril",
     creator: "@0xmythril",
+    images: ["/twitter-image"],
   },
 };
 

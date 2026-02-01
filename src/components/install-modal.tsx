@@ -149,16 +149,25 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
           {/* Prerequisites note */}
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-xs sm:text-sm">
             <p className="text-muted-foreground">
-              <strong className="text-foreground">⚠️ Prerequisites for Terminal:</strong> Make sure you have{" "}
+              <strong className="text-foreground">⚠️ Prerequisites for Terminal:</strong> The{" "}
               <a
-                href="https://www.clawhub.ai"
+                href="https://docs.openclaw.ai/tools/clawhub"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Clawhub
+                ClawHub CLI
               </a>{" "}
-              installed and configured.
+              must be installed first. Installation is covered in the{" "}
+              <a
+                href="https://docs.openclaw.ai/tools/clawhub"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                ClawHub docs
+              </a>
+              .
             </p>
           </div>
 
