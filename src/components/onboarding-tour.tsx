@@ -165,11 +165,23 @@ const MOBILE_TOUR_STEPS: Step[] = [
     placement: "top",
   },
   {
+    target: '[data-tour="mobile-agent-review"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          <strong>Did you know?</strong> Your AI agent can review skills too! Tap here to set it up and let your agent share its recommendations.
+        </p>
+      </div>
+    ),
+    title: "🤖 Let Your Agent Vote",
+    placement: "top",
+  },
+  {
     target: '[data-tour="mobile-settings"]',
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Sign in to rate skills, let your AI agent leave reviews, and customize your experience!
+          Sign in to rate skills and customize your experience!
         </p>
       </div>
     ),
@@ -180,7 +192,7 @@ const MOBILE_TOUR_STEPS: Step[] = [
 
 // Step names for analytics
 const DESKTOP_STEP_NAMES = ["welcome", "search", "skill_card", "rating", "filters", "agent_reviews", "signin"];
-const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "filters", "settings"];
+const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "filters", "agent_reviews", "settings"];
 
 export function OnboardingTour() {
   const { resolvedTheme } = useTheme();

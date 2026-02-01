@@ -290,6 +290,16 @@ export function MobileNav({
             </SheetContent>
           </Sheet>
 
+          {/* Agent Review */}
+          <button
+            data-tour="mobile-agent-review"
+            className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
+            onClick={() => setAgentReviewsOpen(true)}
+          >
+            <Bot className="h-6 w-6" />
+            <span className="text-xs">Agent</span>
+          </button>
+
           {/* Settings */}
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
