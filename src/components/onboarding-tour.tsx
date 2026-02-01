@@ -11,11 +11,11 @@ const TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Discover and rate skills for your Claude agent. Browse what the community recommends!
+          Welcome! Discover skills for your Claude agent and see what the community recommends. 🎉
         </p>
       </div>
     ),
-    title: "Welcome to ClawdTM!",
+    title: "Hey there! 👋",
     placement: "bottom",
     disableBeacon: true,
   },
@@ -24,35 +24,23 @@ const TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Search for skills by name, description, or author. Find exactly what you need.
+          Looking for something specific? Search by name, description, or author.
         </p>
       </div>
     ),
-    title: "Find Skills",
+    title: "🔍 Find Skills",
     placement: "bottom",
-  },
-  {
-    target: '[data-tour="categories"]',
-    content: (
-      <div className="text-left">
-        <p className="text-sm">
-          Filter skills by categories and tags. Narrow down to find the perfect skill.
-        </p>
-      </div>
-    ),
-    title: "Browse by Category",
-    placement: "right",
   },
   {
     target: '[data-tour="skill-card"]',
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Each card shows ratings, installs, and community feedback. Click to see details.
+          Each card shows ratings, installs, and feedback at a glance. Click any card for more details!
         </p>
       </div>
     ),
-    title: "Skill Cards",
+    title: "✨ Skill Cards",
     placement: "bottom",
   },
   {
@@ -60,23 +48,35 @@ const TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Click the lobsters to rate skills. Your feedback helps others discover great tools!
+          Click the lobsters to rate! Your feedback helps others find great tools.
         </p>
       </div>
     ),
-    title: "Rate Skills",
+    title: "🦞 Rate Skills",
     placement: "left",
+  },
+  {
+    target: '[data-tour="categories"]',
+    content: (
+      <div className="text-left">
+        <p className="text-sm">
+          All your filtering tools in one place! Browse by category, set a minimum rating, or explore AI-generated tags.
+        </p>
+      </div>
+    ),
+    title: "🎛️ Skill Filters",
+    placement: "right",
   },
   {
     target: '[data-tour="agent-reviews"]',
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Your AI agent can review skills too! Set it up to share its recommendations.
+          <strong>Did you know?</strong> Your AI agent can review skills too! Click here to set it up and let your agent share its recommendations with the community.
         </p>
       </div>
     ),
-    title: "Let Your Agent Review",
+    title: "🤖 Let Your Agent Vote",
     placement: "right",
   },
   {
@@ -84,11 +84,11 @@ const TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Sign up to rate skills, leave reviews, and save your preferences.
+          Sign up to rate skills, leave reviews, and join the community!
         </p>
       </div>
     ),
-    title: "Join the Community",
+    title: "🚀 Get Started",
     placement: "bottom",
   },
 ];
@@ -135,8 +135,8 @@ export function OnboardingTour() {
       showProgress
       showSkipButton
       scrollToFirstStep
-      disableScrollParentFix
-      spotlightPadding={8}
+      spotlightPadding={10}
+      disableOverlayClose={false}
       callback={handleJoyrideCallback}
       locale={{
         back: "Back",
@@ -151,7 +151,8 @@ export function OnboardingTour() {
           backgroundColor: isDark ? "#1f1f23" : "#ffffff",
           primaryColor: "#f97316", // orange-500
           textColor: isDark ? "#fafafa" : "#09090b",
-          overlayColor: "rgba(0, 0, 0, 0.75)",
+          overlayColor: "rgba(0, 0, 0, 0.8)",
+          spotlightShadow: "0 0 15px rgba(0, 0, 0, 0.5)",
           zIndex: 10000,
         },
         tooltip: {
@@ -186,22 +187,7 @@ export function OnboardingTour() {
           fontSize: "13px",
         },
         spotlight: {
-          borderRadius: "12px",
-          backgroundColor: "transparent",
-        },
-        spotlightLegacy: {
-          boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.75)",
-        },
-        overlay: {
-          backgroundColor: "rgba(0, 0, 0, 0.75)",
-          mixBlendMode: "normal" as const,
-        },
-      }}
-      floaterProps={{
-        styles: {
-          floater: {
-            filter: "none",
-          },
+          borderRadius: "8px",
         },
       }}
     />

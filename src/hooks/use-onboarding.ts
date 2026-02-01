@@ -49,12 +49,12 @@ export function useOnboarding(): UseOnboardingReturn {
       // Clear the session flag
       sessionStorage.removeItem(SESSION_FORCE_KEY);
       
-      // Reset and start tour
+      // Reset and start tour - wait for skills to load
       localStorage.removeItem(STORAGE_KEY);
       setShouldShowTour(true);
       const timer = setTimeout(() => {
         setRunTour(true);
-      }, 500);
+      }, 2000); // Longer delay to ensure skills are loaded
       return () => clearTimeout(timer);
     }
 
@@ -63,10 +63,10 @@ export function useOnboarding(): UseOnboardingReturn {
 
     if (!hasCompletedCurrentVersion) {
       setShouldShowTour(true);
-      // Small delay to let the page render before starting tour
+      // Wait for skills to load before starting tour
       const timer = setTimeout(() => {
         setRunTour(true);
-      }, 1000);
+      }, 2500);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -98,8 +98,11 @@ export function useOnboarding(): UseOnboardingReturn {
       (window as typeof window & { startTour?: () => void }).startTour = () => {
         localStorage.removeItem(STORAGE_KEY);
         setShouldShowTour(true);
-        setRunTour(true);
-        console.log("🦞 Tour started! Refresh the page if elements aren't highlighted.");
+        // Wait for any loading to complete
+        setTimeout(() => {
+          setRunTour(true);
+          console.log("🦞 Tour started!");
+        }, 1000);
       };
     }
   }, []);

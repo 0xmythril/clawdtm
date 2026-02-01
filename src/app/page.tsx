@@ -379,13 +379,14 @@ function SkillsContent() {
                       : "flex flex-col gap-3"
                   }
                 >
-                  {skills.map((skill) => (
+                  {skills.map((skill, index) => (
                     <SkillCard
                       key={skill.slug}
                       skill={skill}
                       onInstall={handleInstall}
                       variant={viewMode}
                       userRating={userRatings?.[skill._id] ?? null}
+                      isFirstCard={index === 0}
                     />
                   ))}
                 </div>

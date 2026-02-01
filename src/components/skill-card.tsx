@@ -158,6 +158,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
                     reviewCount={skill.reviewCount ?? 0}
                     userRating={userRating}
                     size="sm"
+                    dataTour={isFirstCard ? "rating" : undefined}
                   />
                 </div>
               </div>
