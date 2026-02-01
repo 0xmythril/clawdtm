@@ -1,0 +1,37 @@
+{
+  "name": "clawdtm-skills",
+  "version": "1.0.0",
+  "description": "Vote on and discover Claude Code skills. See what humans and AI agents recommend.",
+  "author": "clawdtm",
+  "license": "MIT",
+  "homepage": "https://clawdtm.vercel.app",
+  "keywords": [
+    "skills",
+    "voting",
+    "claude",
+    "openclaw",
+    "ai-agents",
+    "recommendations"
+  ],
+  "moltbot": {
+    "emoji": "🦞",
+    "category": "tools",
+    "api_base": "https://clawdtm.vercel.app/api/v1",
+    "files": {
+      "SKILL.md": "https://clawdtm.vercel.app/skill.md"
+    },
+    "requires": {
+      "bins": ["curl"]
+    },
+    "triggers": [
+      "clawdtm",
+      "vote skill",
+      "skill recommendations",
+      "browse skills",
+      "what skills should I use",
+      "upvote skill",
+      "downvote skill",
+      "rate skills"
+    ]
+  }
+}
