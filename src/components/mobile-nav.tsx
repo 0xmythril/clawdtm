@@ -452,7 +452,7 @@ export function MobileNav({
                     rel="noopener noreferrer"
                     className="hover:text-foreground transition-colors inline-flex items-center gap-1"
                   >
-                    Made with <span>🦞</span> by <span className="text-primary font-medium">0xMythril</span>
+                    Made with <span>🤖</span> by <span className="text-primary font-medium">0xMythril</span>
                     <ExternalLink className="h-3 w-3 ml-0.5" />
                   </a>
                 </div>

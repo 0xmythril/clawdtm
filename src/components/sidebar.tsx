@@ -246,7 +246,7 @@ export function Sidebar({
 
         {/* Skill Filters - Only shown on Skills page and when not collapsed */}
         {isSkillsPage && !collapsed && (
-          <>
+          <div data-tour="categories">
             {/* Section header */}
             <div className="px-3 mb-2">
               <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">
@@ -255,7 +255,7 @@ export function Sidebar({
             </div>
 
             {/* Categories Section */}
-            <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen} data-tour="categories">
+            <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
               <CollapsibleTrigger asChild>
                 <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
                   <span className="flex items-center gap-2">
@@ -403,7 +403,7 @@ export function Sidebar({
                 )}
               </CollapsibleContent>
             </Collapsible>
-          </>
+          </div>
         )}
 
         </div>
@@ -550,7 +550,7 @@ export function Sidebar({
             className="flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
           >
             <span>Made with</span>
-            <span className="text-sm">🦞</span>
+            <span className="text-sm">🤖</span>
             <span>by</span>
             <span className="font-medium text-primary">0xMythril</span>
           </a>
