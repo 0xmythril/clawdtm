@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-export const alt = "ClawdTM - Skills for OpenClaw";
+export const alt = "ClawdTM - The Skill Marketplace for OpenClaw";
 export const size = {
   width: 1200,
   height: 630,
@@ -49,8 +49,9 @@ export default async function Image() {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: 20,
+            gap: 12,
             zIndex: 1,
+            marginTop: -40,
           }}
         >
           {/* Logo */}
@@ -59,15 +60,15 @@ export default async function Image() {
               display: "flex",
               borderRadius: "50%",
               overflow: "hidden",
-              boxShadow: "0 0 60px rgba(239, 68, 68, 0.4), 0 0 120px rgba(249, 115, 22, 0.2)",
+              boxShadow: "0 0 60px rgba(239, 68, 68, 0.5), 0 0 100px rgba(249, 115, 22, 0.3)",
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoData as unknown as string}
               alt="ClawdTM Logo"
-              width={160}
-              height={160}
+              width={120}
+              height={120}
             />
           </div>
 
@@ -77,27 +78,27 @@ export default async function Image() {
               display: "flex",
               alignItems: "baseline",
               gap: 4,
-              marginTop: 8,
+              marginTop: 4,
             }}
           >
             <span
               style={{
-                fontSize: 80,
+                fontSize: 64,
                 fontWeight: 800,
                 fontStyle: "italic",
-                background: "linear-gradient(135deg, #ef4444 0%, #f97316 50%, #eab308 100%)",
+                background: "linear-gradient(135deg, #f87171 0%, #fb923c 50%, #fbbf24 100%)",
                 backgroundClip: "text",
                 color: "transparent",
-                letterSpacing: "-3px",
+                letterSpacing: "-2px",
               }}
             >
               Clawd
             </span>
             <span
               style={{
-                fontSize: 28,
+                fontSize: 22,
                 fontWeight: 700,
-                color: "#71717a",
+                color: "#a1a1aa",
                 marginLeft: 2,
               }}
             >
@@ -108,26 +109,38 @@ export default async function Image() {
           {/* Tagline */}
           <div
             style={{
-              fontSize: 28,
-              color: "#a1a1aa",
-              marginTop: 4,
+              fontSize: 26,
+              color: "#ffffff",
+              marginTop: 0,
               display: "flex",
-              letterSpacing: "0.5px",
+              textAlign: "center",
+              letterSpacing: "0.3px",
+              fontWeight: 500,
             }}
           >
-            Superskill your OpenClaw
+            Reviewable skill marketplace for OpenClaw
+          </div>
+          <div
+            style={{
+              fontSize: 18,
+              color: "#a1a1aa",
+              marginTop: -6,
+              display: "flex",
+            }}
+          >
+            (aka Moltbot / Clawdbot) agents
           </div>
 
           {/* Stats row */}
           <div
             style={{
               display: "flex",
-              gap: 64,
-              marginTop: 40,
-              padding: "24px 48px",
-              background: "rgba(255, 255, 255, 0.03)",
-              borderRadius: 16,
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              gap: 40,
+              marginTop: 20,
+              padding: "16px 36px",
+              background: "rgba(255, 255, 255, 0.04)",
+              borderRadius: 14,
+              border: "1px solid rgba(255, 255, 255, 0.08)",
             }}
           >
             <div
@@ -135,28 +148,28 @@ export default async function Image() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
+                gap: 2,
               }}
             >
               <span
                 style={{
-                  fontSize: 40,
+                  fontSize: 32,
                   fontWeight: 700,
-                  background: "linear-gradient(135deg, #ef4444 0%, #f97316 100%)",
+                  background: "linear-gradient(135deg, #f87171 0%, #fb923c 100%)",
                   backgroundClip: "text",
                   color: "transparent",
                 }}
               >
-                1000+
+                1,600+
               </span>
-              <span style={{ fontSize: 16, color: "#71717a", fontWeight: 500 }}>
+              <span style={{ fontSize: 13, color: "#d4d4d8", fontWeight: 500 }}>
                 Skills
               </span>
             </div>
             <div
               style={{
                 width: 1,
-                background: "rgba(255, 255, 255, 0.1)",
+                background: "rgba(255, 255, 255, 0.12)",
                 display: "flex",
               }}
             />
@@ -165,28 +178,28 @@ export default async function Image() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
+                gap: 2,
               }}
             >
               <span
                 style={{
-                  fontSize: 40,
+                  fontSize: 28,
                   fontWeight: 700,
-                  background: "linear-gradient(135deg, #f97316 0%, #eab308 100%)",
-                  backgroundClip: "text",
-                  color: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
                 }}
               >
-                10
+                🦞🦞🦞🦞🦞
               </span>
-              <span style={{ fontSize: 16, color: "#71717a", fontWeight: 500 }}>
-                Categories
+              <span style={{ fontSize: 13, color: "#d4d4d8", fontWeight: 500 }}>
+                5/5 Lobster Ratings
               </span>
             </div>
             <div
               style={{
                 width: 1,
-                background: "rgba(255, 255, 255, 0.1)",
+                background: "rgba(255, 255, 255, 0.12)",
                 display: "flex",
               }}
             />
@@ -195,42 +208,55 @@ export default async function Image() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
+                gap: 2,
               }}
             >
               <span
                 style={{
-                  fontSize: 40,
+                  fontSize: 28,
                   fontWeight: 700,
-                  background: "linear-gradient(135deg, #eab308 0%, #84cc16 100%)",
-                  backgroundClip: "text",
-                  color: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
-                AI
+                <span>🤖</span>
+                <span style={{ color: "#a1a1aa", fontSize: 20 }}>+</span>
+                <span>👤</span>
               </span>
-              <span style={{ fontSize: 16, color: "#71717a", fontWeight: 500 }}>
-                Powered
+              <span style={{ fontSize: 13, color: "#d4d4d8", fontWeight: 500 }}>
+                Reviewers Welcome
               </span>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer - emphasized URL */}
         <div
           style={{
             position: "absolute",
             bottom: 28,
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            color: "#52525b",
-            fontSize: 16,
+            justifyContent: "center",
+            padding: "10px 28px",
+            background: "linear-gradient(135deg, rgba(248, 113, 113, 0.2) 0%, rgba(251, 146, 60, 0.15) 100%)",
+            borderRadius: 10,
+            border: "1px solid rgba(248, 113, 113, 0.3)",
           }}
         >
-          <span style={{ color: "#71717a", fontWeight: 500 }}>clawdtm.com</span>
-          <span>•</span>
-          <span>by @0xmythril</span>
+          <span
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              background: "linear-gradient(135deg, #f87171 0%, #fb923c 50%, #fbbf24 100%)",
+              backgroundClip: "text",
+              color: "transparent",
+              letterSpacing: "0.5px",
+            }}
+          >
+            clawdtm.com
+          </span>
         </div>
       </div>
     ),
