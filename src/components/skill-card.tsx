@@ -154,7 +154,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
 
   if (variant === "list") {
     return (
-      <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}>
+      <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20 py-3 gap-0" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}>
         <CardContent className="p-4">
           <div className="flex gap-4 items-start">
             {/* Main content */}
@@ -256,7 +256,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
 
   // Default card variant
   return (
-    <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}>
+    <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20 py-3 gap-0" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}>
       <CardContent className="p-4">
         {/* Header: Name + Category */}
         <div className="flex items-start justify-between gap-2 mb-2">

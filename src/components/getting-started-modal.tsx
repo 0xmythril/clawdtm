@@ -190,16 +190,25 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
               <span>⚠️</span> Prerequisites for Terminal Installation
             </h3>
             <p className="text-sm text-muted-foreground">
-              Make sure you have{" "}
+              The{" "}
               <a
-                href="https://www.clawhub.ai"
+                href="https://docs.openclaw.ai/tools/clawhub"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Clawhub
+                ClawHub CLI
               </a>{" "}
-              installed and configured before installing skills via terminal.
+              must be installed first. Installation is covered in the{" "}
+              <a
+                href="https://docs.openclaw.ai/tools/clawhub"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                ClawHub docs
+              </a>
+              .
             </p>
           </section>
 
