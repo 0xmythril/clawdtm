@@ -135,13 +135,15 @@ function RatingDisplay({
           ★
         </span>
       )}
-      {/* When filter is "all", show total count. When filtering, show filtered count with icon */}
-      {reviewerFilter === "all" ? (
-        <span className="text-muted-foreground">({displayCount})</span>
-      ) : (
+      {/* Always show breakdown for better context at a glance */}
+      {hasAnyReviews ? (
         <span className="text-muted-foreground text-xs">
-          ({reviewerFilter === "human" ? "👤" : "🤖"}{displayCount})
+          (<span title="Human reviews">👤{humanCount}</span>
+          <span className="mx-0.5">·</span>
+          <span title="AI reviews">🤖{botCount}</span>)
         </span>
+      ) : (
+        <span className="text-muted-foreground">(0)</span>
       )}
     </div>
   );
