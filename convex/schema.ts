@@ -427,6 +427,11 @@ const cachedSkills = defineTable({
   avgRating: v.optional(v.number()), // Average rating (all reviews)
   avgRatingHuman: v.optional(v.number()), // Average rating (human only)
   avgRatingBot: v.optional(v.number()), // Average rating (bot only)
+  
+  // Combined search field for full-text search (slug + name + description + author)
+  searchText: v.optional(v.string()),
+  // Normalized tags for efficient filtering
+  normalizedTags: v.optional(v.array(v.string())),
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -442,12 +447,25 @@ const cachedSkills = defineTable({
   .index('by_category_installs', ['category', 'installs'])
   // Vote-based sorting (ClawdTM upvotes/downvotes)
   .index('by_clawdtm_votes', ['clawdtmUpvotes', 'clawdtmDownvotes'])
+  // Rating-based sorting (for skills with reviews)
+  .index('by_review_count', ['reviewCount'])
   // Author enrichment index (find skills needing author data)
   .index('by_author', ['author'])
-  .searchIndex('search_name_desc', {
-    searchField: 'slug',
-    filterFields: ['category'],
+  // Full-text search on combined searchText field
+  .searchIndex('search_skills', {
+    searchField: 'searchText',
+    filterFields: ['category', 'hidden'],
   })
+
+// Pre-computed sorted skill lists for fast queries
+const skillSortCache = defineTable({
+  // Sort key: "downloads", "stars", "rating", "reviews", "category:tools:downloads"
+  sortKey: v.string(),
+  // Pre-sorted array of skill IDs
+  skillIds: v.array(v.id('cachedSkills')),
+  // When this cache was last updated
+  updatedAt: v.number(),
+}).index('by_sort_key', ['sortKey'])
 
 // Sync state for ClawdHub API
 const clawdhubSyncState = defineTable({
@@ -637,6 +655,7 @@ export default defineSchema({
   userSkillInstalls,
   userSkillRootInstalls,
   cachedSkills,
+  skillSortCache,
   clawdhubSyncState,
   clerkUsers,
   botAgents,

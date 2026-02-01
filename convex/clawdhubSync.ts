@@ -1,11 +1,51 @@
 import { v } from 'convex/values'
 import { action, mutation, query, internalAction, internalMutation, internalQuery } from './_generated/server'
 import { internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 
 const CLAWDHUB_API = 'https://clawdhub.com/api/v1'
 const BATCH_SIZE = 50
 const MAX_RETRIES = 3
 const RETRY_DELAY_MS = 1000
+
+// Generate searchText for full-text search
+// Includes multiple variants of hyphenated terms for better matching
+function generateSearchText(skill: {
+  slug: string
+  name?: string
+  displayName?: string
+  description?: string
+  summary?: string
+  author?: string
+}): string {
+  const slug = skill.slug
+  const name = skill.name ?? skill.displayName ?? ''
+  
+  // Include multiple variants for hyphenated terms:
+  // - Original: "web-search" 
+  // - No hyphens: "websearch" (treats as single word)
+  // - Spaced: "web search" (treats as separate words)
+  const slugVariants = [
+    slug,
+    slug.replace(/-/g, ''),  // websearch
+    slug.replace(/-/g, ' '), // web search
+  ]
+  
+  const nameVariants = name.includes('-') ? [
+    name,
+    name.replace(/-/g, ''),
+    name.replace(/-/g, ' '),
+  ] : [name]
+  
+  const parts = [
+    ...slugVariants,
+    ...nameVariants,
+    skill.description ?? skill.summary ?? '',
+    skill.author ?? '',
+  ].filter(Boolean)
+  
+  return parts.join(' ').toLowerCase().slice(0, 2000) // Limit size
+}
 
 // ============================================
 // Internal Queries
@@ -148,6 +188,15 @@ export const upsertCachedSkill = internalMutation({
       
       // Only update if something changed
       if (hasChanges) {
+        // Regenerate searchText when skill data changes
+        const searchText = generateSearchText({
+          slug: args.slug,
+          name: args.name,
+          displayName: args.displayName,
+          description: args.description,
+          summary: args.summary,
+          author: args.author,
+        })
         await ctx.db.patch(existing._id, {
           externalId: args.externalId,
           name: args.name,
@@ -164,6 +213,7 @@ export const upsertCachedSkill = internalMutation({
           version: args.version,
           externalCreatedAt: args.externalCreatedAt,
           externalUpdatedAt: args.externalUpdatedAt,
+          searchText,
           lastSyncedAt: now,
         })
         return { updated: true, id: existing._id, changed: true }
@@ -180,8 +230,18 @@ export const upsertCachedSkill = internalMutation({
         return { updated: false, id: existing._id, changed: false }
       }
     } else {
+      // Generate searchText for new skills
+      const searchText = generateSearchText({
+        slug: args.slug,
+        name: args.name,
+        displayName: args.displayName,
+        description: args.description,
+        summary: args.summary,
+        author: args.author,
+      })
       const id = await ctx.db.insert('cachedSkills', {
         ...args,
+        searchText,
         lastSyncedAt: now,
       })
       return { updated: false, id }
@@ -189,12 +249,13 @@ export const upsertCachedSkill = internalMutation({
   },
 })
 
-// Internal mutation to update cached counts (reduces full table scans)
+// Internal mutation to update cached counts and pre-sorted lists
 export const updateCachedCounts = internalMutation({
   args: {},
   handler: async (ctx) => {
     const allSkills = await ctx.db.query('cachedSkills').collect()
     const skills = allSkills.filter(s => !s.hidden)
+    const now = Date.now()
     
     // Build category counts
     const categoryCounts: Record<string, number> = {}
@@ -253,7 +314,100 @@ export const updateCachedCounts = internalMutation({
       })
     }
     
-    return { categories: Object.keys(categoryCounts).length, tags: sortedTags.length, total: skills.length }
+    // ========================================
+    // Pre-compute sorted skill lists
+    // ========================================
+    
+    // Helper to update or create sort cache entry
+    async function updateSortCache(sortKey: string, skillIds: string[]) {
+      const existing = await ctx.db
+        .query('skillSortCache')
+        .withIndex('by_sort_key', (q) => q.eq('sortKey', sortKey))
+        .unique()
+      
+      if (existing) {
+        await ctx.db.patch(existing._id, { 
+          skillIds: skillIds as Id<"cachedSkills">[],
+          updatedAt: now 
+        })
+      } else {
+        await ctx.db.insert('skillSortCache', {
+          sortKey,
+          skillIds: skillIds as Id<"cachedSkills">[],
+          updatedAt: now,
+        })
+      }
+    }
+    
+    // Sort by downloads (top 500)
+    const byDownloads = [...skills]
+      .sort((a, b) => b.downloads - a.downloads)
+      .slice(0, 500)
+      .map(s => s._id)
+    await updateSortCache('downloads', byDownloads)
+    
+    // Sort by stars (top 500)
+    const byStars = [...skills]
+      .sort((a, b) => b.stars - a.stars)
+      .slice(0, 500)
+      .map(s => s._id)
+    await updateSortCache('stars', byStars)
+    
+    // Sort by installs (top 500)
+    const byInstalls = [...skills]
+      .sort((a, b) => b.installs - a.installs)
+      .slice(0, 500)
+      .map(s => s._id)
+    await updateSortCache('installs', byInstalls)
+    
+    // Sort by rating (all skills with reviews, then rest by downloads)
+    const withRatings = skills.filter(s => (s.reviewCount ?? 0) > 0)
+    const withoutRatings = skills.filter(s => (s.reviewCount ?? 0) === 0)
+    const byRating = [
+      ...withRatings.sort((a, b) => {
+        const ratingDiff = (b.avgRating ?? 0) - (a.avgRating ?? 0)
+        if (ratingDiff !== 0) return ratingDiff
+        return (b.reviewCount ?? 0) - (a.reviewCount ?? 0)
+      }),
+      ...withoutRatings.sort((a, b) => b.downloads - a.downloads).slice(0, 500 - withRatings.length)
+    ].map(s => s._id)
+    await updateSortCache('rating', byRating)
+    
+    // Sort by review count
+    const byReviews = [
+      ...withRatings.sort((a, b) => {
+        const countDiff = (b.reviewCount ?? 0) - (a.reviewCount ?? 0)
+        if (countDiff !== 0) return countDiff
+        return (b.avgRating ?? 0) - (a.avgRating ?? 0)
+      }),
+      ...withoutRatings.sort((a, b) => b.downloads - a.downloads).slice(0, 500 - withRatings.length)
+    ].map(s => s._id)
+    await updateSortCache('reviews', byReviews)
+    
+    // Backfill searchText for skills that don't have it
+    let backfilledCount = 0
+    for (const skill of allSkills) {
+      if (!skill.searchText) {
+        const searchText = generateSearchText({
+          slug: skill.slug,
+          name: skill.name,
+          displayName: skill.displayName,
+          description: skill.description,
+          summary: skill.summary,
+          author: skill.author,
+        })
+        await ctx.db.patch(skill._id, { searchText })
+        backfilledCount++
+      }
+    }
+    
+    return { 
+      categories: Object.keys(categoryCounts).length, 
+      tags: sortedTags.length, 
+      total: skills.length,
+      sortCachesUpdated: 5,
+      searchTextBackfilled: backfilledCount,
+    }
   },
 })
 
@@ -678,6 +832,7 @@ export const searchCachedSkills = query({
       v.literal('stars'),
       v.literal('installs'),
       v.literal('rating'),
+      v.literal('reviews'),
       v.literal('votes'),
     )),
     minRating: v.optional(v.number()),
@@ -688,7 +843,7 @@ export const searchCachedSkills = query({
     )),
   },
   handler: async (ctx, args) => {
-    const searchTerm = args.query.trim().toLowerCase()
+    const searchTerm = args.query.trim()
     if (!searchTerm) {
       return { skills: [] }
     }
@@ -697,52 +852,41 @@ export const searchCachedSkills = query({
     const sortBy = args.sortBy ?? 'relevance'
     const reviewerFilter = args.reviewerFilter ?? 'all'
     
-    // OPTIMIZATION: Reduced from 1500 to 500 to save bandwidth
-    // Search typically finds matches in top results; users rarely need 1500+ results
-    const allSkills = await ctx.db.query('cachedSkills').take(500)
+    // OPTIMIZATION: Use Convex full-text search index
+    // This searches ALL skills efficiently without loading them all into memory
+    const searchResults = await ctx.db
+      .query('cachedSkills')
+      .withSearchIndex('search_skills', (q) => q.search('searchText', searchTerm))
+      .take(200) // Get plenty for filtering and sorting
     
     // Filter out hidden skills
-    const visibleSkills = allSkills.filter(s => !s.hidden)
+    const visibleSkills = searchResults.filter(s => !s.hidden)
     
-    // Score and filter matching results
-    const scored = visibleSkills
-      .map(skill => {
-        const name = (skill.name ?? skill.displayName ?? skill.slug).toLowerCase()
-        const slug = skill.slug.toLowerCase()
-        const description = (skill.description ?? skill.summary ?? '').toLowerCase()
-        const author = (skill.author ?? '').toLowerCase()
-        
-        let score = 0
-        
-        // Exact slug match (highest priority)
-        if (slug === searchTerm) score += 100
-        // Slug starts with search term
-        else if (slug.startsWith(searchTerm)) score += 50
-        // Slug contains search term
-        else if (slug.includes(searchTerm)) score += 30
-        
-        // Name exact match
-        if (name === searchTerm) score += 80
-        // Name starts with
-        else if (name.startsWith(searchTerm)) score += 40
-        // Name contains
-        else if (name.includes(searchTerm)) score += 20
-        
-        // Description contains
-        if (description.includes(searchTerm)) score += 10
-        
-        // Author match
-        if (author.includes(searchTerm)) score += 15
-        
-        // Only add popularity boost for relevance sorting
-        if (sortBy === 'relevance') {
-          score += Math.min(skill.stars * 2, 20)
-          score += Math.min(skill.downloads / 10, 10)
-        }
-        
-        return { skill, score }
-      })
-      .filter(({ score }) => score > 0)
+    // Score results for relevance sorting (search index already filtered by match)
+    const scored = visibleSkills.map(skill => {
+      const name = (skill.name ?? skill.displayName ?? skill.slug).toLowerCase()
+      const slug = skill.slug.toLowerCase()
+      const searchLower = searchTerm.toLowerCase()
+      
+      let score = 10 // Base score for being a match
+      
+      // Boost exact matches
+      if (slug === searchLower) score += 100
+      else if (slug.startsWith(searchLower)) score += 50
+      else if (slug.includes(searchLower)) score += 30
+      
+      if (name === searchLower) score += 80
+      else if (name.startsWith(searchLower)) score += 40
+      else if (name.includes(searchLower)) score += 20
+      
+      // Popularity boost for relevance sorting
+      if (sortBy === 'relevance') {
+        score += Math.min(skill.stars * 2, 20)
+        score += Math.min(skill.downloads / 10, 10)
+      }
+      
+      return { skill, score }
+    })
     
     // Filter by minimum rating
     let filtered = scored
@@ -943,6 +1087,7 @@ export const listCachedSkillsWithFilters = query({
       v.literal('installs'),
       v.literal('recent'),
       v.literal('rating'),
+      v.literal('reviews'),
       v.literal('votes')
     )),
     category: v.optional(v.string()),
@@ -965,7 +1110,57 @@ export const listCachedSkillsWithFilters = query({
     const hasTagsFilter = args.tags && args.tags.length > 0
     const hasNixFilter = args.hasNix !== undefined
     const hasRatingFilter = args.minRating !== undefined && args.minRating > 0
-    const hasComplexFilters = hasTagsFilter || hasNixFilter || hasRatingFilter
+    const hasCategoryFilter = args.category && args.category !== 'all'
+    
+    // OPTIMIZATION: Use pre-computed sort cache for simple queries
+    // This is MUCH faster than scanning 2000+ documents
+    // Note: Don't use cache when reviewerFilter is set (needs separate human/bot ratings)
+    const hasReviewerFilter = reviewerFilter !== 'all'
+    const canUseCache = !hasTagsFilter && !hasNixFilter && !hasCategoryFilter && !hasReviewerFilter &&
+      ['downloads', 'stars', 'installs', 'rating', 'reviews'].includes(sortBy)
+    
+    if (canUseCache) {
+      const cache = await ctx.db
+        .query('skillSortCache')
+        .withIndex('by_sort_key', (q) => q.eq('sortKey', sortBy))
+        .unique()
+      
+      if (cache && cache.skillIds.length > 0) {
+        // Use cached sorted IDs
+        let skillIds = cache.skillIds
+        
+        // Apply minRating filter if needed
+        if (hasRatingFilter) {
+          // Need to fetch skills to check ratings
+          const skillsForFilter = await Promise.all(
+            skillIds.slice(0, 200).map(id => ctx.db.get(id))
+          )
+          const filtered = skillsForFilter.filter((s): s is NonNullable<typeof s> => 
+            s !== null && (s.avgRating ?? 0) >= args.minRating!
+          )
+          skillIds = filtered.map(s => s._id)
+        }
+        
+        // Paginate from cached IDs
+        const totalCount = skillIds.length
+        const paginatedIds = skillIds.slice(offset, offset + limit)
+        const skills = await Promise.all(paginatedIds.map(id => ctx.db.get(id)))
+        // Filter out nulls and assert non-null type
+        const validSkills = skills.filter((s): s is NonNullable<typeof s> => s !== null)
+        
+        return {
+          skills: validSkills,
+          hasMore: offset + limit < totalCount,
+          nextCursor: offset + limit < totalCount ? offset + limit : undefined,
+          totalCount,
+        }
+      }
+    }
+    
+    // Fallback to original logic if cache not available or complex filters needed
+    // Rating/reviews sort needs broader scan since we don't have an index on avgRating
+    const needsBroadScan = sortBy === 'rating' || sortBy === 'reviews' || sortBy === 'votes'
+    const hasComplexFilters = hasTagsFilter || hasNixFilter || hasRatingFilter || needsBroadScan
     
     // Special categories that need full scan
     const isSpecialCategory = args.category === 'featured' || args.category === 'verified' || args.category === 'latest'
@@ -1018,8 +1213,8 @@ export const listCachedSkillsWithFilters = query({
       }
       
       skills = rawSkills.filter(s => !s.hidden)
-    } else if (!args.category || args.category === 'all') {
-      // No category filter - use sort index directly
+    } else if ((!args.category || args.category === 'all') && !hasComplexFilters) {
+      // No category filter AND no complex filters - use sort index directly
       const fetchLimit = Math.min(offset + limit + 50, 300)
       
       let rawSkills
@@ -1050,10 +1245,34 @@ export const listCachedSkillsWithFilters = query({
       }
       
       skills = rawSkills.filter(s => !s.hidden)
+    } else if (needsBroadScan) {
+      // OPTIMIZED: For rating/reviews/votes sort, use two-query approach
+      // 1. First get ALL skills with reviews (small set, typically <100)
+      // 2. Then fill remaining slots with regular skills
+      
+      // Get all skills that have been reviewed (these have ratings)
+      const reviewedSkills = await ctx.db
+        .query('cachedSkills')
+        .withIndex('by_review_count')
+        .order('desc')
+        .filter((q) => q.gt(q.field('reviewCount'), 0))
+        .take(200) // Cap at 200 reviewed skills (should be more than enough)
+      
+      // Get regular skills to fill remaining slots (sorted by downloads for variety)
+      const regularSkills = await ctx.db
+        .query('cachedSkills')
+        .withIndex('by_downloads')
+        .order('desc')
+        .take(offset + limit + 100) // Enough for pagination
+      
+      // Merge: reviewed skills first, then regular skills (deduplicated)
+      const reviewedSlugs = new Set(reviewedSkills.map(s => s.slug))
+      const uniqueRegular = regularSkills.filter(s => !reviewedSlugs.has(s.slug))
+      const allSkills = [...reviewedSkills, ...uniqueRegular]
+      
+      skills = allSkills.filter(s => !s.hidden)
     } else {
       // Slow path: Special category or complex filters - need broader scan
-      // OPTIMIZATION: Reduced from 1500 to 500 to save bandwidth
-      // Most users won't paginate beyond first few pages
       const allSkills = await ctx.db
         .query('cachedSkills')
         .order('desc')
@@ -1175,6 +1394,34 @@ export const listCachedSkillsWithFilters = query({
             ? (b.botReviewCount ?? 0)
             : (b.reviewCount ?? 0)
         if (countB !== countA) return countB - countA
+        return b.downloads - a.downloads
+      })
+    } else if (sortBy === 'reviews') {
+      // Sort by review count (most reviews first), then by rating, then by downloads as tiebreaker
+      skills = skills.sort((a, b) => {
+        const countA = reviewerFilter === 'human'
+          ? (a.humanReviewCount ?? 0)
+          : reviewerFilter === 'bot'
+            ? (a.botReviewCount ?? 0)
+            : (a.reviewCount ?? 0)
+        const countB = reviewerFilter === 'human'
+          ? (b.humanReviewCount ?? 0)
+          : reviewerFilter === 'bot'
+            ? (b.botReviewCount ?? 0)
+            : (b.reviewCount ?? 0)
+        if (countB !== countA) return countB - countA
+        // Secondary: rating
+        const ratingA = reviewerFilter === 'human'
+          ? (a.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (a.avgRatingBot ?? 0)
+            : (a.avgRating ?? 0)
+        const ratingB = reviewerFilter === 'human'
+          ? (b.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (b.avgRatingBot ?? 0)
+            : (b.avgRating ?? 0)
+        if (ratingB !== ratingA) return ratingB - ratingA
         return b.downloads - a.downloads
       })
     } else if (sortBy === 'recent') {
@@ -1688,5 +1935,250 @@ export const triggerGitHubAuthorSync = action({
     notFoundInDb: number
   }> => {
     return await ctx.runAction(internal.clawdhubSync.syncAuthorsFromGitHub, {})
+  },
+})
+
+// Manual trigger to update cached counts and sort caches
+export const triggerUpdateCaches = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // This runs the internal mutation directly
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    const skills = allSkills.filter(s => !s.hidden)
+    const now = Date.now()
+    
+    // Pre-compute sorted skill lists
+    async function updateSortCache(sortKey: string, skillIds: string[]) {
+      const existing = await ctx.db
+        .query('skillSortCache')
+        .withIndex('by_sort_key', (q) => q.eq('sortKey', sortKey))
+        .unique()
+      
+      if (existing) {
+        await ctx.db.patch(existing._id, { 
+          skillIds: skillIds as Id<"cachedSkills">[],
+          updatedAt: now 
+        })
+      } else {
+        await ctx.db.insert('skillSortCache', {
+          sortKey,
+          skillIds: skillIds as Id<"cachedSkills">[],
+          updatedAt: now,
+        })
+      }
+    }
+    
+    // Sort by downloads (top 500)
+    const byDownloads = [...skills]
+      .sort((a, b) => b.downloads - a.downloads)
+      .slice(0, 500)
+      .map(s => s._id)
+    await updateSortCache('downloads', byDownloads)
+    
+    // Sort by stars (top 500)
+    const byStars = [...skills]
+      .sort((a, b) => b.stars - a.stars)
+      .slice(0, 500)
+      .map(s => s._id)
+    await updateSortCache('stars', byStars)
+    
+    // Sort by installs (top 500)
+    const byInstalls = [...skills]
+      .sort((a, b) => b.installs - a.installs)
+      .slice(0, 500)
+      .map(s => s._id)
+    await updateSortCache('installs', byInstalls)
+    
+    // Sort by rating
+    const withRatings = skills.filter(s => (s.reviewCount ?? 0) > 0)
+    const withoutRatings = skills.filter(s => (s.reviewCount ?? 0) === 0)
+    const byRating = [
+      ...withRatings.sort((a, b) => {
+        const ratingDiff = (b.avgRating ?? 0) - (a.avgRating ?? 0)
+        if (ratingDiff !== 0) return ratingDiff
+        return (b.reviewCount ?? 0) - (a.reviewCount ?? 0)
+      }),
+      ...withoutRatings.sort((a, b) => b.downloads - a.downloads).slice(0, 500 - withRatings.length)
+    ].map(s => s._id)
+    await updateSortCache('rating', byRating)
+    
+    // Sort by reviews
+    const byReviews = [
+      ...withRatings.sort((a, b) => {
+        const countDiff = (b.reviewCount ?? 0) - (a.reviewCount ?? 0)
+        if (countDiff !== 0) return countDiff
+        return (b.avgRating ?? 0) - (a.avgRating ?? 0)
+      }),
+      ...withoutRatings.sort((a, b) => b.downloads - a.downloads).slice(0, 500 - withRatings.length)
+    ].map(s => s._id)
+    await updateSortCache('reviews', byReviews)
+    
+    // Backfill searchText (only for new skills without it)
+    let backfilledCount = 0
+    for (const skill of allSkills) {
+      if (!skill.searchText) {
+        const searchText = generateSearchText({
+          slug: skill.slug,
+          name: skill.name,
+          displayName: skill.displayName,
+          description: skill.description,
+          summary: skill.summary,
+          author: skill.author,
+        })
+        await ctx.db.patch(skill._id, { searchText })
+        backfilledCount++
+      }
+    }
+    
+    return { 
+      totalSkills: skills.length,
+      sortCachesUpdated: 5,
+      searchTextBackfilled: backfilledCount,
+    }
+  },
+})
+
+// One-time migration to regenerate ALL searchText with improved format
+// Run this after updating generateSearchText to include hyphen variants
+export const regenerateAllSearchText = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allSkills = await ctx.db.query('cachedSkills').collect()
+    let count = 0
+    
+    for (const skill of allSkills) {
+      const searchText = generateSearchText({
+        slug: skill.slug,
+        name: skill.name,
+        displayName: skill.displayName,
+        description: skill.description,
+        summary: skill.summary,
+        author: skill.author,
+      })
+      await ctx.db.patch(skill._id, { searchText })
+      count++
+    }
+    
+    return { regenerated: count }
+  },
+})
+
+// ============================================
+// Optimized Query Functions (use pre-computed caches)
+// ============================================
+
+// List skills from pre-computed sort cache - MUCH faster than scanning all skills
+export const listSkillsOptimized = query({
+  args: {
+    sortBy: v.optional(v.union(
+      v.literal('downloads'),
+      v.literal('stars'),
+      v.literal('installs'),
+      v.literal('rating'),
+      v.literal('reviews')
+    )),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+    category: v.optional(v.string()),
+    minRating: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const sortBy = args.sortBy ?? 'downloads'
+    const limit = args.limit ?? 24
+    const offset = args.offset ?? 0
+    
+    // Get pre-sorted skill IDs from cache
+    const cacheKey = sortBy
+    const cache = await ctx.db
+      .query('skillSortCache')
+      .withIndex('by_sort_key', (q) => q.eq('sortKey', cacheKey))
+      .unique()
+    
+    if (!cache) {
+      // Fallback if cache not populated yet
+      return { skills: [], hasMore: false, totalCount: 0, fromCache: false }
+    }
+    
+    let skillIds = cache.skillIds
+    
+    // Apply category filter if specified
+    if (args.category && args.category !== 'all') {
+      // Need to fetch skills to filter by category
+      const skills = await Promise.all(
+        skillIds.map(id => ctx.db.get(id))
+      )
+      const filtered = skills.filter(s => s && !s.hidden && s.category === args.category)
+      skillIds = filtered.map(s => s!._id)
+    }
+    
+    // Apply minRating filter if specified
+    if (args.minRating && args.minRating > 0) {
+      const skills = await Promise.all(
+        skillIds.slice(0, 200).map(id => ctx.db.get(id)) // Limit fetch for efficiency
+      )
+      const filtered = skills.filter(s => s && (s.avgRating ?? 0) >= args.minRating!)
+      skillIds = filtered.map(s => s!._id)
+    }
+    
+    // Paginate
+    const totalCount = skillIds.length
+    const paginatedIds = skillIds.slice(offset, offset + limit)
+    
+    // Fetch full skill data for the page
+    const skills = await Promise.all(
+      paginatedIds.map(id => ctx.db.get(id))
+    )
+    
+    return {
+      skills: skills.filter(Boolean),
+      hasMore: offset + limit < totalCount,
+      nextCursor: offset + limit < totalCount ? offset + limit : undefined,
+      totalCount,
+      fromCache: true,
+    }
+  },
+})
+
+// Search skills using Convex full-text search - searches ALL skills efficiently
+export const searchSkillsOptimized = query({
+  args: {
+    query: v.string(),
+    limit: v.optional(v.number()),
+    category: v.optional(v.string()),
+    minRating: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const searchTerm = args.query.trim()
+    if (!searchTerm) {
+      return { skills: [], totalCount: 0 }
+    }
+    
+    const limit = args.limit ?? 50
+    
+    // Use Convex full-text search index
+    const searchQuery = ctx.db
+      .query('cachedSkills')
+      .withSearchIndex('search_skills', (q) => {
+        const search = q.search('searchText', searchTerm)
+        if (args.category && args.category !== 'all') {
+          return search.eq('category', args.category)
+        }
+        return search
+      })
+    
+    // Fetch results (get extra for post-filtering)
+    const results = await searchQuery.take(limit * 3)
+    
+    // Filter out hidden skills and apply other filters
+    let filtered = results.filter(s => !s.hidden)
+    
+    if (args.minRating && args.minRating > 0) {
+      filtered = filtered.filter(s => (s.avgRating ?? 0) >= args.minRating!)
+    }
+    
+    return {
+      skills: filtered.slice(0, limit),
+      totalCount: filtered.length,
+    }
   },
 })

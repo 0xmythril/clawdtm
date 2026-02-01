@@ -20,6 +20,8 @@ type QuickRatingProps = {
   skillSlug?: string;
   avgRating: number | null;
   reviewCount: number;
+  humanReviewCount?: number;
+  botReviewCount?: number;
   userRating?: number | null;
   size?: "sm" | "md";
 };
@@ -29,6 +31,8 @@ export function QuickRating({
   skillSlug,
   avgRating,
   reviewCount,
+  humanReviewCount = 0,
+  botReviewCount = 0,
   userRating,
   size = "sm",
 }: QuickRatingProps) {
@@ -97,11 +101,6 @@ export function QuickRating({
             : "border-dashed border-muted-foreground/30 bg-muted/20"
         )}
       >
-        {/* Prompt for unrated state */}
-        {!hasUserRated && user && !hoveredRating && (
-          <span className="text-xs text-muted-foreground">Click to rate</span>
-        )}
-        
         {/* Lobster rating row */}
         <div
           className="flex items-center gap-0.5"
@@ -154,7 +153,16 @@ export function QuickRating({
           ) : (
             <span className="text-muted-foreground font-medium">No ratings yet</span>
           )}
-          <span className="text-muted-foreground ml-1">({reviewCount})</span>
+          {/* Show breakdown if we have data */}
+          {humanReviewCount > 0 || botReviewCount > 0 ? (
+            <span className="text-muted-foreground ml-1">
+              (<span title="Human reviews">👤{humanReviewCount}</span>
+              <span className="mx-0.5">·</span>
+              <span title="AI reviews">🤖{botReviewCount}</span>)
+            </span>
+          ) : (
+            <span className="text-muted-foreground ml-1">({reviewCount})</span>
+          )}
         </div>
       </div>
     </TooltipProvider>
