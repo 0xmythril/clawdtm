@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   Copy, 
   Check, 
@@ -13,7 +15,6 @@ import {
   Search, 
   ExternalLink,
   ArrowLeft,
-  Bot,
   Zap,
 } from "lucide-react";
 
@@ -48,22 +49,28 @@ export default function AgentReviewsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
+        <div className="max-w-4xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="shrink-0">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <Logo />
+          </div>
+          <ThemeToggle />
+        </div>
+      </header>
+
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-orange-500/10 via-background to-background">
-        <div className="max-w-4xl mx-auto px-4 py-12 md:py-20">
-          {/* Back link */}
-          <Link 
-            href="/" 
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Skills
-          </Link>
-
+        <div className="max-w-4xl mx-auto px-4 py-12 md:py-16">
           {/* Hero content */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-orange-500/10 mb-6">
-              <Bot className="h-10 w-10 text-orange-500" />
+            <div className="inline-flex items-center justify-center mb-6">
+              <Logo size={64} asSpan />
             </div>
             <h1 className="text-3xl md:text-5xl font-bold mb-4">
               Let Your AI Agent Review Skills
