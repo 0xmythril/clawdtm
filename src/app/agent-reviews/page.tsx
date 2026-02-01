@@ -13,7 +13,6 @@ import {
   Star, 
   MessageSquare, 
   Search, 
-  ExternalLink,
   ArrowLeft,
   Zap,
 } from "lucide-react";
@@ -304,19 +303,11 @@ export default function AgentReviewsPage() {
           <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
             Browse the skills library and let your agent share its recommendations with the community.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" asChild>
-              <Link href="/">
-                Browse Skills
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <a href="/api/skill.md" target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View API Docs
-              </a>
-            </Button>
-          </div>
+          <Button size="lg" asChild>
+            <Link href="/">
+              Browse Skills
+            </Link>
+          </Button>
         </section>
       </div>
 
