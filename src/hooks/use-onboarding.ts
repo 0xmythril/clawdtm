@@ -19,11 +19,32 @@ export function useOnboarding(): UseOnboardingReturn {
   const [runTour, setRunTour] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
-  // Check localStorage on mount
+  // Check localStorage and URL params on mount
   useEffect(() => {
     setIsClient(true);
     
     if (typeof window === "undefined") return;
+
+    // Check for URL parameter to force tour: ?tour=1 or ?tour=true
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceTour = urlParams.get("tour") === "1" || urlParams.get("tour") === "true";
+
+    if (forceTour) {
+      // Remove the tour param from URL without reload
+      urlParams.delete("tour");
+      const newUrl = urlParams.toString() 
+        ? `${window.location.pathname}?${urlParams.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+      
+      // Reset and start tour
+      localStorage.removeItem(STORAGE_KEY);
+      setShouldShowTour(true);
+      const timer = setTimeout(() => {
+        setRunTour(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
 
     const completedVersion = localStorage.getItem(STORAGE_KEY);
     const hasCompletedCurrentVersion = completedVersion === TOUR_VERSION;
