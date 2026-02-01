@@ -214,6 +214,8 @@ function SkillContent({
             skillId={skill._id}
             avgRating={skill.avgRating}
             reviewCount={skill.reviewCount}
+            humanReviewCount={skill.humanReviewCount}
+            botReviewCount={skill.botReviewCount}
             userRating={userReview?.rating ?? null}
             size="md"
           />

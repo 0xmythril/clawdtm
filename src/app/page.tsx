@@ -157,7 +157,11 @@ function SkillsContent() {
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
       reviewCount: s.reviewCount,
+      humanReviewCount: s.humanReviewCount,
+      botReviewCount: s.botReviewCount,
       avgRating: s.avgRating,
+      avgRatingHuman: s.avgRatingHuman,
+      avgRatingBot: s.avgRatingBot,
     }));
 
     if (cursor === 0) {
@@ -187,7 +191,11 @@ function SkillsContent() {
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
         reviewCount: s.reviewCount,
+        humanReviewCount: s.humanReviewCount,
+        botReviewCount: s.botReviewCount,
         avgRating: s.avgRating,
+        avgRatingHuman: s.avgRatingHuman,
+        avgRatingBot: s.avgRatingBot,
       }));
     }
     return allSkills;
@@ -393,6 +401,7 @@ function SkillsContent() {
                       variant={viewMode}
                       userRating={userRatings?.[skill._id] ?? null}
                       isFirstCard={index === 0}
+                      reviewerFilter={urlReviewerFilter}
                     />
                   ))}
                 </div>

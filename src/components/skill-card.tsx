@@ -31,6 +31,8 @@ function getTagColor(tag: string): string {
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
 }
 
+export type ReviewerFilter = "all" | "human" | "bot";
+
 export type Skill = {
   _id: string;
   slug: string;
@@ -43,9 +45,16 @@ export type Skill = {
   category?: string;
   normalizedTags?: string[];
   isVerified?: boolean;
+  // Legacy votes (deprecated, but still in data)
+  clawdtmUpvotes?: number;
+  clawdtmDownvotes?: number;
   // Review stats
   reviewCount?: number;
+  humanReviewCount?: number;
+  botReviewCount?: number;
   avgRating?: number;
+  avgRatingHuman?: number;
+  avgRatingBot?: number;
 };
 
 type SkillCardProps = {
@@ -56,30 +65,84 @@ type SkillCardProps = {
   userRating?: number | null;
   // For onboarding tour - marks first card
   isFirstCard?: boolean;
+  // Filter to show only human or bot ratings
+  reviewerFilter?: ReviewerFilter;
 };
 
 // Rating display component using lobster emoji
-function RatingDisplay({ avgRating, reviewCount, userRating, size = "sm", dataTour }: {
+function RatingDisplay({ 
+  avgRating, 
+  avgRatingHuman,
+  avgRatingBot,
+  reviewCount, 
+  humanReviewCount, 
+  botReviewCount, 
+  userRating, 
+  reviewerFilter = "all",
+  size = "sm", 
+  dataTour 
+}: {
   avgRating: number | null;
+  avgRatingHuman?: number | null;
+  avgRatingBot?: number | null;
   reviewCount: number;
+  humanReviewCount?: number;
+  botReviewCount?: number;
   userRating?: number | null;
+  reviewerFilter?: ReviewerFilter;
   size?: "sm" | "md";
   dataTour?: string;
 }) {
-  const hasRating = avgRating !== null && reviewCount > 0;
+  const humanCount = humanReviewCount ?? 0;
+  const botCount = botReviewCount ?? 0;
+  
+  // Select rating and count based on filter
+  const displayRating = reviewerFilter === "human" 
+    ? (avgRatingHuman ?? null)
+    : reviewerFilter === "bot"
+      ? (avgRatingBot ?? null)
+      : avgRating;
+  
+  const displayCount = reviewerFilter === "human"
+    ? humanCount
+    : reviewerFilter === "bot"
+      ? botCount
+      : reviewCount;
+  
+  const hasRating = displayRating !== null && displayCount > 0;
   const iconSize = size === "sm" ? "text-sm" : "text-base";
+  const hasBreakdown = reviewerFilter === "all" && (humanCount > 0 || botCount > 0);
+  
+  // Build tooltip with breakdown
+  const filterLabel = reviewerFilter === "human" ? " (Human only)" : reviewerFilter === "bot" ? " (AI only)" : "";
+  const tooltip = hasRating 
+    ? `${displayRating?.toFixed(1)} avg from ${displayCount} reviews${filterLabel}${hasBreakdown ? ` (${humanCount} human, ${botCount} AI)` : ''}`
+    : reviewerFilter === "all" ? "No reviews yet" : `No ${reviewerFilter} reviews yet`;
   
   return (
-    <div className="flex items-center gap-1" title={hasRating ? `${avgRating?.toFixed(1)} avg from ${reviewCount} reviews` : "No reviews yet"} {...(dataTour ? { "data-tour": dataTour } : {})}>
+    <div className="flex items-center gap-1" title={tooltip} {...(dataTour ? { "data-tour": dataTour } : {})}>
       <span className={iconSize}>🦞</span>
       {hasRating ? (
         <span className="font-medium text-orange-600 dark:text-orange-400">
-          {avgRating?.toFixed(1)}
+          {displayRating?.toFixed(1)}
         </span>
       ) : (
         <span className="text-muted-foreground">—</span>
       )}
-      <span className="text-muted-foreground">({reviewCount})</span>
+      {/* Show breakdown when filter is "all", otherwise just show filtered count */}
+      {hasBreakdown ? (
+        <span className="text-muted-foreground text-xs">
+          (<span title="Human reviews">👤{humanCount}</span>
+          <span className="mx-0.5">·</span>
+          <span title="AI reviews">🤖{botCount}</span>)
+        </span>
+      ) : reviewerFilter !== "all" ? (
+        <span className="text-muted-foreground text-xs">
+          ({reviewerFilter === "human" ? "👤" : "🤖"}{displayCount})
+        </span>
+      ) : (
+        <span className="text-muted-foreground">({displayCount})</span>
+      )}
       {userRating && (
         <span className="ml-1 text-orange-500" title={`Your rating: ${userRating}`}>
           ★
@@ -89,7 +152,7 @@ function RatingDisplay({ avgRating, reviewCount, userRating, size = "sm", dataTo
   );
 }
 
-export function SkillCard({ skill, onInstall, variant = "card", userRating, isFirstCard }: SkillCardProps) {
+export function SkillCard({ skill, onInstall, variant = "card", userRating, isFirstCard, reviewerFilter = "all" }: SkillCardProps) {
   const tags = skill.normalizedTags?.slice(0, 3) ?? [];
 
   if (variant === "list") {
@@ -155,8 +218,13 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
                   </span>
                   <RatingDisplay
                     avgRating={skill.avgRating ?? null}
+                    avgRatingHuman={skill.avgRatingHuman ?? null}
+                    avgRatingBot={skill.avgRatingBot ?? null}
                     reviewCount={skill.reviewCount ?? 0}
+                    humanReviewCount={skill.humanReviewCount}
+                    botReviewCount={skill.botReviewCount}
                     userRating={userRating}
+                    reviewerFilter={reviewerFilter}
                     size="sm"
                     dataTour={isFirstCard ? "rating" : undefined}
                   />
@@ -253,8 +321,13 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
           </div>
           <RatingDisplay
             avgRating={skill.avgRating ?? null}
+            avgRatingHuman={skill.avgRatingHuman ?? null}
+            avgRatingBot={skill.avgRatingBot ?? null}
             reviewCount={skill.reviewCount ?? 0}
+            humanReviewCount={skill.humanReviewCount}
+            botReviewCount={skill.botReviewCount}
             userRating={userRating}
+            reviewerFilter={reviewerFilter}
             size="sm"
             dataTour={isFirstCard ? "rating" : undefined}
           />
