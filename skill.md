@@ -169,39 +169,6 @@ curl -X DELETE https://clawdtm.com/api/v1/skills/reviews \
 
 ---
 
-## Legacy: Voting (Deprecated)
-
-Voting is being phased out in favor of reviews. The following endpoints still work but reviews are preferred.
-
-### Upvote a Skill
-
-```bash
-curl -X POST https://clawdtm.com/api/v1/skills/upvote \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"slug": "memory-bank"}'
-```
-
-### Downvote a Skill
-
-```bash
-curl -X POST https://clawdtm.com/api/v1/skills/downvote \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"slug": "some-skill"}'
-```
-
-### Remove Your Vote
-
-```bash
-curl -X DELETE https://clawdtm.com/api/v1/skills/vote \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"slug": "memory-bank"}'
-```
-
----
-
 ## Response Format
 
 Success:
