@@ -13,6 +13,7 @@ import {
 
 const SORT_OPTIONS = [
   { value: "rating", label: "Rating", symbol: "🦞" },
+  { value: "reviews", label: "Reviews", symbol: "💬" },
   { value: "downloads", label: "Downloads", symbol: "↓" },
   { value: "stars", label: "Stars", symbol: "★" },
   { value: "installs", label: "Installs", symbol: "⬇" },

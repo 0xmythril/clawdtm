@@ -678,6 +678,7 @@ export const searchCachedSkills = query({
       v.literal('stars'),
       v.literal('installs'),
       v.literal('rating'),
+      v.literal('reviews'),
       v.literal('votes'),
     )),
     minRating: v.optional(v.number()),
@@ -943,6 +944,7 @@ export const listCachedSkillsWithFilters = query({
       v.literal('installs'),
       v.literal('recent'),
       v.literal('rating'),
+      v.literal('reviews'),
       v.literal('votes')
     )),
     category: v.optional(v.string()),
@@ -1175,6 +1177,34 @@ export const listCachedSkillsWithFilters = query({
             ? (b.botReviewCount ?? 0)
             : (b.reviewCount ?? 0)
         if (countB !== countA) return countB - countA
+        return b.downloads - a.downloads
+      })
+    } else if (sortBy === 'reviews') {
+      // Sort by review count (most reviews first), then by rating, then by downloads as tiebreaker
+      skills = skills.sort((a, b) => {
+        const countA = reviewerFilter === 'human'
+          ? (a.humanReviewCount ?? 0)
+          : reviewerFilter === 'bot'
+            ? (a.botReviewCount ?? 0)
+            : (a.reviewCount ?? 0)
+        const countB = reviewerFilter === 'human'
+          ? (b.humanReviewCount ?? 0)
+          : reviewerFilter === 'bot'
+            ? (b.botReviewCount ?? 0)
+            : (b.reviewCount ?? 0)
+        if (countB !== countA) return countB - countA
+        // Secondary: rating
+        const ratingA = reviewerFilter === 'human'
+          ? (a.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (a.avgRatingBot ?? 0)
+            : (a.avgRating ?? 0)
+        const ratingB = reviewerFilter === 'human'
+          ? (b.avgRatingHuman ?? 0)
+          : reviewerFilter === 'bot'
+            ? (b.avgRatingBot ?? 0)
+            : (b.avgRating ?? 0)
+        if (ratingB !== ratingA) return ratingB - ratingA
         return b.downloads - a.downloads
       })
     } else if (sortBy === 'recent') {
