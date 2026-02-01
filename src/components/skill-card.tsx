@@ -94,7 +94,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
 
   if (variant === "list") {
     return (
-      <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}>
+      <Card className="group overflow-hidden transition-all hover:shadow-md hover:border-primary/20" {...(isFirstCard ? { "data-tour": "skill-card" } : {})}
         <CardContent className="p-4">
           <div className="flex gap-4 items-start">
             {/* Main content */}
@@ -158,7 +158,6 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
                     reviewCount={skill.reviewCount ?? 0}
                     userRating={userRating}
                     size="sm"
-                    dataTour={isFirstCard ? "rating" : undefined}
                   />
                 </div>
               </div>

@@ -13,7 +13,6 @@ import { InstallModal } from "@/components/install-modal";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { OnboardingTour } from "@/components/onboarding-tour";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   trackSearch,
@@ -294,9 +293,6 @@ function SkillsContent() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Onboarding Tour for first-time visitors */}
-      <OnboardingTour />
-      
       {/* Desktop Sidebar */}
       <Sidebar
         tags={tagsData?.tags ?? []}
@@ -379,14 +375,13 @@ function SkillsContent() {
                       : "flex flex-col gap-3"
                   }
                 >
-                  {skills.map((skill, index) => (
+                  {skills.map((skill) => (
                     <SkillCard
                       key={skill.slug}
                       skill={skill}
                       onInstall={handleInstall}
                       variant={viewMode}
                       userRating={userRatings?.[skill._id] ?? null}
-                      isFirstCard={index === 0}
                     />
                   ))}
                 </div>
