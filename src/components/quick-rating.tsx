@@ -13,9 +13,11 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { trackRatingSubmitted } from "@/lib/analytics";
 
 type QuickRatingProps = {
   skillId: Id<"cachedSkills">;
+  skillSlug?: string;
   avgRating: number | null;
   reviewCount: number;
   userRating?: number | null;
@@ -24,6 +26,7 @@ type QuickRatingProps = {
 
 export function QuickRating({
   skillId,
+  skillSlug,
   avgRating,
   reviewCount,
   userRating,
@@ -65,6 +68,9 @@ export function QuickRating({
         rating,
         reviewText: "", // Quick rating = no text
       });
+      
+      // Track the rating
+      trackRatingSubmitted(skillSlug || "unknown", rating);
     } catch (err) {
       // Revert optimistic update on error
       setOptimisticRating(null);

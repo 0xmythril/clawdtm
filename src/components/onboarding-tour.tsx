@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Joyride, { CallBackProps, STATUS, ACTIONS, EVENTS, Step } from "react-joyride";
 import { useTheme } from "next-themes";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import {
+  trackTourStarted,
+  trackTourStepView,
+  trackTourNavigation,
+  trackTourCompleted,
+  trackTourSkipped,
+} from "@/lib/analytics";
 
 const TOUR_STEPS: Step[] = [
   {
@@ -93,31 +100,71 @@ const TOUR_STEPS: Step[] = [
   },
 ];
 
+// Step names for analytics (matches TOUR_STEPS order)
+const STEP_NAMES = ["welcome", "search", "skill_card", "rating", "filters", "agent_reviews", "signin"];
+
 export function OnboardingTour() {
   const { resolvedTheme } = useTheme();
   const { runTour, setRunTour, completeTour } = useOnboarding();
   const [mounted, setMounted] = useState(false);
+  
+  // Tracking state
+  const tourStartTime = useRef<number | null>(null);
+  const stepsViewed = useRef<Set<number>>(new Set());
+  const hasTrackedStart = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status, action, type } = data;
+  // Track tour start when runTour becomes true
+  useEffect(() => {
+    if (runTour && !hasTrackedStart.current) {
+      hasTrackedStart.current = true;
+      tourStartTime.current = Date.now();
+      trackTourStarted();
+    }
+  }, [runTour]);
 
-    // Handle tour completion or skip
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status, action, type, index } = data;
+    const stepName = STEP_NAMES[index] || `step_${index}`;
+
+    // Track step views
+    if (type === EVENTS.STEP_AFTER && !stepsViewed.current.has(index)) {
+      stepsViewed.current.add(index);
+      trackTourStepView(stepName, index);
+    }
+
+    // Track navigation
+    if (action === ACTIONS.NEXT && type === EVENTS.STEP_AFTER) {
+      trackTourNavigation("next", index);
+    }
+    if (action === ACTIONS.PREV && type === EVENTS.STEP_AFTER) {
+      trackTourNavigation("back", index);
+    }
+
+    // Handle tour completion
+    if (status === STATUS.FINISHED) {
+      const duration = tourStartTime.current ? Date.now() - tourStartTime.current : 0;
+      trackTourCompleted(stepsViewed.current.size, duration);
+      completeTour();
+    }
+
+    // Handle tour skip
+    if (status === STATUS.SKIPPED) {
+      trackTourSkipped(stepName, index);
       completeTour();
     }
 
     // Handle close button click
     if (action === ACTIONS.CLOSE) {
+      trackTourSkipped(stepName, index);
       completeTour();
     }
 
     // Handle step errors (element not found)
     if (type === EVENTS.TARGET_NOT_FOUND) {
-      // Skip to next step if target not found
       console.warn("Tour target not found, skipping step");
     }
   };

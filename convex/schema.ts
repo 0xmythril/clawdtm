@@ -502,6 +502,10 @@ const botAgents = defineTable({
     v.literal('unverified')  // Self-registered, not yet claimed
   ),
   
+  // Attribution - how the agent discovered ClawdTM
+  // Common values: cli, clawdhub, other_bot, x_me, x_owner, friend, search
+  source: v.optional(v.string()),
+  
   // Activity tracking
   lastActiveAt: v.optional(v.number()),
   voteCount: v.optional(v.number()),

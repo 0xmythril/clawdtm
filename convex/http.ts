@@ -92,7 +92,7 @@ http.route({
   method: 'POST',
   handler: httpAction(async (ctx, request) => {
     try {
-      const body = await request.json() as { name?: string; description?: string }
+      const body = await request.json() as { name?: string; description?: string; source?: string }
 
       if (!body.name) {
         return jsonResponse({
@@ -105,6 +105,7 @@ http.route({
       const result = await ctx.runMutation(api.botAgents.selfRegister, {
         name: body.name,
         description: body.description,
+        source: body.source, // Attribution tracking
       })
 
       if (!result.success) {

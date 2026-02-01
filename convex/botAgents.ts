@@ -217,6 +217,7 @@ export const selfRegister = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
+    source: v.optional(v.string()), // Attribution: cli, clawdhub, other_bot, x_me, x_owner, friend, search, etc.
   },
   handler: async (ctx, args) => {
     // Rate limit: Check global registration rate
@@ -256,6 +257,7 @@ export const selfRegister = mutation({
       apiKeyHash,
       apiKeyPrefix,
       status: 'verified', // All agents are treated equally
+      source: args.source, // Attribution tracking
       voteCount: 0,
       createdAt: now,
       updatedAt: now,

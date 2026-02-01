@@ -24,6 +24,7 @@ import {
   trackLoadMore,
   trackSkillInstall,
   trackExternalLink,
+  trackPageView,
 } from "@/lib/analytics";
 
 type SortOption = "downloads" | "stars" | "installs" | "rating";
@@ -71,6 +72,11 @@ function SkillsContent() {
   useEffect(() => {
     const savedViewMode = localStorage.getItem("skill-view-mode") as ViewMode | null;
     if (savedViewMode) setViewMode(savedViewMode);
+  }, []);
+
+  // Track page view (handles first visit, returning user, UTM params)
+  useEffect(() => {
+    trackPageView();
   }, []);
 
   // Save view mode to localStorage
