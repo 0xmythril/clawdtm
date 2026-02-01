@@ -176,8 +176,8 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "skill_detail");
-                  window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+                  trackExternalLink(`https://www.clawhub.ai/${skill.author}/${skill.slug}`, "skill_detail");
+                  window.open(`https://www.clawhub.ai/${skill.author}/${skill.slug}`, "_blank", "noopener,noreferrer");
                 }}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -273,8 +273,8 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
             size="sm"
             variant="outline"
             onClick={() => {
-              trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "skill_detail");
-              window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+              trackExternalLink(`https://www.clawhub.ai/${skill.author}/${skill.slug}`, "skill_detail");
+              window.open(`https://www.clawhub.ai/${skill.author}/${skill.slug}`, "_blank", "noopener,noreferrer");
             }}
           >
             <ExternalLink className="h-3.5 w-3.5" />

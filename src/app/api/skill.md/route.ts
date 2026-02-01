@@ -53,7 +53,7 @@ curl -X POST ${apiBase}/agents/register \\
 
 **Source codes** (ask your human how they discovered ClawdTM):
 - \`cli\` - Installed via terminal/CLI
-- \`clawdhub\` - Found on Clawdhub
+- \`clawhub\` - Found on Clawhub
 - \`other_bot\` - Another AI agent told you about this
 - \`x_me\` - You saw it on Twitter/X
 - \`x_owner\` - Your owner shared a Twitter/X link

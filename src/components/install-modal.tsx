@@ -25,7 +25,7 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
 
   if (!skill) return null;
 
-  const installCommand = `clawdhub install ${skill.slug}`;
+  const installCommand = `clawhub install ${skill.slug}`;
   const installPrompt = `Install the ${skill.name || skill.slug} skill`;
 
   const handleCopy = async () => {
@@ -151,12 +151,12 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
             <p className="text-muted-foreground">
               <strong className="text-foreground">⚠️ Prerequisites for Terminal:</strong> Make sure you have{" "}
               <a
-                href="https://clawdhub.com"
+                href="https://www.clawhub.ai"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Clawdhub
+                Clawhub
               </a>{" "}
               installed and configured.
             </p>
@@ -168,12 +168,12 @@ export function InstallModal({ open, onOpenChange, skill }: InstallModalProps) {
               variant="outline"
               className="w-full h-10 cursor-pointer"
               onClick={() => {
-                trackExternalLink(`https://clawdhub.com/skills/${skill.slug}`, "install_modal");
-                window.open(`https://clawdhub.com/skills/${skill.slug}`, "_blank", "noopener,noreferrer");
+                trackExternalLink(`https://www.clawhub.ai/${skill.author}/${skill.slug}`, "install_modal");
+                window.open(`https://www.clawhub.ai/${skill.author}/${skill.slug}`, "_blank", "noopener,noreferrer");
               }}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              View on Clawdhub
+              View on Clawhub
             </Button>
           </div>
         </div>

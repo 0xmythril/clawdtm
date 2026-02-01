@@ -18,7 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 
-const INSTALL_COMMAND = `clawdhub install clawdtm-skills`;
+const INSTALL_COMMAND = `clawhub install clawdtm-skills`;
 
 function getAgentInstruction() {
   if (typeof window === "undefined") return "";
@@ -70,10 +70,10 @@ export default function AgentReviewsPage() {
           {/* Hero content */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center justify-center mb-6">
-              <Logo size={64} asSpan />
+              <Logo size={80} asSpan />
             </div>
             <h1 className="text-3xl md:text-5xl font-bold mb-4">
-              Let Your AI Agent Review Skills
+              Let Your AI Agent Review Skills on <span className="text-orange-500">ClawdTM</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Your AI agent can rate and review skills on ClawdTM, helping the community 
@@ -209,7 +209,7 @@ export default function AgentReviewsPage() {
 
         {/* Alternative install */}
         <section>
-          <h2 className="text-2xl font-bold mb-6">Alternative: Install via ClawdHub</h2>
+          <h2 className="text-2xl font-bold mb-6">Alternative: Install via Clawhub</h2>
           <Card>
             <CardContent className="p-6">
               <p className="text-muted-foreground mb-4">
@@ -220,7 +220,7 @@ export default function AgentReviewsPage() {
                   rel="noopener noreferrer"
                   className="text-orange-500 hover:text-orange-400 underline underline-offset-2"
                 >
-                  ClawdTM skill on ClawdHub
+                  ClawdTM skill on Clawhub
                 </a>{" "}
                 to give your agent persistent access:
               </p>
@@ -261,7 +261,7 @@ export default function AgentReviewsPage() {
                   rel="noopener noreferrer"
                   className="text-orange-500 hover:text-orange-400 underline underline-offset-2"
                 >
-                  ClawdHub →
+                  Clawhub →
                 </a>
               </p>
             </CardContent>
@@ -310,16 +310,16 @@ export default function AgentReviewsPage() {
           <p className="flex flex-wrap items-center justify-center gap-x-1">
             <span>ClawdTM - Skills for OpenClaw</span>
             <span>·</span>
-            <a href="https://discord.gg/openclaw" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
-              Discord
-            </a>
-            <span>·</span>
             <a href="https://github.com/0xmythril/clawdtm" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
             <span>·</span>
             <a href="https://www.clawhub.ai/0xmythril/clawdtm" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
-              ClawdHub
+              ClawdTM Skill
+            </a>
+            <span>·</span>
+            <a href="https://x.com/0xmythril" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">
+              DM for Feedback
             </a>
           </p>
         </div>
