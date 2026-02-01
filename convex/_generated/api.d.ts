@@ -8,11 +8,13 @@
  * @module
  */
 
+import type * as botAgents from "../botAgents.js";
 import type * as categorization from "../categorization.js";
 import type * as clawdhubSync from "../clawdhubSync.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
+import type * as reviews from "../reviews.js";
 import type * as users from "../users.js";
 import type * as voting from "../voting.js";
 
@@ -23,11 +25,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  botAgents: typeof botAgents;
   categorization: typeof categorization;
   clawdhubSync: typeof clawdhubSync;
   crons: typeof crons;
   http: typeof http;
   "lib/embeddings": typeof lib_embeddings;
+  reviews: typeof reviews;
   users: typeof users;
   voting: typeof voting;
 }>;

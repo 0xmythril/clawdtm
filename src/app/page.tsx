@@ -7,12 +7,13 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
-import { SearchBar, type SearchBarRef } from "@/components/search-bar";
+import { SearchBar, type SearchBarRef, type ReviewerFilter } from "@/components/search-bar";
 import { SkillCard, type Skill } from "@/components/skill-card";
 import { InstallModal } from "@/components/install-modal";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { OnboardingTour } from "@/components/onboarding-tour";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   trackSearch,
@@ -23,9 +24,10 @@ import {
   trackLoadMore,
   trackSkillInstall,
   trackExternalLink,
+  trackPageView,
 } from "@/lib/analytics";
 
-type SortOption = "downloads" | "stars" | "installs" | "votes";
+type SortOption = "downloads" | "stars" | "installs" | "rating";
 type ViewMode = "card" | "list";
 
 // Loading fallback for Suspense
@@ -50,7 +52,9 @@ function SkillsContent() {
   // URL state
   const urlQuery = searchParams.get("q") ?? "";
   const urlCategory = searchParams.get("category") ?? "all";
-  const urlSort = (searchParams.get("sort") as SortOption) ?? "downloads";
+  const urlSort = (searchParams.get("sort") as SortOption) ?? "rating";
+  const urlReviewerFilter = (searchParams.get("reviewer") as ReviewerFilter) ?? "all";
+  const urlMinRating = parseInt(searchParams.get("minRating") ?? "0", 10) || 0;
   const urlTags = useMemo(
     () => searchParams.get("tags")?.split(",").filter(Boolean) ?? [],
     [searchParams]
@@ -70,13 +74,18 @@ function SkillsContent() {
     if (savedViewMode) setViewMode(savedViewMode);
   }, []);
 
+  // Track page view (handles first visit, returning user, UTM params)
+  useEffect(() => {
+    trackPageView();
+  }, []);
+
   // Save view mode to localStorage
   useEffect(() => {
     localStorage.setItem("skill-view-mode", viewMode);
   }, [viewMode]);
 
   // Reset pagination when filters change
-  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}`;
+  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}-${urlReviewerFilter}-${urlMinRating}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
 
   if (filterKey !== lastFilterKey) {
@@ -96,11 +105,19 @@ function SkillsContent() {
     sortBy: urlSort,
     category: urlCategory === "all" ? undefined : urlCategory,
     tags: urlTags.length > 0 ? urlTags : undefined,
+    minRating: urlMinRating > 0 ? urlMinRating : undefined,
+    reviewerFilter: urlReviewerFilter !== "all" ? urlReviewerFilter : undefined,
   });
 
   const searchResult = useQuery(
     api.clawdhubSync.searchCachedSkills,
-    query.trim() ? { query: query.trim(), limit: 50, sortBy: urlSort } : "skip"
+    query.trim() ? { 
+      query: query.trim(), 
+      limit: 50, 
+      sortBy: urlSort,
+      minRating: urlMinRating > 0 ? urlMinRating : undefined,
+      reviewerFilter: urlReviewerFilter !== "all" ? urlReviewerFilter : undefined,
+    } : "skip"
   );
 
   // Get skill IDs for vote fetching
@@ -111,9 +128,9 @@ function SkillsContent() {
     return allSkills.map((s) => s._id as Id<"cachedSkills">);
   }, [allSkills, searchResult, query]);
 
-  // Fetch user votes for visible skills
-  const userVotes = useQuery(
-    api.voting.getUserVotesForSkills,
+  // Fetch user ratings for visible skills
+  const userRatings = useQuery(
+    api.reviews.getUserRatingsForSkills,
     userLoaded && user && skillIds.length > 0
       ? { cachedSkillIds: skillIds, clerkId: user.id }
       : "skip"
@@ -139,6 +156,8 @@ function SkillsContent() {
       isVerified: verifiedSlugs.has(s.slug),
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
+      reviewCount: s.reviewCount,
+      avgRating: s.avgRating,
     }));
 
     if (cursor === 0) {
@@ -167,6 +186,8 @@ function SkillsContent() {
         isVerified: verifiedSlugs.has(s.slug),
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
+        reviewCount: s.reviewCount,
+        avgRating: s.avgRating,
       }));
     }
     return allSkills;
@@ -230,6 +251,20 @@ function SkillsContent() {
     [updateURL]
   );
 
+  const handleReviewerFilterChange = useCallback(
+    (newFilter: ReviewerFilter) => {
+      updateURL({ reviewer: newFilter === "all" ? undefined : newFilter });
+    },
+    [updateURL]
+  );
+
+  const handleMinRatingChange = useCallback(
+    (newRating: number) => {
+      updateURL({ minRating: newRating > 0 ? String(newRating) : undefined });
+    },
+    [updateURL]
+  );
+
   const handleTagToggle = useCallback(
     (tag: string) => {
       const isAdding = !urlTags.includes(tag);
@@ -265,6 +300,9 @@ function SkillsContent() {
 
   return (
     <div className="min-h-screen flex">
+      {/* Onboarding Tour for first-time visitors */}
+      <OnboardingTour />
+      
       {/* Desktop Sidebar */}
       <Sidebar
         tags={tagsData?.tags ?? []}
@@ -273,6 +311,8 @@ function SkillsContent() {
         onCategoryChange={handleCategoryChange}
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
+        minRating={urlMinRating}
+        onMinRatingChange={handleMinRatingChange}
       />
 
       {/* Main content */}
@@ -284,7 +324,7 @@ function SkillsContent() {
           <div className="mb-4">
             <h1 className="text-xl md:text-2xl font-bold mb-1 flex flex-wrap items-center gap-x-2">
               {/* Mobile: Show logo inline */}
-              <span className="md:hidden">
+              <span className="md:hidden" data-tour="mobile-logo">
                 <Logo collapsed asSpan size={28} />
               </span>
               <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
@@ -315,6 +355,8 @@ function SkillsContent() {
               setViewMode(mode);
               trackViewModeChange(mode);
             }}
+            reviewerFilter={urlReviewerFilter}
+            onReviewerFilterChange={handleReviewerFilterChange}
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
           />
@@ -343,13 +385,14 @@ function SkillsContent() {
                       : "flex flex-col gap-3"
                   }
                 >
-                  {skills.map((skill) => (
+                  {skills.map((skill, index) => (
                     <SkillCard
                       key={skill.slug}
                       skill={skill}
                       onInstall={handleInstall}
                       variant={viewMode}
-                      userVote={userVotes?.[skill._id] ?? null}
+                      userRating={userRatings?.[skill._id] ?? null}
+                      isFirstCard={index === 0}
                     />
                   ))}
                 </div>
@@ -358,6 +401,18 @@ function SkillsContent() {
                 <div className="mt-8 flex flex-col items-center gap-4">
                   <p className="text-sm text-muted-foreground">
                     Showing {skills.length} of {totalCount} skills
+                    <span className="mx-1.5">·</span>
+                    <span className="text-muted-foreground/70">
+                      Skill data from{" "}
+                      <a 
+                        href="https://www.clawhub.ai" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:underline hover:text-foreground transition-colors"
+                      >
+                        Clawhub
+                      </a>
+                    </span>
                   </p>
                   {hasMore && !query.trim() && (
                     <Button
@@ -378,16 +433,23 @@ function SkillsContent() {
         <footer className="hidden md:block border-t border-border/40 py-4 px-4 md:px-6 mt-auto">
           <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
             <a
-              href="https://discord.gg/eTtG4rhbp6"
+              href="https://github.com/0xmythril/clawdtm"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors flex items-center gap-1.5"
-              onClick={() => trackExternalLink("https://discord.gg/eTtG4rhbp6", "footer_discord")}
+              className="hover:text-foreground transition-colors"
+              onClick={() => trackExternalLink("https://github.com/0xmythril/clawdtm", "footer_github")}
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-              </svg>
-              Join the Community
+              GitHub
+            </a>
+            <span className="text-border">•</span>
+            <a
+              href="https://www.clawhub.ai/0xmythril/clawdtm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+              onClick={() => trackExternalLink("https://www.clawhub.ai/0xmythril/clawdtm", "footer_clawdtm_skill")}
+            >
+              ClawdTM Skill
             </a>
             <span className="text-border">•</span>
             <a
@@ -401,13 +463,13 @@ function SkillsContent() {
             </a>
             <span className="text-border">•</span>
             <a
-              href="https://clawdhub.com"
+              href="https://x.com/0xmythril"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"
-              onClick={() => trackExternalLink("https://clawdhub.com", "footer_clawdhub")}
+              onClick={() => trackExternalLink("https://x.com/0xmythril", "footer_feedback")}
             >
-              Clawdhub
+              DM for Feedback
             </a>
           </div>
         </footer>
@@ -422,6 +484,8 @@ function SkillsContent() {
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
         onSearchFocus={handleSearchFocus}
+        minRating={urlMinRating}
+        onMinRatingChange={handleMinRatingChange}
       />
 
       {/* Install modal */}

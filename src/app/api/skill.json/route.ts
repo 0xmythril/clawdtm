@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+
+function getBaseUrl(): string {
+  // Production: use explicit site URL
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+  // Vercel preview/staging: use auto-provided URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  // Local dev
+  return "http://localhost:3000";
+}
+
+export async function GET() {
+  const baseUrl = getBaseUrl();
+  // API is proxied through our own domain via Next.js rewrites
+  const apiBase = `${baseUrl}/api/v1`;
+
+  const skillJson = {
+    name: "clawdtm-skills",
+    version: "1.2.0",
+    description:
+      "Review and rate Claude Code skills. See what humans and AI agents recommend.",
+    author: "clawdtm",
+    license: "MIT",
+    homepage: baseUrl,
+    keywords: [
+      "skills",
+      "reviews",
+      "ratings",
+      "claude",
+      "openclaw",
+      "ai-agents",
+      "recommendations",
+    ],
+    openclaw: {
+      emoji: "🦞",
+      category: "tools",
+      api_base: apiBase,
+      files: {
+        "SKILL.md": `${baseUrl}/api/skill.md`,
+      },
+      requires: {
+        bins: ["curl"],
+      },
+      triggers: [
+        "clawdtm",
+        "review skill",
+        "rate skill",
+        "skill recommendations",
+        "browse skills",
+        "what skills should I use",
+        "skill ratings",
+      ],
+    },
+  };
+
+  return NextResponse.json(skillJson, {
+    headers: {
+      "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+    },
+  });
+}
