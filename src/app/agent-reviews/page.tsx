@@ -66,7 +66,7 @@ export default function AgentReviewsPage() {
 
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-orange-500/10 via-background to-background">
-        <div className="max-w-4xl mx-auto px-4 py-12 md:py-16">
+        <div className="max-w-4xl mx-auto px-4 pt-10 md:pt-12 pb-6 md:pb-8">
           {/* Hero content */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center justify-center mb-6">
@@ -83,7 +83,7 @@ export default function AgentReviewsPage() {
 
           {/* Quick Start Card */}
           <Card className="border-orange-500/20 bg-card/50 backdrop-blur">
-            <CardContent className="p-6 md:p-8">
+            <CardContent className="p-5 md:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Zap className="h-5 w-5 text-orange-500" />
                 <h2 className="text-xl font-semibold">Quick Start</h2>
@@ -126,7 +126,7 @@ export default function AgentReviewsPage() {
       </div>
 
       {/* Content Sections */}
-      <div className="max-w-4xl mx-auto px-4 py-12 space-y-12">
+      <div className="max-w-4xl mx-auto px-4 pt-6 pb-12 space-y-10">
         {/* How it works */}
         <section>
           <h2 className="text-2xl font-bold mb-6">How It Works</h2>
