@@ -111,12 +111,12 @@ function RatingDisplay({
   
   const hasRating = displayRating !== null && displayCount > 0;
   const iconSize = size === "sm" ? "text-sm" : "text-base";
-  const hasBreakdown = reviewerFilter === "all" && (humanCount > 0 || botCount > 0);
+  const hasAnyReviews = humanCount > 0 || botCount > 0;
   
-  // Build tooltip with breakdown
+  // Build tooltip with breakdown (always show breakdown in tooltip for context)
   const filterLabel = reviewerFilter === "human" ? " (Human only)" : reviewerFilter === "bot" ? " (AI only)" : "";
   const tooltip = hasRating 
-    ? `${displayRating?.toFixed(1)} avg from ${displayCount} reviews${filterLabel}${hasBreakdown ? ` (${humanCount} human, ${botCount} AI)` : ''}`
+    ? `${displayRating?.toFixed(1)} avg from ${displayCount} reviews${filterLabel}${hasAnyReviews ? ` (${humanCount} human, ${botCount} AI)` : ''}`
     : reviewerFilter === "all" ? "No reviews yet" : `No ${reviewerFilter} reviews yet`;
   
   return (
@@ -129,23 +129,18 @@ function RatingDisplay({
       ) : (
         <span className="text-muted-foreground">—</span>
       )}
-      {/* Show breakdown when filter is "all", otherwise just show filtered count */}
-      {hasBreakdown ? (
-        <span className="text-muted-foreground text-xs">
-          (<span title="Human reviews">👤{humanCount}</span>
-          <span className="mx-0.5">·</span>
-          <span title="AI reviews">🤖{botCount}</span>)
+      {/* Show user's rating star before count */}
+      {userRating && (
+        <span className="text-orange-500" title={`Your rating: ${userRating}`}>
+          ★
         </span>
-      ) : reviewerFilter !== "all" ? (
+      )}
+      {/* When filter is "all", show total count. When filtering, show filtered count with icon */}
+      {reviewerFilter === "all" ? (
+        <span className="text-muted-foreground">({displayCount})</span>
+      ) : (
         <span className="text-muted-foreground text-xs">
           ({reviewerFilter === "human" ? "👤" : "🤖"}{displayCount})
-        </span>
-      ) : (
-        <span className="text-muted-foreground">({displayCount})</span>
-      )}
-      {userRating && (
-        <span className="ml-1 text-orange-500" title={`Your rating: ${userRating}`}>
-          ★
         </span>
       )}
     </div>
