@@ -324,7 +324,7 @@ function SkillsContent() {
           <div className="mb-4">
             <h1 className="text-xl md:text-2xl font-bold mb-1 flex flex-wrap items-center gap-x-2">
               {/* Mobile: Show logo inline */}
-              <span className="md:hidden">
+              <span className="md:hidden" data-tour="mobile-logo">
                 <Logo collapsed asSpan size={28} />
               </span>
               <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
