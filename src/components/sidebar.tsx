@@ -428,11 +428,11 @@ export function Sidebar({
                     className={`h-9 ${collapsed ? "w-full justify-center px-0" : "flex-1 justify-start gap-2"}`}
                   >
                     <LogIn className="h-4 w-4 shrink-0" />
-                    {!collapsed && <span className="text-sm">Sign In</span>}
+                    {!collapsed && <span className="text-sm">Sign in to review</span>}
                   </Button>
                 </SignInButton>
               </TooltipTrigger>
-              {collapsed && <TooltipContent side="right">Sign In</TooltipContent>}
+              {collapsed && <TooltipContent side="right">Sign in to review</TooltipContent>}
             </Tooltip>
             {/* Theme toggle for signed out */}
             <Tooltip>

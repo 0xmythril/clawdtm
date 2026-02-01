@@ -6,7 +6,7 @@ import type { Id } from './_generated/dataModel'
 // Constants
 // ============================================
 
-const MIN_REVIEW_LENGTH = 0 // Allow rating-only reviews
+// MIN_REVIEW_LENGTH = 0 - Allow rating-only reviews (not enforced)
 const MAX_REVIEW_LENGTH = 1000
 const MIN_RATING = 1
 const MAX_RATING = 5
@@ -648,6 +648,34 @@ export const getSkillBySlug = query({
       // Timestamps
       createdAt: skill.externalCreatedAt ?? skill.createdAt,
       updatedAt: skill.externalUpdatedAt ?? skill.updatedAt,
+    }
+  },
+})
+
+// ============================================
+// Admin: Backfill review stats for all skills
+// ============================================
+
+// One-time migration to recalculate avgRating for all skills with reviews
+export const backfillReviewStats = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Get all skills that have reviews
+    const allReviews = await ctx.db.query('skillReviews').collect()
+    
+    // Get unique skill IDs
+    const skillIds = [...new Set(allReviews.map(r => r.cachedSkillId))]
+    
+    let updated = 0
+    for (const skillId of skillIds) {
+      await updateSkillReviewStats(ctx, skillId)
+      updated++
+    }
+    
+    return { 
+      success: true, 
+      message: `Updated review stats for ${updated} skills`,
+      skillsUpdated: updated,
     }
   },
 })

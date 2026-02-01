@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -99,6 +98,7 @@ export function MobileNav({
         <div className="flex items-center justify-around h-16 px-4">
           {/* Search */}
           <button
+            data-tour="mobile-search"
             className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
             onClick={onSearchFocus}
           >
@@ -109,7 +109,10 @@ export function MobileNav({
           {/* Filters */}
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2 cursor-pointer">
+              <button 
+                data-tour="mobile-filters"
+                className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors relative min-w-[72px] py-2 cursor-pointer"
+              >
                 <SlidersHorizontal className="h-6 w-6" />
                 <span className="text-xs">Filter</span>
                 {filterCount > 0 && (
@@ -286,10 +289,23 @@ export function MobileNav({
             </SheetContent>
           </Sheet>
 
+          {/* Agent Review */}
+          <button
+            data-tour="mobile-agent-review"
+            className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
+            onClick={() => setAgentReviewsOpen(true)}
+          >
+            <Bot className="h-6 w-6" />
+            <span className="text-xs">Agent</span>
+          </button>
+
           {/* Settings */}
           <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer">
+              <button 
+                data-tour="mobile-settings"
+                className="flex flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground transition-colors min-w-[72px] py-2 cursor-pointer"
+              >
                 <Settings className="h-6 w-6" />
                 <span className="text-xs">Settings</span>
               </button>
@@ -318,7 +334,7 @@ export function MobileNav({
                         className="w-full justify-start gap-3 h-12 text-sm"
                       >
                         <LogIn className="h-5 w-5" />
-                        <span className="flex-1 text-left">Sign In to Vote</span>
+                        <span className="flex-1 text-left">Sign In to Review</span>
                       </Button>
                     </SignInButton>
                   </SignedOut>

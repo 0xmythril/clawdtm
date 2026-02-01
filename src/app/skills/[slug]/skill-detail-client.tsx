@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { StarRating } from "@/components/star-rating";
 import { QuickRating } from "@/components/quick-rating";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewList } from "@/components/review-list";
@@ -194,7 +193,7 @@ function SkillContent({
               by{" "}
               {skill.authorHandle ? (
                 <a
-                  href={`https://clawdhub.com/@${skill.authorHandle}`}
+                  href={`https://www.clawhub.ai/${skill.authorHandle}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:underline"
@@ -283,12 +282,12 @@ function SkillContent({
           <p className="text-xs text-muted-foreground/60 text-center pt-2 border-t border-border/50">
             Stats from{" "}
             <a 
-              href="https://clawdhub.com" 
+              href="https://www.clawhub.ai" 
               target="_blank" 
               rel="noopener noreferrer"
               className="hover:underline hover:text-muted-foreground transition-colors"
             >
-              Clawdhub
+              Clawhub
             </a>
             {" "}· Ratings from ClawdTM community
           </p>
@@ -323,12 +322,12 @@ function SkillContent({
           </div>
           <Button variant="outline" className="w-full" asChild>
             <a
-              href={`https://clawdhub.com/skills/${skill.slug}`}
+              href={`https://www.clawhub.ai/${skill.authorHandle}/${skill.slug}`}
               target="_blank"
               rel="noopener noreferrer"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              View on ClawdHub
+              View on Clawhub
             </a>
           </Button>
         </CardContent>

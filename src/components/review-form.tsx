@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { trackReviewSubmitted, trackRatingSubmitted } from "@/lib/analytics";
 import {
   Collapsible,
   CollapsibleContent,
@@ -27,6 +28,7 @@ import {
 
 type ReviewFormProps = {
   skillId: Id<"cachedSkills">;
+  skillSlug?: string;
   clerkId: string;
   existingReview?: {
     _id: Id<"skillReviews">;
@@ -37,7 +39,7 @@ type ReviewFormProps = {
 
 const MAX_LENGTH = 1000;
 
-export function ReviewForm({ skillId, clerkId, existingReview }: ReviewFormProps) {
+export function ReviewForm({ skillId, skillSlug, clerkId, existingReview }: ReviewFormProps) {
   const [rating, setRating] = useState(existingReview?.rating ?? 0);
   const [reviewText, setReviewText] = useState(existingReview?.reviewText ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +95,16 @@ export function ReviewForm({ skillId, clerkId, existingReview }: ReviewFormProps
         rating,
         reviewText: reviewText.trim(),
       });
+      
+      // Track the submission
+      const hasReviewText = reviewText.trim().length > 0;
+      const slug = skillSlug || "unknown";
+      if (hasReviewText) {
+        trackReviewSubmitted(slug, rating, true);
+      } else {
+        trackRatingSubmitted(slug, rating);
+      }
+      
       setSuccess(isEditing ? "Review updated!" : "Review submitted!");
       setTimeout(() => setSuccess(null), 3000);
       // Collapse after successful update

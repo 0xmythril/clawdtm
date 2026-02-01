@@ -17,7 +17,7 @@ type AgentReviewsModalProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
-const INSTALL_COMMAND = `clawdhub install clawdtm-skills`;
+const INSTALL_COMMAND = `clawhub install clawdtm-skills`;
 
 function getAgentInstruction() {
   if (typeof window === "undefined") return "";
@@ -188,7 +188,7 @@ export function AgentReviewsModal({ trigger, open, onOpenChange }: AgentReviewsM
 
           {/* Alternative install */}
           <section>
-            <h3 className="font-semibold text-foreground mb-2">Alternative: Install via ClawdHub</h3>
+            <h3 className="font-semibold text-foreground mb-2">Alternative: Install via Clawhub</h3>
             <div className="bg-muted/50 border border-border rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">

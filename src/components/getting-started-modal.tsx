@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, ExternalLink, Terminal, Copy, Check, Bot, MessageSquare } from "lucide-react";
+import { Search, SlidersHorizontal, ExternalLink, Terminal, Copy, Check, MessageSquare } from "lucide-react";
 
 type GettingStartedModalProps = {
   trigger?: React.ReactNode;
@@ -20,7 +20,7 @@ type GettingStartedModalProps = {
 export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStartedModalProps) {
   const [copied, setCopied] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
-  const exampleCommand = "clawdhub install web-search";
+  const exampleCommand = "clawhub install web-search";
   const examplePrompt = "Install the web-search skill";
 
   const copyCommand = () => {
@@ -192,12 +192,12 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             <p className="text-sm text-muted-foreground">
               Make sure you have{" "}
               <a
-                href="https://clawdhub.com"
+                href="https://www.clawhub.ai"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Clawdhub
+                Clawhub
               </a>{" "}
               installed and configured before installing skills via terminal.
             </p>
@@ -228,12 +228,12 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             </Button>
             <Button variant="outline" className="flex-1 cursor-pointer" asChild>
               <a
-                href="https://clawdhub.com"
+                href="https://www.clawhub.ai"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Clawdhub
+                Clawhub
               </a>
             </Button>
           </section>

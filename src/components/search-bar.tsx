@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const SORT_OPTIONS = [
+  { value: "rating", label: "Rating", symbol: "🦞" },
   { value: "downloads", label: "Downloads", symbol: "↓" },
   { value: "stars", label: "Stars", symbol: "★" },
   { value: "installs", label: "Installs", symbol: "⬇" },
-  { value: "rating", label: "Rating", symbol: "🦞" },
 ] as const;
 
 const REVIEWER_FILTER_OPTIONS = [

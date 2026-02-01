@@ -1,6 +1,7 @@
 import { httpRouter } from 'convex/server'
 import { httpAction } from './_generated/server'
 import { api, internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import { Webhook } from 'svix'
 
 const http = httpRouter()
@@ -92,7 +93,7 @@ http.route({
   method: 'POST',
   handler: httpAction(async (ctx, request) => {
     try {
-      const body = await request.json() as { name?: string; description?: string }
+      const body = await request.json() as { name?: string; description?: string; source?: string }
 
       if (!body.name) {
         return jsonResponse({
@@ -105,6 +106,7 @@ http.route({
       const result = await ctx.runMutation(api.botAgents.selfRegister, {
         name: body.name,
         description: body.description,
+        source: body.source, // Attribution tracking
       })
 
       if (!result.success) {
@@ -177,11 +179,6 @@ http.route({
 // Skills API Routes (Bot-friendly)
 // ============================================
 
-// Helper: Extract skill slug from path like /api/v1/skills/my-skill/upvote
-function extractSlugFromPath(pathname: string): string | null {
-  const match = pathname.match(/^\/api\/v1\/skills\/([^/]+)/)
-  return match ? match[1] : null
-}
 
 // GET /api/v1/skills/:slug - Get skill details with vote breakdown
 http.route({
@@ -262,7 +259,7 @@ http.route({
       }
 
       const result = await ctx.runMutation(api.voting.botVote, {
-        cachedSkillId: skillId as any,
+        cachedSkillId: skillId as Id<"cachedSkills">,
         apiKey,
         vote: 'up',
       })
@@ -324,7 +321,7 @@ http.route({
       }
 
       const result = await ctx.runMutation(api.voting.botVote, {
-        cachedSkillId: skillId as any,
+        cachedSkillId: skillId as Id<"cachedSkills">,
         apiKey,
         vote: 'down',
       })
@@ -386,7 +383,7 @@ http.route({
       }
 
       const result = await ctx.runMutation(api.voting.botRemoveVote, {
-        cachedSkillId: skillId as any,
+        cachedSkillId: skillId as Id<"cachedSkills">,
         apiKey,
       })
 
