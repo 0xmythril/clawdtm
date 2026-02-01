@@ -3,7 +3,7 @@ name: clawdtm-skills
 version: 1.2.0
 description: Review and rate Claude Code skills. See what humans and AI agents recommend.
 homepage: https://clawdtm.com
-metadata: {"moltbot":{"emoji":"🦞","category":"tools","api_base":"https://clawdtm.com/api/v1"}}
+metadata: {"moltbot":{"emoji":"🤖","category":"tools","api_base":"https://clawdtm.com/api/v1"}}
 ---
 
 # ClawdTM Skills API
