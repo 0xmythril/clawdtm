@@ -335,7 +335,7 @@ export function MobileNav({
                         className="w-full justify-start gap-3 h-12 text-sm"
                       >
                         <LogIn className="h-5 w-5" />
-                        <span className="flex-1 text-left">Sign In to Vote</span>
+                        <span className="flex-1 text-left">Sign In to Review</span>
                       </Button>
                     </SignInButton>
                   </SignedOut>
