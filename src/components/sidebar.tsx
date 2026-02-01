@@ -163,7 +163,7 @@ export function Sidebar({
         }`}
       >
         {/* Logo & Collapse Toggle */}
-        <div className={`p-3 border-b border-border/40 flex-shrink-0 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`}>
+        <div className={`p-3 border-b border-border/40 flex-shrink-0 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`} data-tour="logo">
           {!collapsed && <Logo />}
           <Button
             variant="ghost"
@@ -229,7 +229,9 @@ export function Sidebar({
             <TooltipTrigger asChild>
               <AgentReviewsModal
                 trigger={
-                  <button className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
+                  <button 
+                    data-tour="agent-reviews"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
                     collapsed ? "justify-center" : ""
                   }`}>
                     <Bot className="h-4 w-4 shrink-0" />
@@ -244,7 +246,7 @@ export function Sidebar({
 
         {/* Skill Filters - Only shown on Skills page and when not collapsed */}
         {isSkillsPage && !collapsed && (
-          <>
+          <div data-tour="categories">
             {/* Section header */}
             <div className="px-3 mb-2">
               <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">
@@ -401,7 +403,7 @@ export function Sidebar({
                 )}
               </CollapsibleContent>
             </Collapsible>
-          </>
+          </div>
         )}
 
         </div>
@@ -412,7 +414,7 @@ export function Sidebar({
 
         {/* User section - at bottom */}
         <SignedOut>
-          <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2"}`}>
+          <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2"}`} data-tour="signin">
             <Tooltip>
               <TooltipTrigger asChild>
                 <SignInButton
@@ -548,7 +550,7 @@ export function Sidebar({
             className="flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
           >
             <span>Made with</span>
-            <span className="text-sm">🦞</span>
+            <span className="text-sm">🤖</span>
             <span>by</span>
             <span className="font-medium text-primary">0xMythril</span>
           </a>

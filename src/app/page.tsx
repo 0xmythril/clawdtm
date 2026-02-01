@@ -13,6 +13,7 @@ import { InstallModal } from "@/components/install-modal";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { OnboardingTour } from "@/components/onboarding-tour";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   trackSearch,
@@ -293,6 +294,9 @@ function SkillsContent() {
 
   return (
     <div className="min-h-screen flex">
+      {/* Onboarding Tour for first-time visitors */}
+      <OnboardingTour />
+      
       {/* Desktop Sidebar */}
       <Sidebar
         tags={tagsData?.tags ?? []}
@@ -375,13 +379,14 @@ function SkillsContent() {
                       : "flex flex-col gap-3"
                   }
                 >
-                  {skills.map((skill) => (
+                  {skills.map((skill, index) => (
                     <SkillCard
                       key={skill.slug}
                       skill={skill}
                       onInstall={handleInstall}
                       variant={viewMode}
                       userRating={userRatings?.[skill._id] ?? null}
+                      isFirstCard={index === 0}
                     />
                   ))}
                 </div>
@@ -390,6 +395,18 @@ function SkillsContent() {
                 <div className="mt-8 flex flex-col items-center gap-4">
                   <p className="text-sm text-muted-foreground">
                     Showing {skills.length} of {totalCount} skills
+                    <span className="mx-1.5">·</span>
+                    <span className="text-muted-foreground/70">
+                      Skill data from{" "}
+                      <a 
+                        href="https://clawdhub.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:underline hover:text-foreground transition-colors"
+                      >
+                        Clawdhub
+                      </a>
+                    </span>
                   </p>
                   {hasMore && !query.trim() && (
                     <Button

@@ -97,7 +97,7 @@ export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40 -mx-4 px-4 py-3 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
         <div className="flex gap-2 items-center">
           {/* Search input */}
-          <div className="relative flex-1">
+          <div className="relative flex-1" data-tour="search">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={inputRef}

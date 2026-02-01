@@ -39,6 +39,7 @@ export function QuickRating({
   const currentUserRating = optimisticRating ?? userRating ?? null;
   const displayRating = hoveredRating ?? currentUserRating ?? 0;
   const hasRating = reviewCount > 0;
+  const hasUserRated = currentUserRating !== null;
 
   const sizeClasses = {
     sm: "text-base",
@@ -87,9 +88,14 @@ export function QuickRating({
           containerPadding[size],
           hasRating 
             ? "border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/30" 
-            : "border-border bg-muted/30"
+            : "border-dashed border-muted-foreground/30 bg-muted/20"
         )}
       >
+        {/* Prompt for unrated state */}
+        {!hasUserRated && user && !hoveredRating && (
+          <span className="text-xs text-muted-foreground">Click to rate</span>
+        )}
+        
         {/* Lobster rating row */}
         <div
           className="flex items-center gap-0.5"
@@ -97,6 +103,8 @@ export function QuickRating({
         >
           {[1, 2, 3, 4, 5].map((rating) => {
             const filled = rating <= displayRating;
+            // Show outline style for unrated, empty state
+            const showAsClickable = user && !hasUserRated && !hoveredRating;
 
             return (
               <Tooltip key={rating}>
@@ -111,9 +119,9 @@ export function QuickRating({
                       sizeClasses[size],
                       user && !isSubmitting && "hover:scale-125 cursor-pointer",
                       !user && "cursor-default",
-                      filled ? "opacity-100" : "opacity-40"
+                      filled ? "opacity-100" : showAsClickable ? "opacity-50" : "opacity-40"
                     )}
-                    style={filled ? {} : { filter: "grayscale(80%)" }}
+                    style={filled ? {} : { filter: showAsClickable ? "grayscale(50%)" : "grayscale(80%)" }}
                   >
                     🦞
                   </button>
@@ -138,7 +146,7 @@ export function QuickRating({
           {avgRating !== null ? (
             <span className="text-orange-600 dark:text-orange-400 font-semibold">{avgRating.toFixed(1)}</span>
           ) : (
-            <span className="text-muted-foreground font-medium">No ratings</span>
+            <span className="text-muted-foreground font-medium">No ratings yet</span>
           )}
           <span className="text-muted-foreground ml-1">({reviewCount})</span>
         </div>
