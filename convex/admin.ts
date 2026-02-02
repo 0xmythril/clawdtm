@@ -132,6 +132,69 @@ export async function requireAdmin(
 }
 
 // ============================================
+// Audit Log Helper
+// ============================================
+
+type AuditAction = 
+  | 'hide_skill'
+  | 'unhide_skill'
+  | 'set_featured'
+  | 'set_verified'
+  | 'set_user_role'
+  | 'set_bot_role'
+  | 'create_bot'
+  | 'revoke_bot'
+
+type AuditTargetType = 'skill' | 'user' | 'bot'
+
+interface AuditLogParams {
+  actor: { type: 'human'; clerkId: string; name?: string } | { type: 'bot'; agentId: Id<'botAgents'>; name?: string }
+  action: AuditAction
+  targetType: AuditTargetType
+  targetId: string
+  targetName?: string
+  details?: {
+    reason?: string
+    oldValue?: unknown
+    newValue?: unknown
+  }
+}
+
+async function logAuditEvent(ctx: MutationCtx, params: AuditLogParams) {
+  await ctx.db.insert('adminAuditLogs', {
+    actorType: params.actor.type,
+    actorClerkId: params.actor.type === 'human' ? params.actor.clerkId : undefined,
+    actorBotAgentId: params.actor.type === 'bot' ? params.actor.agentId : undefined,
+    actorName: params.actor.name,
+    action: params.action,
+    targetType: params.targetType,
+    targetId: params.targetId,
+    targetName: params.targetName,
+    details: params.details,
+    createdAt: Date.now(),
+  })
+}
+
+// Helper to get actor info for logging
+async function getHumanActorInfo(ctx: MutationCtx, clerkId: string): Promise<{ type: 'human'; clerkId: string; name?: string }> {
+  const user = await ctx.db
+    .query('clerkUsers')
+    .withIndex('by_clerk_id', (q) => q.eq('clerkId', clerkId))
+    .unique()
+  return { type: 'human', clerkId, name: user?.displayName ?? user?.name ?? undefined }
+}
+
+async function getBotActorInfo(ctx: MutationCtx, apiKey: string): Promise<{ type: 'bot'; agentId: Id<'botAgents'>; name?: string } | null> {
+  const apiKeyHash = simpleHash(apiKey)
+  const agent = await ctx.db
+    .query('botAgents')
+    .withIndex('by_api_key_hash', (q) => q.eq('apiKeyHash', apiKeyHash))
+    .unique()
+  if (!agent) return null
+  return { type: 'bot', agentId: agent._id, name: agent.name }
+}
+
+// ============================================
 // Bootstrap Admin (Internal - run via CLI)
 // ============================================
 
@@ -435,9 +498,22 @@ export const setUserRole = mutation({
       throw new Error('User not found')
     }
 
+    const oldRole = targetUser.role ?? 'user'
+
     await ctx.db.patch(targetUser._id, {
       role: args.role,
       updatedAt: Date.now(),
+    })
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'set_user_role',
+      targetType: 'user',
+      targetId: args.targetClerkId,
+      targetName: targetUser.displayName ?? targetUser.name ?? undefined,
+      details: { oldValue: oldRole, newValue: args.role },
     })
 
     return { success: true, role: args.role }
@@ -461,9 +537,22 @@ export const setBotRole = mutation({
       throw new Error('Bot not found')
     }
 
+    const oldRole = bot.role ?? 'agent'
+
     await ctx.db.patch(args.botAgentId, {
       role: args.role,
       updatedAt: Date.now(),
+    })
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'set_bot_role',
+      targetType: 'bot',
+      targetId: args.botAgentId,
+      targetName: bot.name,
+      details: { oldValue: oldRole, newValue: args.role },
     })
 
     return { success: true, role: args.role }
@@ -517,6 +606,17 @@ export const createPrivilegedBot = mutation({
       updatedAt: now,
     })
 
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'create_bot',
+      targetType: 'bot',
+      targetId: botId,
+      targetName: args.name,
+      details: { newValue: args.role },
+    })
+
     // Return the raw API key - this is the only time it's shown
     return {
       success: true,
@@ -549,6 +649,16 @@ export const revokeBot = mutation({
       updatedAt: Date.now(),
     })
 
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'revoke_bot',
+      targetType: 'bot',
+      targetId: args.botAgentId,
+      targetName: bot.name,
+    })
+
     return { success: true }
   },
 })
@@ -567,7 +677,7 @@ export const setSkillFeatured = mutation({
     featured: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const actor = await requireModerator(ctx, { clerkId: args.clerkId })
+    await requireModerator(ctx, { clerkId: args.clerkId })
 
     const skill = await ctx.db
       .query('cachedSkills')
@@ -578,10 +688,23 @@ export const setSkillFeatured = mutation({
       throw new Error(`Skill not found: ${args.slug}`)
     }
 
+    const oldValue = skill.isFeatured ?? false
+
     await ctx.db.patch(skill._id, {
       isFeatured: args.featured,
       featuredAt: args.featured ? Date.now() : undefined,
-      featuredBy: args.featured ? actor.id : undefined,
+      featuredBy: args.featured ? args.clerkId : undefined,
+    })
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'set_featured',
+      targetType: 'skill',
+      targetId: args.slug,
+      targetName: skill.name ?? skill.displayName ?? args.slug,
+      details: { oldValue, newValue: args.featured },
     })
 
     return { success: true, slug: args.slug, featured: args.featured }
@@ -598,7 +721,7 @@ export const setSkillVerified = mutation({
     verified: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const actor = await requireModerator(ctx, { clerkId: args.clerkId })
+    await requireModerator(ctx, { clerkId: args.clerkId })
 
     const skill = await ctx.db
       .query('cachedSkills')
@@ -609,10 +732,23 @@ export const setSkillVerified = mutation({
       throw new Error(`Skill not found: ${args.slug}`)
     }
 
+    const oldValue = skill.isVerified ?? false
+
     await ctx.db.patch(skill._id, {
       isVerified: args.verified,
       verifiedAt: args.verified ? Date.now() : undefined,
-      verifiedBy: args.verified ? actor.id : undefined,
+      verifiedBy: args.verified ? args.clerkId : undefined,
+    })
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'set_verified',
+      targetType: 'skill',
+      targetId: args.slug,
+      targetName: skill.name ?? skill.displayName ?? args.slug,
+      details: { oldValue, newValue: args.verified },
     })
 
     return { success: true, slug: args.slug, verified: args.verified }
@@ -629,7 +765,7 @@ export const adminHideSkill = mutation({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const actor = await requireModerator(ctx, { clerkId: args.clerkId })
+    await requireModerator(ctx, { clerkId: args.clerkId })
 
     const skill = await ctx.db
       .query('cachedSkills')
@@ -644,7 +780,18 @@ export const adminHideSkill = mutation({
       hidden: true,
       hiddenReason: args.reason ?? 'Hidden by moderator',
       hiddenAt: Date.now(),
-      hiddenBy: actor.id,
+      hiddenBy: args.clerkId,
+    })
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'hide_skill',
+      targetType: 'skill',
+      targetId: args.slug,
+      targetName: skill.name ?? skill.displayName ?? args.slug,
+      details: { reason: args.reason ?? 'Hidden by moderator' },
     })
 
     return { success: true, slug: args.slug }
@@ -678,6 +825,16 @@ export const adminUnhideSkill = mutation({
       hiddenBy: undefined,
     })
 
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'unhide_skill',
+      targetType: 'skill',
+      targetId: args.slug,
+      targetName: skill.name ?? skill.displayName ?? args.slug,
+    })
+
     return { success: true, slug: args.slug }
   },
 })
@@ -696,7 +853,7 @@ export const botHideSkill = mutation({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const actor = await requireModerator(ctx, { apiKey: args.apiKey })
+    await requireModerator(ctx, { apiKey: args.apiKey })
 
     const skill = await ctx.db
       .query('cachedSkills')
@@ -707,12 +864,26 @@ export const botHideSkill = mutation({
       throw new Error(`Skill not found: ${args.slug}`)
     }
 
+    const botActor = await getBotActorInfo(ctx, args.apiKey)
+    
     await ctx.db.patch(skill._id, {
       hidden: true,
       hiddenReason: args.reason ?? 'Hidden by bot moderator',
       hiddenAt: Date.now(),
-      hiddenBy: actor.id,
+      hiddenBy: botActor?.agentId ?? 'unknown',
     })
+
+    // Audit log
+    if (botActor) {
+      await logAuditEvent(ctx, {
+        actor: botActor,
+        action: 'hide_skill',
+        targetType: 'skill',
+        targetId: args.slug,
+        targetName: skill.name ?? skill.displayName ?? args.slug,
+        details: { reason: args.reason ?? 'Hidden by bot moderator' },
+      })
+    }
 
     return { success: true, slug: args.slug }
   },
@@ -745,6 +916,18 @@ export const botUnhideSkill = mutation({
       hiddenBy: undefined,
     })
 
+    // Audit log
+    const botActor = await getBotActorInfo(ctx, args.apiKey)
+    if (botActor) {
+      await logAuditEvent(ctx, {
+        actor: botActor,
+        action: 'unhide_skill',
+        targetType: 'skill',
+        targetId: args.slug,
+        targetName: skill.name ?? skill.displayName ?? args.slug,
+      })
+    }
+
     return { success: true, slug: args.slug }
   },
 })
@@ -759,7 +942,7 @@ export const botSetSkillFeatured = mutation({
     featured: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const actor = await requireModerator(ctx, { apiKey: args.apiKey })
+    await requireModerator(ctx, { apiKey: args.apiKey })
 
     const skill = await ctx.db
       .query('cachedSkills')
@@ -770,11 +953,26 @@ export const botSetSkillFeatured = mutation({
       throw new Error(`Skill not found: ${args.slug}`)
     }
 
+    const oldValue = skill.isFeatured ?? false
+    const botActor = await getBotActorInfo(ctx, args.apiKey)
+
     await ctx.db.patch(skill._id, {
       isFeatured: args.featured,
       featuredAt: args.featured ? Date.now() : undefined,
-      featuredBy: args.featured ? actor.id : undefined,
+      featuredBy: args.featured ? botActor?.agentId ?? 'unknown' : undefined,
     })
+
+    // Audit log
+    if (botActor) {
+      await logAuditEvent(ctx, {
+        actor: botActor,
+        action: 'set_featured',
+        targetType: 'skill',
+        targetId: args.slug,
+        targetName: skill.name ?? skill.displayName ?? args.slug,
+        details: { oldValue, newValue: args.featured },
+      })
+    }
 
     return { success: true, slug: args.slug, featured: args.featured }
   },
@@ -790,7 +988,7 @@ export const botSetSkillVerified = mutation({
     verified: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const actor = await requireModerator(ctx, { apiKey: args.apiKey })
+    await requireModerator(ctx, { apiKey: args.apiKey })
 
     const skill = await ctx.db
       .query('cachedSkills')
@@ -801,12 +999,89 @@ export const botSetSkillVerified = mutation({
       throw new Error(`Skill not found: ${args.slug}`)
     }
 
+    const oldValue = skill.isVerified ?? false
+    const botActor = await getBotActorInfo(ctx, args.apiKey)
+
     await ctx.db.patch(skill._id, {
       isVerified: args.verified,
       verifiedAt: args.verified ? Date.now() : undefined,
-      verifiedBy: args.verified ? actor.id : undefined,
+      verifiedBy: args.verified ? botActor?.agentId ?? 'unknown' : undefined,
     })
 
+    // Audit log
+    if (botActor) {
+      await logAuditEvent(ctx, {
+        actor: botActor,
+        action: 'set_verified',
+        targetType: 'skill',
+        targetId: args.slug,
+        targetName: skill.name ?? skill.displayName ?? args.slug,
+        details: { oldValue, newValue: args.verified },
+      })
+    }
+
     return { success: true, slug: args.slug, verified: args.verified }
+  },
+})
+
+// ============================================
+// Audit Log Query
+// ============================================
+
+/**
+ * List audit logs (moderator+)
+ */
+export const listAuditLogs = query({
+  args: {
+    clerkId: v.string(),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+    actionFilter: v.optional(v.string()),
+    targetTypeFilter: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { isModerator } = await isHumanAdmin(ctx, args.clerkId)
+    if (!isModerator) {
+      throw new Error('Unauthorized: Moderator role required')
+    }
+
+    const limit = args.limit ?? 50
+    const offset = args.offset ?? 0
+
+    // Get all audit logs, sorted by most recent
+    let logs = await ctx.db
+      .query('adminAuditLogs')
+      .withIndex('by_created')
+      .order('desc')
+      .take(500) // Get a reasonable batch
+
+    // Apply filters
+    if (args.actionFilter) {
+      logs = logs.filter((l) => l.action === args.actionFilter)
+    }
+    if (args.targetTypeFilter) {
+      logs = logs.filter((l) => l.targetType === args.targetTypeFilter)
+    }
+
+    const total = logs.length
+    const paginated = logs.slice(offset, offset + limit)
+
+    return {
+      logs: paginated.map((log) => ({
+        _id: log._id,
+        actorType: log.actorType,
+        actorName: log.actorName ?? (log.actorType === 'human' ? 'Unknown User' : 'Unknown Bot'),
+        actorClerkId: log.actorClerkId,
+        actorBotAgentId: log.actorBotAgentId,
+        action: log.action,
+        targetType: log.targetType,
+        targetId: log.targetId,
+        targetName: log.targetName,
+        details: log.details,
+        createdAt: log.createdAt,
+      })),
+      total,
+      hasMore: offset + limit < total,
+    }
   },
 })

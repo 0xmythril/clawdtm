@@ -653,6 +653,50 @@ const categorizationLogs = defineTable({
   .index('by_created', ['createdAt'])
   .index('by_status', ['status', 'createdAt'])
 
+// Admin audit logs (tracks moderator/admin actions)
+const adminAuditLogs = defineTable({
+  // Actor identity - one of these will be set
+  actorClerkId: v.optional(v.string()),     // Human moderator/admin
+  actorBotAgentId: v.optional(v.id('botAgents')), // Bot moderator/admin
+  actorType: v.union(v.literal('human'), v.literal('bot')),
+  actorName: v.optional(v.string()),        // Cached name for display
+  
+  // Action performed
+  action: v.union(
+    v.literal('hide_skill'),
+    v.literal('unhide_skill'),
+    v.literal('set_featured'),
+    v.literal('set_verified'),
+    v.literal('set_user_role'),
+    v.literal('set_bot_role'),
+    v.literal('create_bot'),
+    v.literal('revoke_bot')
+  ),
+  
+  // Target of the action
+  targetType: v.union(
+    v.literal('skill'),
+    v.literal('user'),
+    v.literal('bot')
+  ),
+  targetId: v.string(),                     // slug for skills, clerkId for users, botAgentId for bots
+  targetName: v.optional(v.string()),       // Cached name for display
+  
+  // Action-specific details
+  details: v.optional(v.object({
+    reason: v.optional(v.string()),         // For hide actions
+    oldValue: v.optional(v.any()),          // Previous state
+    newValue: v.optional(v.any()),          // New state
+  })),
+  
+  createdAt: v.number(),
+})
+  .index('by_actor_human', ['actorClerkId', 'createdAt'])
+  .index('by_actor_bot', ['actorBotAgentId', 'createdAt'])
+  .index('by_action', ['action', 'createdAt'])
+  .index('by_target', ['targetType', 'targetId', 'createdAt'])
+  .index('by_created', ['createdAt'])
+
 export default defineSchema({
   ...authTables,
   users,
@@ -687,4 +731,5 @@ export default defineSchema({
   cachedSkillVotes,
   skillReviews,
   categorizationLogs,
+  adminAuditLogs,
 })
