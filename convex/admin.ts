@@ -298,15 +298,26 @@ export const listAllBots = query({
     const total = bots.length
     const paginated = bots.slice(offset, offset + limit)
 
+    // Get review counts for each bot
+    const botsWithReviews = await Promise.all(
+      paginated.map(async (b) => {
+        const reviews = await ctx.db
+          .query('skillReviews')
+          .withIndex('by_bot_agent', (q) => q.eq('botAgentId', b._id))
+          .collect()
+        return { bot: b, reviewCount: reviews.length }
+      })
+    )
+
     return {
-      bots: paginated.map((b) => ({
+      bots: botsWithReviews.map(({ bot: b, reviewCount }) => ({
         _id: b._id,
         name: b.name,
         description: b.description,
         apiKeyPrefix: b.apiKeyPrefix,
         status: b.status,
         role: b.role ?? 'agent',
-        voteCount: b.voteCount ?? 0,
+        reviewCount,
         lastActiveAt: b.lastActiveAt,
         createdAt: b.createdAt,
         revokedAt: b.revokedAt,

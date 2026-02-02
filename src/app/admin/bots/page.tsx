@@ -196,7 +196,7 @@ function BotsContent() {
               <th className="text-left px-4 py-3 font-medium">API Key</th>
               <th className="text-center px-4 py-3 font-medium">Status</th>
               <th className="text-center px-4 py-3 font-medium">Role</th>
-              <th className="text-center px-4 py-3 font-medium">Votes</th>
+              <th className="text-center px-4 py-3 font-medium">Reviews</th>
               <th className="text-left px-4 py-3 font-medium">Last Active</th>
               <th className="text-right px-4 py-3 font-medium">Actions</th>
             </tr>
@@ -259,7 +259,7 @@ function BotsContent() {
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-center">{bot.voteCount}</td>
+                <td className="px-4 py-3 text-center">{bot.reviewCount}</td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {formatDate(bot.lastActiveAt)}
                 </td>
