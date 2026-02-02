@@ -841,6 +841,7 @@ export const searchCachedSkills = query({
       v.literal('human'),
       v.literal('bot')
     )),
+    category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const searchTerm = args.query.trim()
@@ -851,6 +852,7 @@ export const searchCachedSkills = query({
     const limit = args.limit ?? 30
     const sortBy = args.sortBy ?? 'relevance'
     const reviewerFilter = args.reviewerFilter ?? 'all'
+    const category = args.category
     
     // OPTIMIZATION: Use Convex full-text search index
     // This searches ALL skills efficiently without loading them all into memory
@@ -860,7 +862,14 @@ export const searchCachedSkills = query({
       .take(200) // Get plenty for filtering and sorting
     
     // Filter out hidden skills
-    const visibleSkills = searchResults.filter(s => !s.hidden)
+    let visibleSkills = searchResults.filter(s => !s.hidden)
+    
+    // Filter by category (verified/featured)
+    if (category === 'verified') {
+      visibleSkills = visibleSkills.filter(s => s.isVerified === true)
+    } else if (category === 'featured') {
+      visibleSkills = visibleSkills.filter(s => s.isFeatured === true)
+    }
     
     // Score results for relevance sorting (search index already filtered by match)
     const scored = visibleSkills.map(skill => {
@@ -983,6 +992,8 @@ export const searchCachedSkills = query({
         reviewCount: s.reviewCount,
         humanReviewCount: s.humanReviewCount,
         botReviewCount: s.botReviewCount,
+        isFeatured: s.isFeatured ?? false,
+        isVerified: s.isVerified ?? false,
       }))
     
     return { skills: results }
@@ -1281,32 +1292,15 @@ export const listCachedSkillsWithFilters = query({
       skills = allSkills.filter(s => !s.hidden)
     }
     
-    // Curated featured skills list (align with clawdhub install / getting-started example)
-    const FEATURED_SLUGS = [
-      'web-search',       // Getting-started example: clawdhub install web-search
-      'gog',              // Google Workspace (Gmail, Calendar, Tasks, Drive, Sheets, Docs)
-      'notion',           // Notion pages, databases, blocks
-      'bird',             // X/Twitter CLI (feed, mentions, DMs)
-      'perplexity',       // AI web search with citations
-      'nano-banana-pro',  // Image generation
-      'weather',          // Current weather & forecasts
-      'gifgrep',          // GIF search & download
-      'goplaces',         // Google Places API
-      'github',           // GitHub CLI (issues, PRs, runs)
-      'summarize',        // URL/file summarization
-    ]
-    
-    // Verified skills list (curated/tested)
-    const VERIFIED_SLUGS = [
-      'gog',              // Google Workspace - tested and verified
-    ]
-    
     // Filter by category
+    // Featured and verified are now database-driven (managed via admin panel)
     if (args.category && args.category !== 'all') {
       if (args.category === 'featured') {
-        skills = skills.filter(s => FEATURED_SLUGS.includes(s.slug))
+        // Use database field instead of hardcoded list
+        skills = skills.filter(s => s.isFeatured === true)
       } else if (args.category === 'verified') {
-        skills = skills.filter(s => VERIFIED_SLUGS.includes(s.slug))
+        // Use database field instead of hardcoded list
+        skills = skills.filter(s => s.isVerified === true)
       } else if (args.category === 'latest') {
         // Latest = no filter, just sort by most recently updated (handled in sort section below)
         // This ensures we always show results, not just skills from last 24h
@@ -1486,6 +1480,10 @@ export const listCachedSkillsWithFilters = query({
       reviewCount: s.reviewCount,
       humanReviewCount: s.humanReviewCount,
       botReviewCount: s.botReviewCount,
+      
+      // Curation status (admin-managed)
+      isFeatured: s.isFeatured ?? false,
+      isVerified: s.isVerified ?? false,
     }))
     
     return {
@@ -1543,15 +1541,34 @@ export const resetSyncStatus = mutation({
 
 // ============================================
 // Moderation - Hide/Unhide Skills
+// DEPRECATED: Use admin.ts mutations instead (adminHideSkill, adminUnhideSkill)
+// These are kept for backwards compatibility but now require auth
 // ============================================
 
-// Hide a skill (prevent it from showing in the UI)
+// Hide a skill (DEPRECATED - use admin:adminHideSkill instead)
+// Now requires clerkId for auth
 export const hideSkill = mutation({
   args: {
     slug: v.string(),
     reason: v.optional(v.string()),
+    clerkId: v.optional(v.string()), // Required for auth
   },
   handler: async (ctx, args) => {
+    // Require clerkId and check moderator role
+    const clerkId = args.clerkId
+    if (!clerkId) {
+      throw new Error('Unauthorized: clerkId required. Use admin:adminHideSkill instead.')
+    }
+    
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', clerkId))
+      .unique()
+    
+    if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+      throw new Error('Unauthorized: Moderator or admin role required')
+    }
+    
     const skill = await ctx.db
       .query('cachedSkills')
       .withIndex('by_slug', (q) => q.eq('slug', args.slug))
@@ -1565,18 +1582,35 @@ export const hideSkill = mutation({
       hidden: true,
       hiddenReason: args.reason ?? 'Hidden by moderator',
       hiddenAt: Date.now(),
+      hiddenBy: clerkId,
     })
     
     return { success: true, slug: args.slug }
   },
 })
 
-// Unhide a skill
+// Unhide a skill (DEPRECATED - use admin:adminUnhideSkill instead)
 export const unhideSkill = mutation({
   args: {
     slug: v.string(),
+    clerkId: v.optional(v.string()), // Required for auth
   },
   handler: async (ctx, args) => {
+    // Require clerkId and check moderator role
+    const clerkId = args.clerkId
+    if (!clerkId) {
+      throw new Error('Unauthorized: clerkId required. Use admin:adminUnhideSkill instead.')
+    }
+    
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', clerkId))
+      .unique()
+    
+    if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+      throw new Error('Unauthorized: Moderator or admin role required')
+    }
+    
     const skill = await ctx.db
       .query('cachedSkills')
       .withIndex('by_slug', (q) => q.eq('slug', args.slug))
@@ -1590,16 +1624,35 @@ export const unhideSkill = mutation({
       hidden: false,
       hiddenReason: undefined,
       hiddenAt: undefined,
+      hiddenBy: undefined,
     })
     
     return { success: true, slug: args.slug }
   },
 })
 
-// List all hidden skills
+// List all hidden skills (DEPRECATED - use admin:listSkillsForAdmin with filter='hidden')
+// Now requires clerkId for auth
 export const listHiddenSkills = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    clerkId: v.optional(v.string()), // Required for auth
+  },
+  handler: async (ctx, args) => {
+    // Require clerkId and check moderator role
+    const clerkId = args.clerkId
+    if (!clerkId) {
+      throw new Error('Unauthorized: clerkId required. Use admin:listSkillsForAdmin instead.')
+    }
+    
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', clerkId))
+      .unique()
+    
+    if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+      throw new Error('Unauthorized: Moderator or admin role required')
+    }
+    
     const skills = await ctx.db
       .query('cachedSkills')
       .withIndex('by_hidden', (q) => q.eq('hidden', true))

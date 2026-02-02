@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot } from "lucide-react";
+import { Search, SlidersHorizontal, Settings, X, Moon, Sun, Github, ExternalLink, FolderOpen, Cpu, HelpCircle, LogIn, Bot, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -52,9 +52,10 @@ type MobileNavProps = {
   onMinRatingChange?: (rating: number) => void;
 };
 
-// Fixed categories - same as sidebar (Featured/Verified hidden until more content)
+// Fixed categories - same as sidebar
 const FIXED_CATEGORIES = [
   { name: "all", label: "All", icon: null },
+  { name: "verified", label: "Verified", icon: "badge" }, // Uses BadgeCheck icon
   { name: "latest", label: "Latest", icon: "🆕" },
 ];
 
@@ -210,7 +211,11 @@ export function MobileNav({
                           }`}
                         >
                           <span className="flex items-center gap-1.5">
-                            {cat.icon && <span>{cat.icon}</span>}
+                            {cat.icon === "badge" ? (
+                              <BadgeCheck className="h-4 w-4 text-blue-500" />
+                            ) : cat.icon ? (
+                              <span>{cat.icon}</span>
+                            ) : null}
                             <span className="capitalize">{cat.label}</span>
                           </span>
                         </button>

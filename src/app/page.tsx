@@ -117,6 +117,7 @@ function SkillsContent() {
       sortBy: urlSort,
       minRating: urlMinRating > 0 ? urlMinRating : undefined,
       reviewerFilter: urlReviewerFilter !== "all" ? urlReviewerFilter : undefined,
+      category: urlCategory !== "all" ? urlCategory : undefined,
     } : "skip"
   );
 
@@ -136,8 +137,6 @@ function SkillsContent() {
       : "skip"
   );
 
-  const verifiedSlugs = useMemo(() => new Set(["gog"]), []);
-
   // Accumulate skills for infinite scroll
   useEffect(() => {
     if (!cachedResult?.skills) return;
@@ -153,7 +152,7 @@ function SkillsContent() {
       installs: s.installs,
       category: s.category,
       normalizedTags: s.normalizedTags,
-      isVerified: verifiedSlugs.has(s.slug),
+      isVerified: s.isVerified ?? false, // Now from database
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
       reviewCount: s.reviewCount,
@@ -173,7 +172,7 @@ function SkillsContent() {
         return [...prev, ...unique];
       });
     }
-  }, [cachedResult, cursor, verifiedSlugs]);
+  }, [cachedResult, cursor]);
 
   // Determine which data to show
   const skills: Skill[] = useMemo(() => {
@@ -187,7 +186,7 @@ function SkillsContent() {
         downloads: s.downloads,
         stars: s.stars,
         installs: s.installs,
-        isVerified: verifiedSlugs.has(s.slug),
+        isVerified: s.isVerified ?? false, // Now from database
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
         reviewCount: s.reviewCount,
@@ -199,7 +198,7 @@ function SkillsContent() {
       }));
     }
     return allSkills;
-  }, [allSkills, searchResult, query, verifiedSlugs]);
+  }, [allSkills, searchResult, query]);
 
   // Better loading detection - show loading only if we're actually waiting for initial data
   // If categories/tags loaded but skills haven't, we're connected - just waiting for skills
