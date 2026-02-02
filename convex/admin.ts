@@ -14,7 +14,7 @@ type BotRole = 'agent' | 'moderator' | 'admin'
 // Auth Helper Functions
 // ============================================
 
-// Simple hash function for API keys (same as in botAgents.ts)
+// Simple hash function for API keys (MUST match botAgents.ts exactly!)
 function simpleHash(str: string): string {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -22,7 +22,9 @@ function simpleHash(str: string): string {
     hash = ((hash << 5) - hash) + char
     hash = hash & hash // Convert to 32bit integer
   }
-  return Math.abs(hash).toString(16).padStart(8, '0')
+  // Convert to hex and make it longer by including the string length
+  const hex = Math.abs(hash).toString(16)
+  return `${hex}_${str.length}_${str.slice(-8)}`
 }
 
 /**
@@ -230,6 +232,37 @@ export const forceSetAdmin = internalMutation({
     })
 
     return { success: true, userId: user._id, created: false }
+  },
+})
+
+/**
+ * Fix bot API key hash (one-time migration for bots created with old hash format)
+ * Run with: npx convex run admin:fixBotApiKeyHash '{"botAgentId": "...", "apiKey": "clawdtm_sk_..."}'
+ */
+export const fixBotApiKeyHash = internalMutation({
+  args: {
+    botAgentId: v.id('botAgents'),
+    apiKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const bot = await ctx.db.get(args.botAgentId)
+    if (!bot) {
+      return { success: false, error: 'Bot not found' }
+    }
+
+    const newHash = simpleHash(args.apiKey)
+    
+    await ctx.db.patch(args.botAgentId, {
+      apiKeyHash: newHash,
+      updatedAt: Date.now(),
+    })
+
+    return { 
+      success: true, 
+      botName: bot.name,
+      oldHash: bot.apiKeyHash,
+      newHash,
+    }
   },
 })
 
