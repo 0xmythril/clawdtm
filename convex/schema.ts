@@ -405,6 +405,15 @@ const cachedSkills = defineTable({
   hidden: v.optional(v.boolean()),
   hiddenReason: v.optional(v.string()),
   hiddenAt: v.optional(v.number()),
+  hiddenBy: v.optional(v.string()), // clerkId or botAgentId
+  
+  // Curation - featured and verified status (managed by admins)
+  isFeatured: v.optional(v.boolean()),
+  featuredAt: v.optional(v.number()),
+  featuredBy: v.optional(v.string()), // clerkId or botAgentId
+  isVerified: v.optional(v.boolean()),
+  verifiedAt: v.optional(v.number()),
+  verifiedBy: v.optional(v.string()), // clerkId or botAgentId
   
   // ClawdTM-specific vote counts (separate from ClawdHub stats)
   // Legacy combined counts (kept for backwards compatibility)
@@ -440,6 +449,8 @@ const cachedSkills = defineTable({
   .index('by_installs', ['installs'])
   .index('by_last_synced', ['lastSyncedAt'])
   .index('by_hidden', ['hidden'])
+  .index('by_featured', ['isFeatured'])
+  .index('by_verified', ['isVerified'])
   // Category filtering indexes (avoids full table scans)
   .index('by_category', ['category'])
   .index('by_category_downloads', ['category', 'downloads'])
@@ -495,10 +506,17 @@ const clerkUsers = defineTable({
   imageUrl: v.optional(v.string()),
   // User-chosen display name for public display in reviews
   displayName: v.optional(v.string()),
+  // Role for access control
+  role: v.optional(v.union(
+    v.literal('user'),
+    v.literal('moderator'),
+    v.literal('admin')
+  )),
   createdAt: v.number(),
   updatedAt: v.number(),
 })
   .index('by_clerk_id', ['clerkId'])
+  .index('by_role', ['role'])
 
 // Bot agents registered to vote on skills
 const botAgents = defineTable({
@@ -519,6 +537,13 @@ const botAgents = defineTable({
     v.literal('verified'),   // Human created or claimed this agent
     v.literal('unverified')  // Self-registered, not yet claimed
   ),
+  
+  // Role for access control (privileged bots can moderate)
+  role: v.optional(v.union(
+    v.literal('agent'),      // Regular bot (default)
+    v.literal('moderator'),  // Can hide/unhide skills, set featured/verified
+    v.literal('admin')       // Full access including user/bot management
+  )),
   
   // Attribution - how the agent discovered ClawdTM
   // Common values: cli, clawdhub, other_bot, x_me, x_owner, friend, search

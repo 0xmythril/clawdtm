@@ -719,4 +719,237 @@ http.route({
   }),
 })
 
+// ============================================
+// Admin Routes (Bot Moderator/Admin Auth)
+// ============================================
+
+// CORS preflight for admin endpoints
+http.route({
+  path: '/api/v1/admin/hide-skill',
+  method: 'OPTIONS',
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-API-Key',
+      },
+    })
+  }),
+})
+
+http.route({
+  path: '/api/v1/admin/unhide-skill',
+  method: 'OPTIONS',
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-API-Key',
+      },
+    })
+  }),
+})
+
+http.route({
+  path: '/api/v1/admin/set-featured',
+  method: 'OPTIONS',
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-API-Key',
+      },
+    })
+  }),
+})
+
+http.route({
+  path: '/api/v1/admin/set-verified',
+  method: 'OPTIONS',
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-API-Key',
+      },
+    })
+  }),
+})
+
+// Helper: Extract Admin API Key
+function extractAdminApiKey(request: Request): string | null {
+  // Check X-Admin-API-Key header first
+  const adminKey = request.headers.get('X-Admin-API-Key')
+  if (adminKey) {
+    return adminKey
+  }
+  // Fall back to Bearer token
+  return extractBearerToken(request)
+}
+
+// POST /api/v1/admin/hide-skill - Hide a skill (bot moderator+)
+http.route({
+  path: '/api/v1/admin/hide-skill',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = extractAdminApiKey(request)
+    if (!apiKey) {
+      return jsonResponse({ error: 'API key required' }, 401)
+    }
+
+    let body: { slug?: string; reason?: string }
+    try {
+      body = await request.json()
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400)
+    }
+
+    if (!body.slug) {
+      return jsonResponse({ error: 'slug is required' }, 400)
+    }
+
+    try {
+      const result = await ctx.runMutation(api.admin.botHideSkill, {
+        apiKey,
+        slug: body.slug,
+        reason: body.reason,
+      })
+      return jsonResponse(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      if (message.includes('Unauthorized')) {
+        return jsonResponse({ error: message }, 403)
+      }
+      return jsonResponse({ error: message }, 500)
+    }
+  }),
+})
+
+// POST /api/v1/admin/unhide-skill - Unhide a skill (bot moderator+)
+http.route({
+  path: '/api/v1/admin/unhide-skill',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = extractAdminApiKey(request)
+    if (!apiKey) {
+      return jsonResponse({ error: 'API key required' }, 401)
+    }
+
+    let body: { slug?: string }
+    try {
+      body = await request.json()
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400)
+    }
+
+    if (!body.slug) {
+      return jsonResponse({ error: 'slug is required' }, 400)
+    }
+
+    try {
+      const result = await ctx.runMutation(api.admin.botUnhideSkill, {
+        apiKey,
+        slug: body.slug,
+      })
+      return jsonResponse(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      if (message.includes('Unauthorized')) {
+        return jsonResponse({ error: message }, 403)
+      }
+      return jsonResponse({ error: message }, 500)
+    }
+  }),
+})
+
+// POST /api/v1/admin/set-featured - Set skill featured status (bot moderator+)
+http.route({
+  path: '/api/v1/admin/set-featured',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = extractAdminApiKey(request)
+    if (!apiKey) {
+      return jsonResponse({ error: 'API key required' }, 401)
+    }
+
+    let body: { slug?: string; featured?: boolean }
+    try {
+      body = await request.json()
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400)
+    }
+
+    if (!body.slug) {
+      return jsonResponse({ error: 'slug is required' }, 400)
+    }
+    if (typeof body.featured !== 'boolean') {
+      return jsonResponse({ error: 'featured must be a boolean' }, 400)
+    }
+
+    try {
+      const result = await ctx.runMutation(api.admin.botSetSkillFeatured, {
+        apiKey,
+        slug: body.slug,
+        featured: body.featured,
+      })
+      return jsonResponse(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      if (message.includes('Unauthorized')) {
+        return jsonResponse({ error: message }, 403)
+      }
+      return jsonResponse({ error: message }, 500)
+    }
+  }),
+})
+
+// POST /api/v1/admin/set-verified - Set skill verified status (bot moderator+)
+http.route({
+  path: '/api/v1/admin/set-verified',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = extractAdminApiKey(request)
+    if (!apiKey) {
+      return jsonResponse({ error: 'API key required' }, 401)
+    }
+
+    let body: { slug?: string; verified?: boolean }
+    try {
+      body = await request.json()
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400)
+    }
+
+    if (!body.slug) {
+      return jsonResponse({ error: 'slug is required' }, 400)
+    }
+    if (typeof body.verified !== 'boolean') {
+      return jsonResponse({ error: 'verified must be a boolean' }, 400)
+    }
+
+    try {
+      const result = await ctx.runMutation(api.admin.botSetSkillVerified, {
+        apiKey,
+        slug: body.slug,
+        verified: body.verified,
+      })
+      return jsonResponse(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      if (message.includes('Unauthorized')) {
+        return jsonResponse({ error: message }, 403)
+      }
+      return jsonResponse({ error: message }, 500)
+    }
+  }),
+})
+
 export default http

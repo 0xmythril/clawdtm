@@ -19,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Bot,
+  BadgeCheck,
 } from "lucide-react";
 import {
   Tooltip,
@@ -137,9 +138,10 @@ export function Sidebar({
     }
   }, [tagsOpen, mounted]);
 
-  // Fixed categories - no search needed (Featured/Verified hidden until more content)
+  // Fixed categories - no search needed
   const fixedCategories = [
     { name: "all", label: "All", icon: null },
+    { name: "verified", label: "Verified", icon: "badge" }, // Uses BadgeCheck icon
     { name: "latest", label: "Latest", icon: "🆕" },
   ];
 
@@ -281,7 +283,11 @@ export function Sidebar({
                     }`}
                   >
                     <span className="flex items-center gap-2">
-                      {cat.icon && <span>{cat.icon}</span>}
+                      {cat.icon === "badge" ? (
+                        <BadgeCheck className="h-4 w-4 text-blue-500" />
+                      ) : cat.icon ? (
+                        <span>{cat.icon}</span>
+                      ) : null}
                       <span className="capitalize">{cat.label}</span>
                     </span>
                   </button>
