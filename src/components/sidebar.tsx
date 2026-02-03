@@ -68,24 +68,23 @@ function getTagColor(tag: string): string {
 
 type TagData = { tag: string; count: number };
 
-// Rating filter options
+// Rating filter options (click again to deselect)
 const RATING_OPTIONS = [
-  { value: 0, label: "Any Rating", icon: null },
-  { value: 5, label: "5 🦞 only", icon: "🦞🦞🦞🦞🦞" },
-  { value: 4, label: "4+ 🦞", icon: "🦞🦞🦞🦞" },
-  { value: 3, label: "3+ 🦞", icon: "🦞🦞🦞" },
-  { value: 2, label: "2+ 🦞", icon: "🦞🦞" },
+  { value: 5, label: "5 🦞 only" },
+  { value: 4, label: "4+ 🦞" },
+  { value: 3, label: "3+ 🦞" },
+  { value: 2, label: "2+ 🦞" },
 ];
 
-// Security filter options
+// Security filter options (click again to deselect)
 const SECURITY_OPTIONS = [
-  { value: "any", label: "Any Security", icon: null, color: "" },
-  { value: "safe", label: "Safe Only", icon: ShieldCheck, color: "text-green-500" },
-  { value: "safe-low", label: "Safe + Low Risk", icon: ShieldCheck, color: "text-green-600" },
+  { value: "safe", label: "Safe (90+)", icon: ShieldCheck, color: "text-green-500" },
+  { value: "low", label: "Low Risk (70+)", icon: ShieldCheck, color: "text-green-600" },
+  { value: "medium", label: "Medium (50+)", icon: Shield, color: "text-yellow-500" },
   { value: "scanned", label: "All Scanned", icon: Shield, color: "text-blue-500" },
 ] as const;
 
-export type SecurityFilter = typeof SECURITY_OPTIONS[number]["value"];
+export type SecurityFilter = typeof SECURITY_OPTIONS[number]["value"] | "any";
 
 type SidebarProps = {
   tags: TagData[];
@@ -277,7 +276,7 @@ export function Sidebar({
             {/* Categories Section */}
             <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
                   <span className="flex items-center gap-2">
                     <FolderOpen className="h-3.5 w-3.5" />
                     Categories
@@ -317,10 +316,13 @@ export function Sidebar({
             {onMinRatingChange && (
               <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-4">
                 <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
                     <span className="flex items-center gap-2">
                       <span className="text-sm">🦞</span>
                       Min Rating
+                      {minRating > 0 && (
+                        <span className="text-[10px] normal-case font-normal text-muted-foreground">(filtered)</span>
+                      )}
                     </span>
                     {ratingsOpen ? (
                       <ChevronDown className="h-3.5 w-3.5" />
@@ -330,19 +332,22 @@ export function Sidebar({
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-0.5 mt-1">
-                  {RATING_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => onMinRatingChange(option.value)}
-                      className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                        minRating === option.value
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      }`}
-                    >
-                      <span>{option.label}</span>
-                    </button>
-                  ))}
+                  {RATING_OPTIONS.map((option) => {
+                    const isActive = minRating === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => onMinRatingChange(isActive ? 0 : option.value)}
+                        className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
                 </CollapsibleContent>
               </Collapsible>
             )}
@@ -351,10 +356,13 @@ export function Sidebar({
             {onSecurityFilterChange && (
               <Collapsible open={securityOpen} onOpenChange={setSecurityOpen} className="mt-4">
                 <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
                     <span className="flex items-center gap-2">
                       <Shield className="h-3.5 w-3.5" />
                       Security
+                      {securityFilter !== "any" && (
+                        <span className="text-[10px] normal-case font-normal text-muted-foreground">(filtered)</span>
+                      )}
                     </span>
                     {securityOpen ? (
                       <ChevronDown className="h-3.5 w-3.5" />
@@ -366,17 +374,18 @@ export function Sidebar({
                 <CollapsibleContent className="space-y-0.5 mt-1">
                   {SECURITY_OPTIONS.map((option) => {
                     const Icon = option.icon;
+                    const isActive = securityFilter === option.value;
                     return (
                       <button
                         key={option.value}
-                        onClick={() => onSecurityFilterChange(option.value)}
+                        onClick={() => onSecurityFilterChange(isActive ? "any" : option.value)}
                         className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                          securityFilter === option.value
+                          isActive
                             ? "bg-primary text-primary-foreground"
                             : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                         }`}
                       >
-                        {Icon && <Icon className={`h-4 w-4 ${securityFilter === option.value ? "" : option.color}`} />}
+                        {Icon && <Icon className={`h-4 w-4 ${isActive ? "" : option.color}`} />}
                         <span>{option.label}</span>
                       </button>
                     );
@@ -388,10 +397,13 @@ export function Sidebar({
             {/* Tags Section */}
             <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-4">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
                   <span className="flex items-center gap-2">
                     <Cpu className="h-3.5 w-3.5" />
                     Tags by AI
+                    {selectedTags.length > 0 && (
+                      <span className="text-[10px] normal-case font-normal text-muted-foreground">({selectedTags.length})</span>
+                    )}
                   </span>
                   {tagsOpen ? (
                     <ChevronDown className="h-3.5 w-3.5" />

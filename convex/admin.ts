@@ -140,6 +140,7 @@ export async function requireAdmin(
 type AuditAction = 
   | 'hide_skill'
   | 'unhide_skill'
+  | 'hide_skills_by_author'
   | 'set_featured'
   | 'set_verified'
   | 'set_user_role'
@@ -147,7 +148,7 @@ type AuditAction =
   | 'create_bot'
   | 'revoke_bot'
 
-type AuditTargetType = 'skill' | 'user' | 'bot'
+type AuditTargetType = 'skill' | 'user' | 'bot' | 'author'
 
 interface AuditLogParams {
   actor: { type: 'human'; clerkId: string; name?: string } | { type: 'bot'; agentId: Id<'botAgents'>; name?: string }
@@ -159,6 +160,8 @@ interface AuditLogParams {
     reason?: string
     oldValue?: unknown
     newValue?: unknown
+    // For bulk operations
+    count?: number
   }
 }
 
@@ -962,6 +965,93 @@ export const botUnhideSkill = mutation({
     }
 
     return { success: true, slug: args.slug }
+  },
+})
+
+/**
+ * Hide all skills by a specific author (moderator+)
+ * Useful for blocking malicious users
+ */
+export const adminHideSkillsByAuthor = mutation({
+  args: {
+    clerkId: v.string(),
+    author: v.string(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; hiddenCount: number; author: string }> => {
+    await requireModerator(ctx, { clerkId: args.clerkId })
+
+    // Find all skills by this author
+    const skills = await ctx.db
+      .query('cachedSkills')
+      .filter((q) => q.eq(q.field('author'), args.author))
+      .collect()
+
+    if (skills.length === 0) {
+      return { success: true, hiddenCount: 0, author: args.author }
+    }
+
+    const reason = args.reason ?? `All skills by ${args.author} hidden by moderator`
+    const now = Date.now()
+    let hiddenCount = 0
+
+    for (const skill of skills) {
+      if (!skill.hidden) {
+        await ctx.db.patch(skill._id, {
+          hidden: true,
+          hiddenReason: reason,
+          hiddenAt: now,
+          hiddenBy: args.clerkId,
+        })
+        hiddenCount++
+      }
+    }
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'hide_skills_by_author',
+      targetType: 'author',
+      targetId: args.author,
+      targetName: args.author,
+      details: { reason, count: hiddenCount },
+    })
+
+    return { success: true, hiddenCount, author: args.author }
+  },
+})
+
+/**
+ * Get all unique authors with skill counts (for admin panel)
+ */
+export const getAuthorsWithCounts = query({
+  args: {
+    clerkId: v.string(),
+    includeHidden: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<{ author: string; total: number; hidden: number }[]> => {
+    await requireModerator(ctx, { clerkId: args.clerkId })
+
+    const skills = await ctx.db.query('cachedSkills').collect()
+    
+    const authorMap = new Map<string, { total: number; hidden: number }>()
+    
+    for (const skill of skills) {
+      const author = skill.author ?? 'unknown'
+      const current = authorMap.get(author) ?? { total: 0, hidden: 0 }
+      current.total++
+      if (skill.hidden) current.hidden++
+      authorMap.set(author, current)
+    }
+
+    const result = Array.from(authorMap.entries())
+      .map(([author, counts]) => ({ author, ...counts }))
+      .sort((a, b) => b.total - a.total) // Sort by total skills descending
+
+    return args.includeHidden 
+      ? result 
+      : result.filter(a => a.hidden < a.total) // Exclude fully hidden authors
   },
 })
 

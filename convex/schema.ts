@@ -681,6 +681,7 @@ const adminAuditLogs = defineTable({
   action: v.union(
     v.literal('hide_skill'),
     v.literal('unhide_skill'),
+    v.literal('hide_skills_by_author'),
     v.literal('set_featured'),
     v.literal('set_verified'),
     v.literal('set_user_role'),
@@ -693,7 +694,8 @@ const adminAuditLogs = defineTable({
   targetType: v.union(
     v.literal('skill'),
     v.literal('user'),
-    v.literal('bot')
+    v.literal('bot'),
+    v.literal('author')
   ),
   targetId: v.string(),                     // slug for skills, clerkId for users, botAgentId for bots
   targetName: v.optional(v.string()),       // Cached name for display
@@ -703,6 +705,7 @@ const adminAuditLogs = defineTable({
     reason: v.optional(v.string()),         // For hide actions
     oldValue: v.optional(v.any()),          // Previous state
     newValue: v.optional(v.any()),          // New state
+    count: v.optional(v.number()),          // For bulk operations
   })),
   
   createdAt: v.number(),

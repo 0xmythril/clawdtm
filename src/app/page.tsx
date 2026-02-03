@@ -214,15 +214,17 @@ function SkillsContent() {
       result = allSkills;
     }
     
-    // Apply security filter (client-side)
+    // Apply security filter (client-side, score-based)
     if (urlSecurityFilter !== "any") {
       result = result.filter((s) => {
-        if (!s.securityRisk) return false; // Not scanned = hide when filtering
+        if (s.securityScore === undefined) return false; // Not scanned = hide when filtering
         switch (urlSecurityFilter) {
           case "safe":
-            return s.securityRisk === "safe";
-          case "safe-low":
-            return s.securityRisk === "safe" || s.securityRisk === "low";
+            return s.securityScore >= 90;
+          case "low":
+            return s.securityScore >= 70;
+          case "medium":
+            return s.securityScore >= 50;
           case "scanned":
             return true; // Already filtered out unscanned above
           default:

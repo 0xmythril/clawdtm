@@ -19,9 +19,17 @@ import {
   Eye,
   EyeOff,
   SlidersHorizontal,
+  UserX,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type RiskLevel = "safe" | "low" | "medium" | "high" | "critical";
 
@@ -75,9 +83,17 @@ export default function AdminSecurityPage() {
   const [selectedRisk, setSelectedRisk] = useState<RiskLevel | null>(null);
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 50]);
   const [scanningSkillId, setScanningSkillId] = useState<Id<"cachedSkills"> | null>(null);
+  const [authorsOpen, setAuthorsOpen] = useState(false);
+  const [blockingAuthor, setBlockingAuthor] = useState<string | null>(null);
 
   // Get security stats
   const stats = useQuery(api.security.getSecurityStats);
+  
+  // Get authors (only when section is open)
+  const authors = useQuery(
+    api.admin.getAuthorsWithCounts,
+    authorsOpen && clerkId ? { clerkId, includeHidden: true } : "skip"
+  );
 
   // Get skills by risk level (when in risk mode)
   const skillsByRisk = useQuery(
@@ -97,6 +113,24 @@ export default function AdminSecurityPage() {
   // Mutations
   const triggerScan = useMutation(api.security.triggerManualScan);
   const hideSkill = useMutation(api.admin.adminHideSkill);
+  const hideByAuthor = useMutation(api.admin.adminHideSkillsByAuthor);
+
+  const handleBlockAuthor = async (author: string) => {
+    if (!clerkId) return;
+    setBlockingAuthor(author);
+    try {
+      const result = await hideByAuthor({ 
+        clerkId, 
+        author, 
+        reason: `All skills by ${author} blocked by admin` 
+      });
+      console.log(`Blocked ${result.hiddenCount} skills by ${author}`);
+    } catch (error) {
+      console.error("Block author failed:", error);
+    } finally {
+      setBlockingAuthor(null);
+    }
+  };
 
   const handleScan = async (skillId: Id<"cachedSkills">) => {
     if (!clerkId) return;
@@ -376,6 +410,83 @@ export default function AdminSecurityPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Block by Author Section */}
+      <Collapsible open={authorsOpen} onOpenChange={setAuthorsOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <UserX className="h-5 w-5" />
+                  Block by Author
+                </span>
+                {authorsOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Block all skills from a specific author. This is useful for dealing with malicious users.
+              </p>
+              
+              {authors === undefined ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {authors.map((author) => (
+                    <div
+                      key={author.author}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium">{author.author}</span>
+                        <Badge variant="secondary">
+                          {author.total} skill{author.total !== 1 ? "s" : ""}
+                        </Badge>
+                        {author.hidden > 0 && (
+                          <Badge variant="destructive">
+                            {author.hidden} hidden
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {author.hidden < author.total && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleBlockAuthor(author.author)}
+                          disabled={blockingAuthor === author.author}
+                        >
+                          {blockingAuthor === author.author ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserX className="h-4 w-4" />
+                          )}
+                          <span className="ml-1">Block All</span>
+                        </Button>
+                      )}
+                      
+                      {author.hidden === author.total && author.total > 0 && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          All blocked
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Info Panel */}
       {filterMode === "risk" && !selectedRisk && (
