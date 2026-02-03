@@ -28,4 +28,18 @@ crons.interval(
   { limit: 50 },
 )
 
+// Security scan unscanned skills every 5 minutes (batch of 50 for faster initial scan)
+crons.interval(
+  'security-scan-batch',
+  { minutes: 5 },
+  internal.security.scanBatch,
+)
+
+// Rescan skills with old security scans every Sunday at 3am UTC
+crons.weekly(
+  'security-rescan-weekly',
+  { dayOfWeek: 'sunday', hourUTC: 3, minuteUTC: 0 },
+  internal.security.rescanOldSkills,
+)
+
 export default crons

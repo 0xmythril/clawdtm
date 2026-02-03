@@ -15,6 +15,11 @@ import {
   MessageSquare,
   Bot,
   User,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
+  ShieldQuestion,
+  AlertTriangle,
 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -27,6 +32,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+
+type SecurityRisk = "safe" | "low" | "medium" | "high" | "critical";
 
 type SkillData = {
   _id: Id<"cachedSkills">;
@@ -50,6 +57,12 @@ type SkillData = {
   avgRatingBot: number | null;
   createdAt?: number;
   updatedAt?: number;
+  // Security
+  securityScore?: number;
+  securityRisk?: SecurityRisk;
+  securityFlags?: string[];
+  lastSecurityScanAt?: number;
+  vtAnalysisUrl?: string;
 };
 
 type Props = {
@@ -238,7 +251,7 @@ function SkillContent({
       </div>
 
       {/* Stats */}
-      <Card>
+      <Card className="bg-gray-50 dark:bg-card">
         <CardContent className="py-4">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="text-center">
@@ -281,23 +294,14 @@ function SkillContent({
               <p className="text-xs text-muted-foreground">Avg Rating</p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground/60 text-center pt-2 border-t border-border/50">
-            Stats from{" "}
-            <a 
-              href="https://www.clawhub.ai" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:underline hover:text-muted-foreground transition-colors"
-            >
-              Clawhub
-            </a>
-            {" "}· Ratings from ClawdTM community
-          </p>
         </CardContent>
       </Card>
 
+      {/* Security Section */}
+      <SecuritySection skill={skill} />
+
       {/* Install Command */}
-      <Card className="gap-3 py-4">
+      <Card className="gap-3 py-4 bg-gray-50 dark:bg-card">
         <CardHeader className="pb-0">
           <CardTitle className="text-lg flex items-center gap-2">
             <Terminal className="h-5 w-5" />
@@ -348,7 +352,7 @@ function SkillContent({
       </Card>
 
       {/* Reviews Section */}
-      <Card>
+      <Card className="bg-gray-50 dark:bg-card">
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -372,14 +376,14 @@ function SkillContent({
               className="w-auto"
             >
               <TabsList className="h-8">
-                <TabsTrigger value="combined" className="text-xs px-2 h-7">
+                <TabsTrigger value="combined" className="text-xs px-2 h-7 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input/30">
                   All
                 </TabsTrigger>
-                <TabsTrigger value="human" className="text-xs px-2 h-7">
+                <TabsTrigger value="human" className="text-xs px-2 h-7 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input/30">
                   <User className="h-3 w-3 mr-1" />
                   Human
                 </TabsTrigger>
-                <TabsTrigger value="bot" className="text-xs px-2 h-7">
+                <TabsTrigger value="bot" className="text-xs px-2 h-7 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input/30">
                   <Bot className="h-3 w-3 mr-1" />
                   Bot
                 </TabsTrigger>
@@ -415,5 +419,202 @@ function SkillContent({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Security section component
+function SecuritySection({ skill }: { skill: SkillData }) {
+  const { securityScore, securityRisk, securityFlags, lastSecurityScanAt, vtAnalysisUrl } = skill;
+  
+  // Security risk config
+  const riskConfig = {
+    safe: { 
+      icon: ShieldCheck, 
+      color: "text-green-500",
+      bgColor: "bg-green-50 dark:bg-green-950/30",
+      borderColor: "border-green-200 dark:border-green-800",
+      label: "Safe",
+      description: "No security concerns detected"
+    },
+    low: { 
+      icon: ShieldCheck, 
+      color: "text-green-600",
+      bgColor: "bg-green-50 dark:bg-green-950/30",
+      borderColor: "border-green-200 dark:border-green-800",
+      label: "Low Risk",
+      description: "Minor concerns, likely safe to use"
+    },
+    medium: { 
+      icon: Shield, 
+      color: "text-yellow-500",
+      bgColor: "bg-yellow-50 dark:bg-yellow-950/30",
+      borderColor: "border-yellow-200 dark:border-yellow-800",
+      label: "Medium Risk",
+      description: "Some suspicious patterns detected - review before use"
+    },
+    high: { 
+      icon: ShieldAlert, 
+      color: "text-orange-500",
+      bgColor: "bg-orange-50 dark:bg-orange-950/30",
+      borderColor: "border-orange-200 dark:border-orange-800",
+      label: "High Risk",
+      description: "Multiple red flags - use with extreme caution"
+    },
+    critical: { 
+      icon: ShieldAlert, 
+      color: "text-red-500",
+      bgColor: "bg-red-50 dark:bg-red-950/30",
+      borderColor: "border-red-200 dark:border-red-800",
+      label: "Critical Risk",
+      description: "Likely malicious - do not use"
+    },
+  };
+
+  // Flag descriptions
+  const flagDescriptions: Record<string, string> = {
+    remote_execution: "Downloads and executes external code",
+    obfuscated_code: "Contains obfuscated or encoded scripts",
+    sensitive_data_access: "Accesses passwords, credentials, or wallets",
+    shell_commands: "Executes shell commands",
+    network_requests: "Makes requests to external servers",
+    permission_escalation: "Requests elevated permissions",
+    data_exfiltration: "May send data to external servers",
+    persistence: "Sets up persistent processes",
+    external_url: "Contains external download URLs",
+    vt_threats_detected: "VirusTotal detected threats in linked files",
+    parse_error: "Analysis could not complete - review manually",
+    scan_error: "Scan failed - manual review recommended",
+  };
+
+  // Not scanned yet
+  if (!securityRisk) {
+    return (
+      <Card className="border-dashed bg-gray-50 dark:bg-card">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <ShieldQuestion className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Security Scan Pending</p>
+              <p className="text-xs text-muted-foreground">
+                This skill will be automatically scanned for security issues
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const config = riskConfig[securityRisk];
+  const Icon = config.icon;
+  const flags = securityFlags ?? [];
+
+  return (
+    <Card className={`${config.bgColor} ${config.borderColor}`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Icon className={`h-5 w-5 ${config.color}`} />
+          Security Analysis
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Risk level and score */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className={`font-semibold ${config.color}`}>
+              {config.label}
+            </span>
+            <p className="text-xs text-muted-foreground">{config.description}</p>
+          </div>
+          {securityScore !== undefined && (
+            <div className="text-right">
+              <span className={`text-2xl font-bold ${config.color}`}>
+                {securityScore}
+              </span>
+              <span className="text-sm text-muted-foreground">/100</span>
+            </div>
+          )}
+        </div>
+
+        {/* Score bar */}
+        {securityScore !== undefined && (
+          <div className="w-full bg-muted rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all ${
+                securityScore >= 70 ? "bg-green-500" :
+                securityScore >= 50 ? "bg-yellow-500" :
+                securityScore >= 25 ? "bg-orange-500" : "bg-red-500"
+              }`}
+              style={{ width: `${securityScore}%` }}
+            />
+          </div>
+        )}
+
+        {/* Flags */}
+        {flags.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Detected Issues:</p>
+            <div className="flex flex-wrap gap-2">
+              {flags.map((flag) => (
+                <Badge
+                  key={flag}
+                  variant="outline"
+                  className="text-xs flex items-center gap-1"
+                  title={flagDescriptions[flag] ?? flag}
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  {flag.replace(/_/g, " ")}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* How we analyze - collapsible summary */}
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+            How is this analyzed?
+          </summary>
+          <div className="mt-2 p-3 bg-muted/50 rounded-lg space-y-2 text-muted-foreground">
+            <p>
+              Skills are automatically analyzed using AI to detect potential security risks in their code and configuration.
+            </p>
+            <p className="font-medium text-foreground">We check for:</p>
+            <ul className="list-disc list-inside space-y-1 pl-2">
+              <li>Remote code execution (downloading external binaries)</li>
+              <li>Obfuscated or encoded scripts</li>
+              <li>Access to sensitive data (passwords, keys, wallets)</li>
+              <li>Dangerous shell commands</li>
+              <li>Suspicious network requests</li>
+              <li>Permission escalation attempts</li>
+            </ul>
+            <p className="text-xs opacity-75">
+              High-risk skills may also be scanned with VirusTotal for additional verification.
+            </p>
+          </div>
+        </details>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs text-muted-foreground">
+          <span>
+            {lastSecurityScanAt 
+              ? `Scanned ${new Date(lastSecurityScanAt).toLocaleDateString()}`
+              : "Recently scanned"
+            }
+          </span>
+          {vtAnalysisUrl && (
+            <a
+              href={vtAnalysisUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline flex items-center gap-1"
+            >
+              View VirusTotal Report
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

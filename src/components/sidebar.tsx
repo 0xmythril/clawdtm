@@ -10,7 +10,6 @@ import {
   Sun,
   ChevronDown,
   ChevronRight,
-  FolderOpen,
   Cpu,
   HelpCircle,
   Search,
@@ -19,7 +18,9 @@ import {
   PanelLeftClose,
   PanelLeft,
   Bot,
-  BadgeCheck,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
 } from "lucide-react";
 import {
   Tooltip,
@@ -65,14 +66,23 @@ function getTagColor(tag: string): string {
 
 type TagData = { tag: string; count: number };
 
-// Rating filter options
+// Rating filter options (click again to deselect)
 const RATING_OPTIONS = [
-  { value: 0, label: "Any Rating", icon: null },
-  { value: 5, label: "5 🦞 only", icon: "🦞🦞🦞🦞🦞" },
-  { value: 4, label: "4+ 🦞", icon: "🦞🦞🦞🦞" },
-  { value: 3, label: "3+ 🦞", icon: "🦞🦞🦞" },
-  { value: 2, label: "2+ 🦞", icon: "🦞🦞" },
+  { value: 5, label: "5 🦞 only" },
+  { value: 4, label: "4+ 🦞" },
+  { value: 3, label: "3+ 🦞" },
+  { value: 2, label: "2+ 🦞" },
 ];
+
+// Security filter options (click again to deselect)
+const SECURITY_OPTIONS = [
+  { value: "safe", label: "Safe (90+)", icon: ShieldCheck, color: "text-green-500" },
+  { value: "low", label: "Low Risk (70+)", icon: ShieldCheck, color: "text-green-600" },
+  { value: "medium", label: "Medium (50+)", icon: Shield, color: "text-yellow-500" },
+  { value: "scanned", label: "All Scanned", icon: Shield, color: "text-blue-500" },
+] as const;
+
+export type SecurityFilter = typeof SECURITY_OPTIONS[number]["value"] | "any";
 
 type SidebarProps = {
   tags: TagData[];
@@ -83,6 +93,8 @@ type SidebarProps = {
   onClearTags: () => void;
   minRating?: number;
   onMinRatingChange?: (rating: number) => void;
+  securityFilter?: SecurityFilter;
+  onSecurityFilterChange?: (filter: SecurityFilter) => void;
 };
 
 export function Sidebar({
@@ -94,14 +106,16 @@ export function Sidebar({
   onClearTags,
   minRating = 0,
   onMinRatingChange,
+  securityFilter = "any",
+  onSecurityFilterChange,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const authRedirectUrl =
     typeof window !== "undefined" ? window.location.origin : "/";
   const [collapsed, setCollapsed] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [ratingsOpen, setRatingsOpen] = useState(true);
+  const [securityOpen, setSecurityOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
@@ -113,10 +127,8 @@ export function Sidebar({
     setMounted(true);
     // Load collapsed state from localStorage
     const savedCollapsed = localStorage.getItem("sidebar-collapsed");
-    const savedCategoriesOpen = localStorage.getItem("sidebar-categories-open");
     const savedTagsOpen = localStorage.getItem("sidebar-tags-open");
     if (savedCollapsed !== null) setCollapsed(savedCollapsed === "true");
-    if (savedCategoriesOpen !== null) setCategoriesOpen(savedCategoriesOpen === "true");
     if (savedTagsOpen !== null) setTagsOpen(savedTagsOpen === "true");
   }, []);
 
@@ -128,22 +140,9 @@ export function Sidebar({
 
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem("sidebar-categories-open", String(categoriesOpen));
-    }
-  }, [categoriesOpen, mounted]);
-
-  useEffect(() => {
-    if (mounted) {
       localStorage.setItem("sidebar-tags-open", String(tagsOpen));
     }
   }, [tagsOpen, mounted]);
-
-  // Fixed categories - no search needed
-  const fixedCategories = [
-    { name: "all", label: "All", icon: null },
-    { name: "verified", label: "Verified", icon: "badge" }, // Uses BadgeCheck icon
-    { name: "latest", label: "Latest", icon: "🆕" },
-  ];
 
   // Filter and limit tags
   const filteredTags = useMemo(() => {
@@ -256,53 +255,62 @@ export function Sidebar({
               </span>
             </div>
 
-            {/* Categories Section */}
-            <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
-                  <span className="flex items-center gap-2">
-                    <FolderOpen className="h-3.5 w-3.5" />
-                    Categories
-                  </span>
-                  {categoriesOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 mt-1">
-                {fixedCategories.map((cat) => (
-                  <button
-                    key={cat.name}
-                    onClick={() => onCategoryChange(cat.name)}
-                    className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                      activeCategory === cat.name
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                    }`}
-                  >
+            {/* Security Section */}
+            {onSecurityFilterChange && (
+              <Collapsible open={securityOpen} onOpenChange={setSecurityOpen}>
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
                     <span className="flex items-center gap-2">
-                      {cat.icon === "badge" ? (
-                        <BadgeCheck className="h-4 w-4 text-blue-500" />
-                      ) : cat.icon ? (
-                        <span>{cat.icon}</span>
-                      ) : null}
-                      <span className="capitalize">{cat.label}</span>
+                      <Shield className="h-3.5 w-3.5" />
+                      Security
+                      {securityFilter !== "any" && (
+                        <span className="text-[10px] normal-case font-normal text-muted-foreground/70">(filtered)</span>
+                      )}
                     </span>
+                    {securityOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
                   </button>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-0.5 mt-1">
+                  <p className="text-[10px] text-muted-foreground/60 px-3 mb-1">
+                    {securityFilter !== "any" ? "Click again to deselect" : "Click to select"}
+                  </p>
+                  {SECURITY_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const isActive = securityFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => onSecurityFilterChange(isActive ? "any" : option.value)}
+                        className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        }`}
+                      >
+                        {Icon && <Icon className={`h-4 w-4 ${isActive ? "" : option.color}`} />}
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             {/* Rating Filter Section */}
             {onMinRatingChange && (
-              <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-4">
+              <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-3">
                 <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
                     <span className="flex items-center gap-2">
                       <span className="text-sm">🦞</span>
                       Min Rating
+                      {minRating > 0 && (
+                        <span className="text-[10px] normal-case font-normal text-muted-foreground/70">(filtered)</span>
+                      )}
                     </span>
                     {ratingsOpen ? (
                       <ChevronDown className="h-3.5 w-3.5" />
@@ -312,30 +320,39 @@ export function Sidebar({
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-0.5 mt-1">
-                  {RATING_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => onMinRatingChange(option.value)}
-                      className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                        minRating === option.value
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      }`}
-                    >
-                      <span>{option.label}</span>
-                    </button>
-                  ))}
+                  <p className="text-[10px] text-muted-foreground/60 px-3 mb-1">
+                    {minRating > 0 ? "Click again to deselect" : "Click to select"}
+                  </p>
+                  {RATING_OPTIONS.map((option) => {
+                    const isActive = minRating === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => onMinRatingChange(isActive ? 0 : option.value)}
+                        className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
                 </CollapsibleContent>
               </Collapsible>
             )}
 
             {/* Tags Section */}
-            <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-4">
+            <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-3">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
                   <span className="flex items-center gap-2">
                     <Cpu className="h-3.5 w-3.5" />
                     Tags by AI
+                    {selectedTags.length > 0 && (
+                      <span className="text-[10px] normal-case font-normal text-muted-foreground">({selectedTags.length})</span>
+                    )}
                   </span>
                   {tagsOpen ? (
                     <ChevronDown className="h-3.5 w-3.5" />

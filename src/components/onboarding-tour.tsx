@@ -44,7 +44,7 @@ const DESKTOP_TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Each card shows ratings, installs, and feedback at a glance. Click any card for more details!
+          Each card shows ratings, installs, and <strong>security status</strong> at a glance. Look for the shield icon! Click any card for more details.
         </p>
       </div>
     ),
@@ -67,12 +67,15 @@ const DESKTOP_TOUR_STEPS: Step[] = [
     target: '[data-tour="categories"]',
     content: (
       <div className="text-left">
-        <p className="text-sm">
-          All your filtering tools in one place! Browse by category, set a minimum rating, or explore AI-generated tags.
+        <p className="text-sm mb-2">
+          Filter by <strong>security level</strong> to find safe skills, set a <strong>minimum rating</strong>, or explore <strong>AI-generated tags</strong>.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          💡 Tip: Click a filter to select it, click again to deselect!
         </p>
       </div>
     ),
-    title: "🎛️ Skill Filters",
+    title: "🛡️ Smart Filters",
     placement: "right",
   },
   {
@@ -121,7 +124,7 @@ const MOBILE_TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Each card shows ratings, installs, and feedback at a glance. Tap any card for more details!
+          Each card shows ratings, installs, and <strong>security status</strong> at a glance. Look for the shield icon! Tap any card for more details.
         </p>
       </div>
     ),
@@ -156,12 +159,15 @@ const MOBILE_TOUR_STEPS: Step[] = [
     target: '[data-tour="mobile-filters"]',
     content: (
       <div className="text-left">
-        <p className="text-sm">
-          Filter by category, set a minimum rating, or explore AI-generated tags to find the perfect skill.
+        <p className="text-sm mb-2">
+          Filter by <strong>security level</strong>, set a <strong>minimum rating</strong>, or explore tags to find the perfect skill.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          💡 Tip: Tap a filter to select, tap again to deselect!
         </p>
       </div>
     ),
-    title: "🎛️ Skill Filters",
+    title: "🛡️ Smart Filters",
     placement: "top",
   },
   {
@@ -191,8 +197,8 @@ const MOBILE_TOUR_STEPS: Step[] = [
 ];
 
 // Step names for analytics
-const DESKTOP_STEP_NAMES = ["welcome", "search", "skill_card", "rating", "filters", "agent_reviews", "signin"];
-const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "filters", "agent_reviews", "settings"];
+const DESKTOP_STEP_NAMES = ["welcome", "search", "skill_card", "rating", "smart_filters", "agent_reviews", "signin"];
+const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "smart_filters", "agent_reviews", "settings"];
 
 export function OnboardingTour() {
   const { resolvedTheme } = useTheme();

@@ -834,6 +834,7 @@ export const searchCachedSkills = query({
       v.literal('rating'),
       v.literal('reviews'),
       v.literal('votes'),
+      v.literal('recent'),
     )),
     minRating: v.optional(v.number()),
     reviewerFilter: v.optional(v.union(
@@ -957,6 +958,13 @@ export const searchCachedSkills = query({
           return b.skill.downloads - a.skill.downloads
         })
         break
+      case 'recent':
+        sorted = filtered.sort((a, b) => {
+          const updatedA = a.skill.externalUpdatedAt ?? a.skill.lastSyncedAt ?? 0
+          const updatedB = b.skill.externalUpdatedAt ?? b.skill.lastSyncedAt ?? 0
+          return updatedB - updatedA
+        })
+        break
       case 'relevance':
       default:
         sorted = filtered.sort((a, b) => b.score - a.score)
@@ -994,6 +1002,11 @@ export const searchCachedSkills = query({
         botReviewCount: s.botReviewCount,
         isFeatured: s.isFeatured ?? false,
         isVerified: s.isVerified ?? false,
+        // Security
+        securityScore: s.securityScore,
+        securityRisk: s.securityRisk,
+        securityFlags: s.securityFlags,
+        lastSecurityScanAt: s.lastSecurityScanAt,
       }))
     
     return { skills: results }
@@ -1484,6 +1497,12 @@ export const listCachedSkillsWithFilters = query({
       // Curation status (admin-managed)
       isFeatured: s.isFeatured ?? false,
       isVerified: s.isVerified ?? false,
+      
+      // Security
+      securityScore: s.securityScore,
+      securityRisk: s.securityRisk,
+      securityFlags: s.securityFlags,
+      lastSecurityScanAt: s.lastSecurityScanAt,
     }))
     
     return {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Download, Terminal, ExternalLink, BadgeCheck } from "lucide-react";
+import { Star, Download, Terminal, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +33,8 @@ function getTagColor(tag: string): string {
 
 export type ReviewerFilter = "all" | "human" | "bot";
 
+export type SecurityRisk = "safe" | "low" | "medium" | "high" | "critical";
+
 export type Skill = {
   _id: string;
   slug: string;
@@ -55,6 +57,11 @@ export type Skill = {
   avgRating?: number;
   avgRatingHuman?: number;
   avgRatingBot?: number;
+  // Security
+  securityScore?: number;
+  securityRisk?: SecurityRisk;
+  securityFlags?: string[];
+  lastSecurityScanAt?: number;
 };
 
 type SkillCardProps = {
@@ -68,6 +75,69 @@ type SkillCardProps = {
   // Filter to show only human or bot ratings
   reviewerFilter?: ReviewerFilter;
 };
+
+// Security badge component
+function SecurityBadge({ 
+  risk, 
+  score,
+  size = "sm" 
+}: { 
+  risk?: SecurityRisk; 
+  score?: number;
+  size?: "sm" | "md";
+}) {
+  const iconSize = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
+  
+  if (!risk) {
+    // Not scanned yet
+    return (
+      <span title="Security scan pending" className="text-muted-foreground">
+        <ShieldQuestion className={iconSize} />
+      </span>
+    );
+  }
+  
+  const config = {
+    safe: { 
+      icon: ShieldCheck, 
+      color: "text-green-500", 
+      label: "Safe",
+      tooltip: `Security: Safe (${score}/100)` 
+    },
+    low: { 
+      icon: ShieldCheck, 
+      color: "text-green-600", 
+      label: "Low risk",
+      tooltip: `Security: Low risk (${score}/100)` 
+    },
+    medium: { 
+      icon: Shield, 
+      color: "text-yellow-500", 
+      label: "Medium risk",
+      tooltip: `Security: Medium risk (${score}/100) - Review recommended` 
+    },
+    high: { 
+      icon: ShieldAlert, 
+      color: "text-orange-500", 
+      label: "High risk",
+      tooltip: `Security: High risk (${score}/100) - Use with caution` 
+    },
+    critical: { 
+      icon: ShieldAlert, 
+      color: "text-red-500", 
+      label: "Critical",
+      tooltip: `Security: Critical risk (${score}/100) - Potential malware` 
+    },
+  };
+  
+  const { icon: Icon, color, tooltip } = config[risk];
+  
+  return (
+    <span title={tooltip} className={color}>
+      <Icon className={iconSize} />
+    </span>
+  );
+}
 
 // Rating display component using lobster emoji
 function RatingDisplay({ 
@@ -162,13 +232,11 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
               {/* Header */}
               <div className="flex items-start gap-2 mb-1">
                 <Link href={`/skills/${skill.slug}`} className="min-w-0">
-                  <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
-                    {skill.name || skill.slug}
-                    {skill.isVerified && (
-                      <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-                    )}
-                  </h3>
-                </Link>
+              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
+                {skill.name || skill.slug}
+                <SecurityBadge risk={skill.securityRisk} score={skill.securityScore} />
+              </h3>
+            </Link>
                 {skill.category && (
                   <Badge variant="secondary" className="text-xs shrink-0">
                     {skill.category}
@@ -193,7 +261,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
                       <Badge
                         key={tag}
                         variant="outline"
-                        className={`text-xs px-1.5 py-0 border-0 ${getTagColor(tag)}`}
+                        className={`text-sm px-2 py-0.5 border-0 ${getTagColor(tag)}`}
                       >
                         {tag}
                       </Badge>
@@ -264,9 +332,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
             <Link href={`/skills/${skill.slug}`}>
               <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
                 {skill.name || skill.slug}
-                {skill.isVerified && (
-                  <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-                )}
+                <SecurityBadge risk={skill.securityRisk} score={skill.securityScore} />
               </h3>
             </Link>
             <p className="text-xs text-muted-foreground truncate">
@@ -292,7 +358,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
               <Badge
                 key={tag}
                 variant="outline"
-                className={`text-xs px-2 py-0.5 border-0 ${getTagColor(tag)}`}
+                className={`text-sm px-2.5 py-1 border-0 ${getTagColor(tag)}`}
               >
                 {tag}
               </Badge>
