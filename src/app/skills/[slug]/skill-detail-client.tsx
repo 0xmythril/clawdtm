@@ -570,6 +570,30 @@ function SecuritySection({ skill }: { skill: SkillData }) {
           </div>
         )}
 
+        {/* How we analyze - collapsible summary */}
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+            How is this analyzed?
+          </summary>
+          <div className="mt-2 p-3 bg-muted/50 rounded-lg space-y-2 text-muted-foreground">
+            <p>
+              Skills are automatically analyzed using AI to detect potential security risks in their code and configuration.
+            </p>
+            <p className="font-medium text-foreground">We check for:</p>
+            <ul className="list-disc list-inside space-y-1 pl-2">
+              <li>Remote code execution (downloading external binaries)</li>
+              <li>Obfuscated or encoded scripts</li>
+              <li>Access to sensitive data (passwords, keys, wallets)</li>
+              <li>Dangerous shell commands</li>
+              <li>Suspicious network requests</li>
+              <li>Permission escalation attempts</li>
+            </ul>
+            <p className="text-xs opacity-75">
+              High-risk skills may also be scanned with VirusTotal for additional verification.
+            </p>
+          </div>
+        </details>
+
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs text-muted-foreground">
           <span>

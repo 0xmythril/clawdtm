@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Download, Terminal, ExternalLink, BadgeCheck, ShieldCheck, ShieldAlert, ShieldQuestion, Shield } from "lucide-react";
+import { Star, Download, Terminal, ExternalLink, BadgeCheck, ShieldCheck, ShieldAlert, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -89,12 +89,8 @@ function SecurityBadge({
   const iconSize = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   
   if (!risk) {
-    // Not scanned yet
-    return (
-      <span title="Security scan pending" className="text-muted-foreground">
-        <ShieldQuestion className={iconSize} />
-      </span>
-    );
+    // Not scanned yet - don't show anything to avoid clutter
+    return null;
   }
   
   const config = {
