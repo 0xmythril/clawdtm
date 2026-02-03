@@ -27,7 +27,7 @@ import {
   trackPageView,
 } from "@/lib/analytics";
 
-type SortOption = "downloads" | "stars" | "installs" | "rating" | "reviews";
+type SortOption = "downloads" | "stars" | "installs" | "rating" | "reviews" | "recent";
 type ViewMode = "card" | "list";
 
 // Loading fallback for Suspense

@@ -10,7 +10,6 @@ import {
   Sun,
   ChevronDown,
   ChevronRight,
-  FolderOpen,
   Cpu,
   HelpCircle,
   Search,
@@ -19,7 +18,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   Bot,
-  BadgeCheck,
   ShieldCheck,
   ShieldAlert,
   Shield,
@@ -116,7 +114,6 @@ export function Sidebar({
   const authRedirectUrl =
     typeof window !== "undefined" ? window.location.origin : "/";
   const [collapsed, setCollapsed] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [ratingsOpen, setRatingsOpen] = useState(true);
   const [securityOpen, setSecurityOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
@@ -130,10 +127,8 @@ export function Sidebar({
     setMounted(true);
     // Load collapsed state from localStorage
     const savedCollapsed = localStorage.getItem("sidebar-collapsed");
-    const savedCategoriesOpen = localStorage.getItem("sidebar-categories-open");
     const savedTagsOpen = localStorage.getItem("sidebar-tags-open");
     if (savedCollapsed !== null) setCollapsed(savedCollapsed === "true");
-    if (savedCategoriesOpen !== null) setCategoriesOpen(savedCategoriesOpen === "true");
     if (savedTagsOpen !== null) setTagsOpen(savedTagsOpen === "true");
   }, []);
 
@@ -145,22 +140,9 @@ export function Sidebar({
 
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem("sidebar-categories-open", String(categoriesOpen));
-    }
-  }, [categoriesOpen, mounted]);
-
-  useEffect(() => {
-    if (mounted) {
       localStorage.setItem("sidebar-tags-open", String(tagsOpen));
     }
   }, [tagsOpen, mounted]);
-
-  // Fixed categories - no search needed
-  const fixedCategories = [
-    { name: "all", label: "All", icon: null },
-    { name: "verified", label: "Verified", icon: "badge" }, // Uses BadgeCheck icon
-    { name: "latest", label: "Latest", icon: "🆕" },
-  ];
 
   // Filter and limit tags
   const filteredTags = useMemo(() => {
@@ -273,95 +255,16 @@ export function Sidebar({
               </span>
             </div>
 
-            {/* Categories Section */}
-            <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
-                  <span className="flex items-center gap-2">
-                    <FolderOpen className="h-3.5 w-3.5" />
-                    Categories
-                  </span>
-                  {categoriesOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 mt-1">
-                {fixedCategories.map((cat) => (
-                  <button
-                    key={cat.name}
-                    onClick={() => onCategoryChange(cat.name)}
-                    className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                      activeCategory === cat.name
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      {cat.icon === "badge" ? (
-                        <BadgeCheck className="h-4 w-4 text-blue-500" />
-                      ) : cat.icon ? (
-                        <span>{cat.icon}</span>
-                      ) : null}
-                      <span className="capitalize">{cat.label}</span>
-                    </span>
-                  </button>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Rating Filter Section */}
-            {onMinRatingChange && (
-              <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-4">
-                <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm">🦞</span>
-                      Min Rating
-                      {minRating > 0 && (
-                        <span className="text-[10px] normal-case font-normal text-muted-foreground">(filtered)</span>
-                      )}
-                    </span>
-                    {ratingsOpen ? (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-0.5 mt-1">
-                  {RATING_OPTIONS.map((option) => {
-                    const isActive = minRating === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        onClick={() => onMinRatingChange(isActive ? 0 : option.value)}
-                        className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
-                          isActive
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                        }`}
-                      >
-                        <span>{option.label}</span>
-                      </button>
-                    );
-                  })}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
             {/* Security Section */}
             {onSecurityFilterChange && (
-              <Collapsible open={securityOpen} onOpenChange={setSecurityOpen} className="mt-4">
+              <Collapsible open={securityOpen} onOpenChange={setSecurityOpen}>
                 <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
+                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
                     <span className="flex items-center gap-2">
                       <Shield className="h-3.5 w-3.5" />
                       Security
                       {securityFilter !== "any" && (
-                        <span className="text-[10px] normal-case font-normal text-muted-foreground">(filtered)</span>
+                        <span className="text-[10px] normal-case font-normal text-muted-foreground/70">(filtered)</span>
                       )}
                     </span>
                     {securityOpen ? (
@@ -372,6 +275,9 @@ export function Sidebar({
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-0.5 mt-1">
+                  <p className="text-[10px] text-muted-foreground/60 px-3 mb-1">
+                    {securityFilter !== "any" ? "Click again to deselect" : "Click to select"}
+                  </p>
                   {SECURITY_OPTIONS.map((option) => {
                     const Icon = option.icon;
                     const isActive = securityFilter === option.value;
@@ -394,10 +300,53 @@ export function Sidebar({
               </Collapsible>
             )}
 
+            {/* Rating Filter Section */}
+            {onMinRatingChange && (
+              <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-3">
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm">🦞</span>
+                      Min Rating
+                      {minRating > 0 && (
+                        <span className="text-[10px] normal-case font-normal text-muted-foreground/70">(filtered)</span>
+                      )}
+                    </span>
+                    {ratingsOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-0.5 mt-1">
+                  <p className="text-[10px] text-muted-foreground/60 px-3 mb-1">
+                    {minRating > 0 ? "Click again to deselect" : "Click to select"}
+                  </p>
+                  {RATING_OPTIONS.map((option) => {
+                    const isActive = minRating === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => onMinRatingChange(isActive ? 0 : option.value)}
+                        className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
             {/* Tags Section */}
-            <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-4">
+            <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-3">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-muted/50 rounded-md text-foreground hover:bg-muted">
+                <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
                   <span className="flex items-center gap-2">
                     <Cpu className="h-3.5 w-3.5" />
                     Tags by AI

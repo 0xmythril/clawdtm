@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Download, Terminal, ExternalLink, BadgeCheck, ShieldCheck, ShieldAlert, ShieldQuestion, Shield } from "lucide-react";
+import { Star, Download, Terminal, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -232,14 +232,11 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
               {/* Header */}
               <div className="flex items-start gap-2 mb-1">
                 <Link href={`/skills/${skill.slug}`} className="min-w-0">
-                  <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
-                    {skill.name || skill.slug}
-                    {skill.isVerified && (
-                      <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-                    )}
-                    <SecurityBadge risk={skill.securityRisk} score={skill.securityScore} />
-                  </h3>
-                </Link>
+              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
+                {skill.name || skill.slug}
+                <SecurityBadge risk={skill.securityRisk} score={skill.securityScore} />
+              </h3>
+            </Link>
                 {skill.category && (
                   <Badge variant="secondary" className="text-xs shrink-0">
                     {skill.category}
@@ -264,7 +261,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
                       <Badge
                         key={tag}
                         variant="outline"
-                        className={`text-xs px-1.5 py-0 border-0 ${getTagColor(tag)}`}
+                        className={`text-sm px-2 py-0.5 border-0 ${getTagColor(tag)}`}
                       >
                         {tag}
                       </Badge>
@@ -335,9 +332,6 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
             <Link href={`/skills/${skill.slug}`}>
               <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors flex items-center gap-1">
                 {skill.name || skill.slug}
-                {skill.isVerified && (
-                  <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
-                )}
                 <SecurityBadge risk={skill.securityRisk} score={skill.securityScore} />
               </h3>
             </Link>
@@ -364,7 +358,7 @@ export function SkillCard({ skill, onInstall, variant = "card", userRating, isFi
               <Badge
                 key={tag}
                 variant="outline"
-                className={`text-xs px-2 py-0.5 border-0 ${getTagColor(tag)}`}
+                className={`text-sm px-2.5 py-1 border-0 ${getTagColor(tag)}`}
               >
                 {tag}
               </Badge>
