@@ -20,6 +20,9 @@ import {
   PanelLeft,
   Bot,
   BadgeCheck,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
 } from "lucide-react";
 import {
   Tooltip,
@@ -74,6 +77,16 @@ const RATING_OPTIONS = [
   { value: 2, label: "2+ 🦞", icon: "🦞🦞" },
 ];
 
+// Security filter options
+const SECURITY_OPTIONS = [
+  { value: "any", label: "Any Security", icon: null, color: "" },
+  { value: "safe", label: "Safe Only", icon: ShieldCheck, color: "text-green-500" },
+  { value: "safe-low", label: "Safe + Low Risk", icon: ShieldCheck, color: "text-green-600" },
+  { value: "scanned", label: "All Scanned", icon: Shield, color: "text-blue-500" },
+] as const;
+
+export type SecurityFilter = typeof SECURITY_OPTIONS[number]["value"];
+
 type SidebarProps = {
   tags: TagData[];
   activeCategory: string;
@@ -83,6 +96,8 @@ type SidebarProps = {
   onClearTags: () => void;
   minRating?: number;
   onMinRatingChange?: (rating: number) => void;
+  securityFilter?: SecurityFilter;
+  onSecurityFilterChange?: (filter: SecurityFilter) => void;
 };
 
 export function Sidebar({
@@ -94,6 +109,8 @@ export function Sidebar({
   onClearTags,
   minRating = 0,
   onMinRatingChange,
+  securityFilter = "any",
+  onSecurityFilterChange,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
@@ -102,6 +119,7 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [ratingsOpen, setRatingsOpen] = useState(true);
+  const [securityOpen, setSecurityOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
@@ -325,6 +343,44 @@ export function Sidebar({
                       <span>{option.label}</span>
                     </button>
                   ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Security Section */}
+            {onSecurityFilterChange && (
+              <Collapsible open={securityOpen} onOpenChange={setSecurityOpen} className="mt-4">
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5" />
+                      Security
+                    </span>
+                    {securityOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-0.5 mt-1">
+                  {SECURITY_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => onSecurityFilterChange(option.value)}
+                        className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
+                          securityFilter === option.value
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        }`}
+                      >
+                        {Icon && <Icon className={`h-4 w-4 ${securityFilter === option.value ? "" : option.color}`} />}
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
                 </CollapsibleContent>
               </Collapsible>
             )}

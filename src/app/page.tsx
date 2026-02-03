@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, type SecurityFilter } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { SearchBar, type SearchBarRef, type ReviewerFilter } from "@/components/search-bar";
 import { SkillCard, type Skill } from "@/components/skill-card";
@@ -55,6 +55,7 @@ function SkillsContent() {
   const urlSort = (searchParams.get("sort") as SortOption) ?? "rating";
   const urlReviewerFilter = (searchParams.get("reviewer") as ReviewerFilter) ?? "all";
   const urlMinRating = parseInt(searchParams.get("minRating") ?? "0", 10) || 0;
+  const urlSecurityFilter = (searchParams.get("security") as SecurityFilter) ?? "any";
   const urlTags = useMemo(
     () => searchParams.get("tags")?.split(",").filter(Boolean) ?? [],
     [searchParams]
@@ -85,7 +86,7 @@ function SkillsContent() {
   }, [viewMode]);
 
   // Reset pagination when filters change
-  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}-${urlReviewerFilter}-${urlMinRating}`;
+  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}-${urlReviewerFilter}-${urlMinRating}-${urlSecurityFilter}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
 
   if (filterKey !== lastFilterKey) {
@@ -152,7 +153,7 @@ function SkillsContent() {
       installs: s.installs,
       category: s.category,
       normalizedTags: s.normalizedTags,
-      isVerified: s.isVerified ?? false, // Now from database
+      isVerified: s.isVerified ?? false,
       clawdtmUpvotes: s.clawdtmUpvotes,
       clawdtmDownvotes: s.clawdtmDownvotes,
       reviewCount: s.reviewCount,
@@ -161,6 +162,11 @@ function SkillsContent() {
       avgRating: s.avgRating,
       avgRatingHuman: s.avgRatingHuman,
       avgRatingBot: s.avgRatingBot,
+      // Security
+      securityScore: s.securityScore,
+      securityRisk: s.securityRisk,
+      securityFlags: s.securityFlags,
+      lastSecurityScanAt: s.lastSecurityScanAt,
     }));
 
     if (cursor === 0) {
@@ -176,8 +182,10 @@ function SkillsContent() {
 
   // Determine which data to show
   const skills: Skill[] = useMemo(() => {
+    let result: Skill[];
+    
     if (query.trim() && searchResult?.skills) {
-      return searchResult.skills.map((s) => ({
+      result = searchResult.skills.map((s) => ({
         _id: s._id,
         slug: s.slug,
         name: s.name ?? s.slug,
@@ -186,7 +194,7 @@ function SkillsContent() {
         downloads: s.downloads,
         stars: s.stars,
         installs: s.installs,
-        isVerified: s.isVerified ?? false, // Now from database
+        isVerified: s.isVerified ?? false,
         clawdtmUpvotes: s.clawdtmUpvotes,
         clawdtmDownvotes: s.clawdtmDownvotes,
         reviewCount: s.reviewCount,
@@ -195,10 +203,35 @@ function SkillsContent() {
         avgRating: s.avgRating,
         avgRatingHuman: s.avgRatingHuman,
         avgRatingBot: s.avgRatingBot,
+        // Security
+        securityScore: s.securityScore,
+        securityRisk: s.securityRisk,
+        securityFlags: s.securityFlags,
+        lastSecurityScanAt: s.lastSecurityScanAt,
       }));
+    } else {
+      result = allSkills;
     }
-    return allSkills;
-  }, [allSkills, searchResult, query]);
+    
+    // Apply security filter (client-side)
+    if (urlSecurityFilter !== "any") {
+      result = result.filter((s) => {
+        if (!s.securityRisk) return false; // Not scanned = hide when filtering
+        switch (urlSecurityFilter) {
+          case "safe":
+            return s.securityRisk === "safe";
+          case "safe-low":
+            return s.securityRisk === "safe" || s.securityRisk === "low";
+          case "scanned":
+            return true; // Already filtered out unscanned above
+          default:
+            return true;
+        }
+      });
+    }
+    
+    return result;
+  }, [allSkills, searchResult, query, urlSecurityFilter]);
 
   // Better loading detection - show loading only if we're actually waiting for initial data
   // If categories/tags loaded but skills haven't, we're connected - just waiting for skills
@@ -272,6 +305,13 @@ function SkillsContent() {
     [updateURL]
   );
 
+  const handleSecurityFilterChange = useCallback(
+    (newFilter: SecurityFilter) => {
+      updateURL({ security: newFilter !== "any" ? newFilter : undefined });
+    },
+    [updateURL]
+  );
+
   const handleTagToggle = useCallback(
     (tag: string) => {
       const isAdding = !urlTags.includes(tag);
@@ -320,6 +360,8 @@ function SkillsContent() {
         onClearTags={handleClearTags}
         minRating={urlMinRating}
         onMinRatingChange={handleMinRatingChange}
+        securityFilter={urlSecurityFilter}
+        onSecurityFilterChange={handleSecurityFilterChange}
       />
 
       {/* Main content */}
