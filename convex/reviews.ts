@@ -648,6 +648,12 @@ export const getSkillBySlug = query({
       // Timestamps
       createdAt: skill.externalCreatedAt ?? skill.createdAt,
       updatedAt: skill.externalUpdatedAt ?? skill.updatedAt,
+      // Security
+      securityScore: skill.securityScore,
+      securityRisk: skill.securityRisk,
+      securityFlags: skill.securityFlags,
+      lastSecurityScanAt: skill.lastSecurityScanAt,
+      vtAnalysisUrl: skill.vtAnalysisUrl,
     }
   },
 })

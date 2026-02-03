@@ -994,6 +994,11 @@ export const searchCachedSkills = query({
         botReviewCount: s.botReviewCount,
         isFeatured: s.isFeatured ?? false,
         isVerified: s.isVerified ?? false,
+        // Security
+        securityScore: s.securityScore,
+        securityRisk: s.securityRisk,
+        securityFlags: s.securityFlags,
+        lastSecurityScanAt: s.lastSecurityScanAt,
       }))
     
     return { skills: results }
@@ -1484,6 +1489,12 @@ export const listCachedSkillsWithFilters = query({
       // Curation status (admin-managed)
       isFeatured: s.isFeatured ?? false,
       isVerified: s.isVerified ?? false,
+      
+      // Security
+      securityScore: s.securityScore,
+      securityRisk: s.securityRisk,
+      securityFlags: s.securityFlags,
+      lastSecurityScanAt: s.lastSecurityScanAt,
     }))
     
     return {
