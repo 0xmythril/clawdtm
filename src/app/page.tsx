@@ -453,7 +453,12 @@ function SkillsContent() {
                 {/* Pagination */}
                 <div className="mt-8 flex flex-col items-center gap-4">
                   <p className="text-sm text-muted-foreground">
-                    Showing {skills.length} of {totalCount} skills
+                    Showing {skills.length}
+                    {urlSecurityFilter !== "any" ? (
+                      <span> matching skills (of {syncStatus?.totalCached ?? totalCount} total)</span>
+                    ) : (
+                      <span> of {totalCount} skills</span>
+                    )}
                     <span className="mx-1.5">·</span>
                     <span className="text-muted-foreground/70">
                       Skill data from{" "}
