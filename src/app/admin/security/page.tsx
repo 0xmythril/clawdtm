@@ -7,6 +7,7 @@ import { useAdminRole } from "@/components/admin/admin-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -17,6 +18,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -56,19 +58,41 @@ const RISK_CONFIG = {
   },
 };
 
+// Score range presets matching risk levels
+const SCORE_PRESETS = [
+  { label: "Critical (0-24)", min: 0, max: 24, color: "text-red-500" },
+  { label: "High (25-49)", min: 25, max: 49, color: "text-orange-500" },
+  { label: "Medium (50-69)", min: 50, max: 69, color: "text-yellow-500" },
+  { label: "Low (70-89)", min: 70, max: 89, color: "text-green-600" },
+  { label: "Safe (90-100)", min: 90, max: 100, color: "text-green-500" },
+];
+
+type FilterMode = "risk" | "score";
+
 export default function AdminSecurityPage() {
   const { clerkId } = useAdminRole();
+  const [filterMode, setFilterMode] = useState<FilterMode>("risk");
   const [selectedRisk, setSelectedRisk] = useState<RiskLevel | null>(null);
+  const [scoreRange, setScoreRange] = useState<[number, number]>([0, 50]);
   const [scanningSkillId, setScanningSkillId] = useState<Id<"cachedSkills"> | null>(null);
 
   // Get security stats
   const stats = useQuery(api.security.getSecurityStats);
 
-  // Get skills by risk level
-  const skillsQuery = useQuery(
+  // Get skills by risk level (when in risk mode)
+  const skillsByRisk = useQuery(
     api.security.getSkillsByRiskLevel,
-    selectedRisk ? { riskLevel: selectedRisk, limit: 50 } : "skip"
+    filterMode === "risk" && selectedRisk ? { riskLevel: selectedRisk, limit: 50 } : "skip"
   );
+
+  // Get skills by score range (when in score mode)
+  const skillsByScore = useQuery(
+    api.security.getSkillsByScoreRange,
+    filterMode === "score" ? { minScore: scoreRange[0], maxScore: scoreRange[1], limit: 50 } : "skip"
+  );
+
+  // Use the appropriate query result
+  const skillsQuery = filterMode === "risk" ? skillsByRisk : skillsByScore;
 
   // Mutations
   const triggerScan = useMutation(api.security.triggerManualScan);
@@ -137,9 +161,12 @@ export default function AdminSecurityPage() {
               key={level}
               className={cn(
                 "cursor-pointer transition-all hover:ring-2 hover:ring-primary/50",
-                selectedRisk === level && "ring-2 ring-primary"
+                filterMode === "risk" && selectedRisk === level && "ring-2 ring-primary"
               )}
-              onClick={() => setSelectedRisk(level)}
+              onClick={() => {
+                setFilterMode("risk");
+                setSelectedRisk(level);
+              }}
             >
               <CardContent className="pt-4">
                 <div className="text-center">
@@ -155,22 +182,97 @@ export default function AdminSecurityPage() {
         })}
       </div>
 
-      {/* Risk Level Details */}
-      {selectedRisk && (
+      {/* Score Range Slider Filter */}
+      <Card className={cn(
+        "transition-all",
+        filterMode === "score" && "ring-2 ring-primary"
+      )}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4" />
+            Filter by Score Range
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <Slider
+                value={scoreRange}
+                onValueChange={(value) => {
+                  setScoreRange(value as [number, number]);
+                  setFilterMode("score");
+                }}
+                min={0}
+                max={100}
+                step={5}
+                className="w-full"
+              />
+              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                <span>0 (Critical)</span>
+                <span>25</span>
+                <span>50</span>
+                <span>70</span>
+                <span>100 (Safe)</span>
+              </div>
+            </div>
+            <div className="text-center min-w-[100px]">
+              <p className="text-lg font-semibold">
+                {scoreRange[0]} - {scoreRange[1]}
+              </p>
+              <p className="text-xs text-muted-foreground">Score Range</p>
+            </div>
+          </div>
+          
+          {/* Quick presets */}
+          <div className="flex flex-wrap gap-2">
+            {SCORE_PRESETS.map((preset) => (
+              <Button
+                key={preset.label}
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "text-xs",
+                  filterMode === "score" && 
+                  scoreRange[0] === preset.min && 
+                  scoreRange[1] === preset.max && 
+                  "ring-2 ring-primary"
+                )}
+                onClick={() => {
+                  setScoreRange([preset.min, preset.max]);
+                  setFilterMode("score");
+                }}
+              >
+                <span className={preset.color}>●</span>
+                <span className="ml-1">{preset.label}</span>
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Skills List */}
+      {((filterMode === "risk" && selectedRisk) || filterMode === "score") && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              {(() => {
-                const config = RISK_CONFIG[selectedRisk];
-                const Icon = config.icon;
-                return (
-                  <>
-                    <Icon className={cn("h-5 w-5", config.color)} />
-                    {config.label} Risk Skills
-                    <Badge variant="secondary">{skillsQuery?.total ?? 0}</Badge>
-                  </>
-                );
-              })()}
+              {filterMode === "risk" && selectedRisk ? (
+                (() => {
+                  const config = RISK_CONFIG[selectedRisk];
+                  const Icon = config.icon;
+                  return (
+                    <>
+                      <Icon className={cn("h-5 w-5", config.color)} />
+                      {config.label} Risk Skills
+                    </>
+                  );
+                })()
+              ) : (
+                <>
+                  <SlidersHorizontal className="h-5 w-5" />
+                  Skills with Score {scoreRange[0]}-{scoreRange[1]}
+                </>
+              )}
+              <Badge variant="secondary">{skillsQuery?.total ?? 0}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -180,7 +282,10 @@ export default function AdminSecurityPage() {
               </div>
             ) : skillsQuery.skills.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No skills with {selectedRisk} risk level
+                {filterMode === "risk" 
+                  ? `No skills with ${selectedRisk} risk level`
+                  : `No skills with score between ${scoreRange[0]} and ${scoreRange[1]}`
+                }
               </p>
             ) : (
               <div className="space-y-2">
@@ -252,11 +357,12 @@ export default function AdminSecurityPage() {
                         </a>
                       </Button>
 
-                      {(selectedRisk === "high" || selectedRisk === "critical") && (
+                      {((filterMode === "risk" && (selectedRisk === "high" || selectedRisk === "critical")) ||
+                        (filterMode === "score" && (skill.securityScore ?? 100) < 50)) && (
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleHide(skill.slug, `Hidden due to ${selectedRisk} security risk`)}
+                          onClick={() => handleHide(skill.slug, `Hidden due to security score ${skill.securityScore}/100`)}
                         >
                           <EyeOff className="h-4 w-4" />
                           <span className="ml-1">Hide</span>
@@ -272,7 +378,7 @@ export default function AdminSecurityPage() {
       )}
 
       {/* Info Panel */}
-      {!selectedRisk && (
+      {filterMode === "risk" && !selectedRisk && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

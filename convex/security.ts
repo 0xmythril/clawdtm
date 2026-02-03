@@ -531,6 +531,60 @@ export const getSkillsByRiskLevel = query({
 })
 
 /**
+ * Get skills filtered by security score range (for slider filter)
+ */
+export const getSkillsByScoreRange = query({
+  args: {
+    minScore: v.number(),
+    maxScore: v.number(),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50
+    const offset = args.offset ?? 0
+    
+    // Get all scanned skills and filter by score range
+    const allSkills = await ctx.db
+      .query('cachedSkills')
+      .filter((q) => 
+        q.and(
+          q.neq(q.field('hidden'), true),
+          q.neq(q.field('securityScore'), undefined)
+        )
+      )
+      .collect()
+    
+    // Filter by score range
+    const filtered = allSkills.filter(s => 
+      s.securityScore !== undefined && 
+      s.securityScore >= args.minScore && 
+      s.securityScore <= args.maxScore
+    )
+    
+    // Sort by score ascending (worst first)
+    filtered.sort((a, b) => (a.securityScore ?? 0) - (b.securityScore ?? 0))
+    
+    const paginated = filtered.slice(offset, offset + limit)
+    
+    return {
+      skills: paginated.map(s => ({
+        _id: s._id,
+        slug: s.slug,
+        name: s.name ?? s.displayName ?? s.slug,
+        author: s.author,
+        securityScore: s.securityScore,
+        securityRisk: s.securityRisk,
+        securityFlags: s.securityFlags ?? [],
+        lastSecurityScanAt: s.lastSecurityScanAt,
+      })),
+      total: filtered.length,
+      hasMore: offset + limit < filtered.length,
+    }
+  },
+})
+
+/**
  * Get security stats for admin dashboard
  */
 export const getSecurityStats = query({

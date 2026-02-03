@@ -294,18 +294,6 @@ function SkillContent({
               <p className="text-xs text-muted-foreground">Avg Rating</p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground/60 text-center pt-2 border-t border-border/50">
-            Stats from{" "}
-            <a 
-              href="https://www.clawhub.ai" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:underline hover:text-muted-foreground transition-colors"
-            >
-              Clawhub
-            </a>
-            {" "}· Ratings from ClawdTM community
-          </p>
         </CardContent>
       </Card>
 
