@@ -141,6 +141,7 @@ type AuditAction =
   | 'hide_skill'
   | 'unhide_skill'
   | 'hide_skills_by_author'
+  | 'unhide_skills_by_author'
   | 'set_featured'
   | 'set_verified'
   | 'set_user_role'

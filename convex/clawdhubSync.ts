@@ -834,6 +834,7 @@ export const searchCachedSkills = query({
       v.literal('rating'),
       v.literal('reviews'),
       v.literal('votes'),
+      v.literal('recent'),
     )),
     minRating: v.optional(v.number()),
     reviewerFilter: v.optional(v.union(
@@ -955,6 +956,13 @@ export const searchCachedSkills = query({
               : (b.skill.reviewCount ?? 0)
           if (countB !== countA) return countB - countA
           return b.skill.downloads - a.skill.downloads
+        })
+        break
+      case 'recent':
+        sorted = filtered.sort((a, b) => {
+          const updatedA = a.skill.externalUpdatedAt ?? a.skill.lastSyncedAt ?? 0
+          const updatedB = b.skill.externalUpdatedAt ?? b.skill.lastSyncedAt ?? 0
+          return updatedB - updatedA
         })
         break
       case 'relevance':
