@@ -86,7 +86,8 @@ function SkillsContent() {
   }, [viewMode]);
 
   // Reset pagination when filters change
-  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}-${urlReviewerFilter}-${urlMinRating}-${urlSecurityFilter}`;
+  // Note: urlSecurityFilter excluded - it's a client-side filter that doesn't require data refetch
+  const filterKey = `${urlCategory}-${urlSort}-${urlTags.join(",")}-${urlReviewerFilter}-${urlMinRating}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
 
   if (filterKey !== lastFilterKey) {
