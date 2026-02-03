@@ -251,7 +251,7 @@ function SkillContent({
       </div>
 
       {/* Stats */}
-      <Card>
+      <Card className="bg-gray-50 dark:bg-card">
         <CardContent className="py-4">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="text-center">
@@ -301,7 +301,7 @@ function SkillContent({
       <SecuritySection skill={skill} />
 
       {/* Install Command */}
-      <Card className="gap-3 py-4">
+      <Card className="gap-3 py-4 bg-gray-50 dark:bg-card">
         <CardHeader className="pb-0">
           <CardTitle className="text-lg flex items-center gap-2">
             <Terminal className="h-5 w-5" />
@@ -352,7 +352,7 @@ function SkillContent({
       </Card>
 
       {/* Reviews Section */}
-      <Card>
+      <Card className="bg-gray-50 dark:bg-card">
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -375,15 +375,15 @@ function SkillContent({
               onValueChange={(v) => setReviewFilter(v as typeof reviewFilter)}
               className="w-auto"
             >
-              <TabsList className="h-8 bg-muted/60">
-                <TabsTrigger value="combined" className="text-xs px-2 h-7 data-[state=active]:bg-muted data-[state=active]:shadow-none">
+              <TabsList className="h-8">
+                <TabsTrigger value="combined" className="text-xs px-2 h-7 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input/30">
                   All
                 </TabsTrigger>
-                <TabsTrigger value="human" className="text-xs px-2 h-7 data-[state=active]:bg-muted data-[state=active]:shadow-none">
+                <TabsTrigger value="human" className="text-xs px-2 h-7 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input/30">
                   <User className="h-3 w-3 mr-1" />
                   Human
                 </TabsTrigger>
-                <TabsTrigger value="bot" className="text-xs px-2 h-7 data-[state=active]:bg-muted data-[state=active]:shadow-none">
+                <TabsTrigger value="bot" className="text-xs px-2 h-7 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-input/30">
                   <Bot className="h-3 w-3 mr-1" />
                   Bot
                 </TabsTrigger>
@@ -489,7 +489,7 @@ function SecuritySection({ skill }: { skill: SkillData }) {
   // Not scanned yet
   if (!securityRisk) {
     return (
-      <Card className="border-dashed">
+      <Card className="border-dashed bg-gray-50 dark:bg-card">
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <ShieldQuestion className="h-5 w-5 text-muted-foreground" />

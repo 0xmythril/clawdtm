@@ -28,10 +28,10 @@ crons.interval(
   { limit: 50 },
 )
 
-// Security scan unscanned skills every 15 minutes (batch of 10)
+// Security scan unscanned skills every 5 minutes (batch of 50 for faster initial scan)
 crons.interval(
   'security-scan-batch',
-  { minutes: 15 },
+  { minutes: 5 },
   internal.security.scanBatch,
 )
 

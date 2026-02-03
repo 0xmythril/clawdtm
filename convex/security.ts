@@ -383,8 +383,8 @@ export const analyzeSkill = internalAction({
 export const scanBatch = internalAction({
   args: {},
   handler: async (ctx): Promise<{ scanned: number; total: number }> => {
-    // Get unscanned skills
-    const skills = await ctx.runMutation(internal.security.getUnscannedSkills, { limit: 10 })
+    // Get unscanned skills (larger batch for faster initial scanning)
+    const skills = await ctx.runMutation(internal.security.getUnscannedSkills, { limit: 50 })
     
     if (skills.length === 0) {
       console.log('[Security] No unscanned skills found')
