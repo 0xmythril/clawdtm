@@ -1023,6 +1023,57 @@ export const adminHideSkillsByAuthor = mutation({
 })
 
 /**
+ * Unhide all skills by a specific author (moderator+)
+ * Useful for unblocking authors who were previously blocked
+ */
+export const adminUnhideSkillsByAuthor = mutation({
+  args: {
+    clerkId: v.string(),
+    author: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; unhiddenCount: number; author: string }> => {
+    await requireModerator(ctx, { clerkId: args.clerkId })
+
+    // Find all hidden skills by this author
+    const skills = await ctx.db
+      .query('cachedSkills')
+      .filter((q) => q.eq(q.field('author'), args.author))
+      .collect()
+
+    if (skills.length === 0) {
+      return { success: true, unhiddenCount: 0, author: args.author }
+    }
+
+    let unhiddenCount = 0
+
+    for (const skill of skills) {
+      if (skill.hidden) {
+        await ctx.db.patch(skill._id, {
+          hidden: false,
+          hiddenReason: undefined,
+          hiddenAt: undefined,
+          hiddenBy: undefined,
+        })
+        unhiddenCount++
+      }
+    }
+
+    // Audit log
+    const actor = await getHumanActorInfo(ctx, args.clerkId)
+    await logAuditEvent(ctx, {
+      actor,
+      action: 'unhide_skills_by_author',
+      targetType: 'author',
+      targetId: args.author,
+      targetName: args.author,
+      details: { count: unhiddenCount },
+    })
+
+    return { success: true, unhiddenCount, author: args.author }
+  },
+})
+
+/**
  * Get all unique authors with skill counts (for admin panel)
  */
 export const getAuthorsWithCounts = query({

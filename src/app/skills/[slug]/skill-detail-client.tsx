@@ -375,15 +375,15 @@ function SkillContent({
               onValueChange={(v) => setReviewFilter(v as typeof reviewFilter)}
               className="w-auto"
             >
-              <TabsList className="h-8">
-                <TabsTrigger value="combined" className="text-xs px-2 h-7">
+              <TabsList className="h-8 bg-muted/60">
+                <TabsTrigger value="combined" className="text-xs px-2 h-7 data-[state=active]:bg-muted data-[state=active]:shadow-none">
                   All
                 </TabsTrigger>
-                <TabsTrigger value="human" className="text-xs px-2 h-7">
+                <TabsTrigger value="human" className="text-xs px-2 h-7 data-[state=active]:bg-muted data-[state=active]:shadow-none">
                   <User className="h-3 w-3 mr-1" />
                   Human
                 </TabsTrigger>
-                <TabsTrigger value="bot" className="text-xs px-2 h-7">
+                <TabsTrigger value="bot" className="text-xs px-2 h-7 data-[state=active]:bg-muted data-[state=active]:shadow-none">
                   <Bot className="h-3 w-3 mr-1" />
                   Bot
                 </TabsTrigger>

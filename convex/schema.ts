@@ -682,6 +682,7 @@ const adminAuditLogs = defineTable({
     v.literal('hide_skill'),
     v.literal('unhide_skill'),
     v.literal('hide_skills_by_author'),
+    v.literal('unhide_skills_by_author'),
     v.literal('set_featured'),
     v.literal('set_verified'),
     v.literal('set_user_role'),
