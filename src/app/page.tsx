@@ -457,7 +457,7 @@ function SkillsContent() {
                     {urlSecurityFilter !== "any" ? (
                       <span> matching skills (of {syncStatus?.totalCached ?? totalCount} total)</span>
                     ) : (
-                      <span> of {totalCount} skills</span>
+                      <span> of {syncStatus?.totalCached ?? totalCount} skills</span>
                     )}
                     <span className="mx-1.5">·</span>
                     <span className="text-muted-foreground/70">
