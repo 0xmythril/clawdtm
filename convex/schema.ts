@@ -441,6 +441,19 @@ const cachedSkills = defineTable({
   searchText: v.optional(v.string()),
   // Normalized tags for efficient filtering
   normalizedTags: v.optional(v.array(v.string())),
+  
+  // Security scanning results
+  securityScore: v.optional(v.number()),        // 0-100 (100 = safe)
+  securityRisk: v.optional(v.union(
+    v.literal('safe'),
+    v.literal('low'),
+    v.literal('medium'),
+    v.literal('high'),
+    v.literal('critical')
+  )),
+  securityFlags: v.optional(v.array(v.string())), // ["remote_execution", "obfuscated_code", etc.]
+  lastSecurityScanAt: v.optional(v.number()),
+  vtAnalysisUrl: v.optional(v.string()),         // Link to VirusTotal report (if scanned)
 })
   .index('by_external_id', ['externalId'])
   .index('by_slug', ['slug'])
@@ -467,6 +480,9 @@ const cachedSkills = defineTable({
     searchField: 'searchText',
     filterFields: ['category', 'hidden'],
   })
+  // Security scanning indexes
+  .index('by_security_risk', ['securityRisk'])
+  .index('by_last_security_scan', ['lastSecurityScanAt'])
 
 // Pre-computed sorted skill lists for fast queries
 const skillSortCache = defineTable({
@@ -697,6 +713,44 @@ const adminAuditLogs = defineTable({
   .index('by_target', ['targetType', 'targetId', 'createdAt'])
   .index('by_created', ['createdAt'])
 
+// Security scan logs (AI and VirusTotal analysis results)
+const securityScanLogs = defineTable({
+  skillId: v.id('cachedSkills'),
+  skillSlug: v.string(),
+  scanType: v.union(v.literal('ai'), v.literal('virustotal')),
+  
+  // Scan results
+  securityScore: v.number(),                  // 0-100 (100 = safe)
+  riskLevel: v.union(
+    v.literal('safe'),
+    v.literal('low'),
+    v.literal('medium'),
+    v.literal('high'),
+    v.literal('critical')
+  ),
+  flags: v.array(v.string()),                 // ["remote_execution", "obfuscated_code", etc.]
+  summary: v.string(),                        // Brief human-readable summary
+  reasoning: v.string(),                      // Detailed AI reasoning
+  
+  // VirusTotal results (if scanType === 'virustotal')
+  vtPositives: v.optional(v.number()),        // Number of engines flagging as malicious
+  vtTotal: v.optional(v.number()),            // Total number of engines
+  vtPermalink: v.optional(v.string()),        // Link to VT report
+  vtScannedUrls: v.optional(v.array(v.string())), // URLs that were scanned
+  
+  // Metadata
+  model: v.optional(v.string()),              // AI model used (e.g., "google/gemini-2.0-flash-001")
+  durationMs: v.optional(v.number()),         // How long the scan took
+  status: v.union(v.literal('success'), v.literal('error')),
+  errorMessage: v.optional(v.string()),
+  createdAt: v.number(),
+})
+  .index('by_skill', ['skillId', 'createdAt'])
+  .index('by_slug', ['skillSlug', 'createdAt'])
+  .index('by_scan_type', ['scanType', 'createdAt'])
+  .index('by_risk_level', ['riskLevel', 'createdAt'])
+  .index('by_created', ['createdAt'])
+
 export default defineSchema({
   ...authTables,
   users,
@@ -732,4 +786,5 @@ export default defineSchema({
   skillReviews,
   categorizationLogs,
   adminAuditLogs,
+  securityScanLogs,
 })
