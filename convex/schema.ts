@@ -674,7 +674,7 @@ const adminAuditLogs = defineTable({
   // Actor identity - one of these will be set
   actorClerkId: v.optional(v.string()),     // Human moderator/admin
   actorBotAgentId: v.optional(v.id('botAgents')), // Bot moderator/admin
-  actorType: v.union(v.literal('human'), v.literal('bot')),
+  actorType: v.union(v.literal('human'), v.literal('bot'), v.literal('system')),
   actorName: v.optional(v.string()),        // Cached name for display
   
   // Action performed
@@ -683,6 +683,7 @@ const adminAuditLogs = defineTable({
     v.literal('unhide_skill'),
     v.literal('hide_skills_by_author'),
     v.literal('unhide_skills_by_author'),
+    v.literal('auto_block_author'),
     v.literal('set_featured'),
     v.literal('set_verified'),
     v.literal('set_user_role'),
@@ -707,6 +708,8 @@ const adminAuditLogs = defineTable({
     oldValue: v.optional(v.any()),          // Previous state
     newValue: v.optional(v.any()),          // New state
     count: v.optional(v.number()),          // For bulk operations
+    triggerSkill: v.optional(v.string()),   // For auto-block: skill that triggered the action
+    riskLevel: v.optional(v.string()),      // For auto-block: risk level that triggered the action
   })),
   
   createdAt: v.number(),

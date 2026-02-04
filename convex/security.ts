@@ -199,6 +199,56 @@ export const recordScanResult = internalMutation({
         lastSecurityScanAt: Date.now(),
         vtAnalysisUrl: args.vtPermalink,
       })
+      
+      // Auto-block author if high or critical risk detected
+      if (args.riskLevel === 'high' || args.riskLevel === 'critical') {
+        const skill = await ctx.db.get(args.skillId)
+        if (skill?.author && skill.author !== 'unknown' && skill.author !== 'community') {
+          const author = skill.author
+          
+          // Get all skills by this author
+          const authorSkills = await ctx.db
+            .query('cachedSkills')
+            .withIndex('by_author', (q) => q.eq('author', author))
+            .collect()
+          
+          // Hide all skills that aren't already hidden
+          let hiddenCount = 0
+          const now = Date.now()
+          for (const s of authorSkills) {
+            if (!s.hidden) {
+              await ctx.db.patch(s._id, {
+                hidden: true,
+                hiddenReason: `Auto-blocked: Author has skill "${args.skillSlug}" flagged as ${args.riskLevel} risk`,
+                hiddenAt: now,
+                hiddenBy: 'system:security-scanner',
+              })
+              hiddenCount++
+            }
+          }
+          
+          // Log to audit if any skills were hidden
+          if (hiddenCount > 0) {
+            await ctx.db.insert('adminAuditLogs', {
+              actorType: 'system',
+              actorName: 'Security Scanner',
+              action: 'auto_block_author',
+              targetType: 'author',
+              targetId: author,
+              targetName: author,
+              details: {
+                triggerSkill: args.skillSlug,
+                riskLevel: args.riskLevel,
+                count: hiddenCount,
+                reason: `Auto-blocked due to ${args.riskLevel} risk skill: ${args.skillSlug}`,
+              },
+              createdAt: now,
+            })
+            
+            console.log(`[Security] Auto-blocked author "${author}": ${hiddenCount} skills hidden (triggered by ${args.skillSlug})`)
+          }
+        }
+      }
     }
   },
 })
