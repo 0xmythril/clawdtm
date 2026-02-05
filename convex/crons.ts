@@ -35,11 +35,12 @@ crons.interval(
   internal.security.scanBatch,
 )
 
-// Rescan skills with old security scans every Sunday at 3am UTC
-crons.weekly(
-  'security-rescan-weekly',
-  { dayOfWeek: 'sunday', hourUTC: 3, minuteUTC: 0 },
-  internal.security.rescanOldSkills,
+// Check GitHub commits for skill updates every 15 minutes
+// Auto-rescans skills that have been modified
+crons.interval(
+  'github-commit-check',
+  { minutes: 15 },
+  internal.security.checkGitHubCommits,
 )
 
 export default crons

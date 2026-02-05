@@ -217,16 +217,16 @@ function SkillsContent() {
     // Apply security filter (client-side, score-based)
     if (urlSecurityFilter !== "any") {
       result = result.filter((s) => {
-        if (s.securityScore === undefined) return false; // Not scanned = hide when filtering
         switch (urlSecurityFilter) {
           case "safe":
-            return s.securityScore >= 90;
+            return s.securityScore !== undefined && s.securityScore >= 90;
           case "low":
-            return s.securityScore >= 70;
+            return s.securityScore !== undefined && s.securityScore >= 70;
           case "medium":
-            return s.securityScore >= 50;
-          case "scanned":
-            return true; // Already filtered out unscanned above
+            return s.securityScore !== undefined && s.securityScore >= 50;
+          case "pending":
+            // Show skills that haven't been scanned yet (no lastSecurityScanAt or no score)
+            return s.lastSecurityScanAt === undefined || s.securityScore === undefined;
           default:
             return true;
         }
@@ -385,7 +385,12 @@ function SkillsContent() {
               <span>your <span className="line-through opacity-60">Clawdbot</span> OpenClaw</span>
             </h1>
             <p className="text-muted-foreground text-sm">
-              {syncStatus?.totalCached ?? 0} community skills ready to install
+              {syncStatus?.totalCached ?? 0} skills ready to install
+              {(syncStatus?.totalHidden ?? 0) > 0 && (
+                <span className="text-orange-500 dark:text-orange-400">
+                  {" "}(& protecting you from {syncStatus?.totalHidden} blocked skills)
+                </span>
+              )}
               {syncStatus?.status === "running" && (
                 <span className="ml-2 inline-flex items-center gap-1">
                   <RefreshCw className="h-3 w-3 animate-spin" />
@@ -457,7 +462,7 @@ function SkillsContent() {
                     {urlSecurityFilter !== "any" ? (
                       <span> matching skills (of {syncStatus?.totalCached ?? totalCount} total)</span>
                     ) : (
-                      <span> of {totalCount} skills</span>
+                      <span> of {syncStatus?.totalCached ?? totalCount} skills</span>
                     )}
                     <span className="mx-1.5">·</span>
                     <span className="text-muted-foreground/70">

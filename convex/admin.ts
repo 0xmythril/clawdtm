@@ -142,6 +142,7 @@ type AuditAction =
   | 'unhide_skill'
   | 'hide_skills_by_author'
   | 'unhide_skills_by_author'
+  | 'auto_block_author'
   | 'set_featured'
   | 'set_verified'
   | 'set_user_role'
@@ -152,7 +153,10 @@ type AuditAction =
 type AuditTargetType = 'skill' | 'user' | 'bot' | 'author'
 
 interface AuditLogParams {
-  actor: { type: 'human'; clerkId: string; name?: string } | { type: 'bot'; agentId: Id<'botAgents'>; name?: string }
+  actor: 
+    | { type: 'human'; clerkId: string; name?: string } 
+    | { type: 'bot'; agentId: Id<'botAgents'>; name?: string }
+    | { type: 'system'; name?: string }
   action: AuditAction
   targetType: AuditTargetType
   targetId: string
@@ -163,6 +167,9 @@ interface AuditLogParams {
     newValue?: unknown
     // For bulk operations
     count?: number
+    // For auto-block
+    triggerSkill?: string
+    riskLevel?: string
   }
 }
 
@@ -171,7 +178,7 @@ async function logAuditEvent(ctx: MutationCtx, params: AuditLogParams) {
     actorType: params.actor.type,
     actorClerkId: params.actor.type === 'human' ? params.actor.clerkId : undefined,
     actorBotAgentId: params.actor.type === 'bot' ? params.actor.agentId : undefined,
-    actorName: params.actor.name,
+    actorName: params.actor.type === 'system' ? 'Security Scanner' : params.actor.name,
     action: params.action,
     targetType: params.targetType,
     targetId: params.targetId,
@@ -180,6 +187,10 @@ async function logAuditEvent(ctx: MutationCtx, params: AuditLogParams) {
     createdAt: Date.now(),
   })
 }
+
+// Export for use in security.ts
+export { logAuditEvent }
+export type { AuditLogParams }
 
 // Helper to get actor info for logging
 async function getHumanActorInfo(ctx: MutationCtx, clerkId: string): Promise<{ type: 'human'; clerkId: string; name?: string }> {
@@ -498,6 +509,10 @@ export const listSkillsForAdmin = query({
         verifiedAt: s.verifiedAt,
         reviewCount: s.reviewCount ?? 0,
         avgRating: s.avgRating,
+        // Security info
+        securityScore: s.securityScore,
+        securityRisk: s.securityRisk,
+        lastSecurityScanAt: s.lastSecurityScanAt,
       })),
       total,
       hasMore: offset + limit < total,

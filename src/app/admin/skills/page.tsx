@@ -14,6 +14,12 @@ import {
   CheckCircle,
   Loader2,
   ExternalLink,
+  RefreshCw,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -58,8 +64,11 @@ export default function AdminSkillsPage() {
   const setVerified = useMutation(api.admin.setSkillVerified);
   const hideSkill = useMutation(api.admin.adminHideSkill);
   const unhideSkill = useMutation(api.admin.adminUnhideSkill);
+  const triggerScan = useMutation(api.security.triggerManualScan);
 
   const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
+  // Track skills that are queued for scanning (shows "Scanning..." even after mutation completes)
+  const [scanningSkills, setScanningSkills] = useState<Set<string>>(new Set());
 
   const handleToggleFeatured = async (slug: string, currentValue: boolean) => {
     if (!clerkId) return;
@@ -110,12 +119,100 @@ export default function AdminSkillsPage() {
     setHideDialogOpen(true);
   };
 
+  const handleRescan = async (skillId: string, skillName: string) => {
+    if (!clerkId) return;
+    setLoadingActions((prev) => ({ ...prev, [`scan-${skillId}`]: true }));
+    try {
+      const result = await triggerScan({ skillId: skillId as Parameters<typeof triggerScan>[0]["skillId"], clerkId });
+      // Add to scanning set to show "Scanning..." state
+      setScanningSkills((prev) => new Set(prev).add(skillId));
+      alert(`✓ Scan queued for "${skillName}"\n\n${result.message}\n\nThe scan runs in the background. Refresh to see results.`);
+    } catch (error) {
+      console.error("Rescan failed:", error);
+      alert(`✗ Failed to queue scan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [`scan-${skillId}`]: false }));
+    }
+  };
+
   const filters: { value: Filter; label: string }[] = [
     { value: "all", label: "All Skills" },
     { value: "hidden", label: "Hidden" },
     { value: "featured", label: "Featured" },
     { value: "verified", label: "Verified" },
   ];
+
+  // Helper to render security badge
+  const renderSecurityBadge = (skill: {
+    _id: string;
+    securityRisk?: string;
+    securityScore?: number;
+    lastSecurityScanAt?: number;
+  }) => {
+    const isScanning = scanningSkills.has(skill._id);
+    
+    if (isScanning) {
+      return (
+        <div className="flex items-center gap-1 text-blue-500" title="Scanning...">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-xs">Scanning</span>
+        </div>
+      );
+    }
+
+    if (!skill.securityRisk) {
+      return (
+        <div className="flex items-center gap-1 text-muted-foreground" title="Not scanned">
+          <ShieldQuestion className="h-4 w-4" />
+          <span className="text-xs">Pending</span>
+        </div>
+      );
+    }
+
+    const riskColors: Record<string, string> = {
+      safe: "text-green-600",
+      low: "text-emerald-500",
+      medium: "text-yellow-600",
+      high: "text-orange-500",
+      critical: "text-red-600",
+    };
+
+    const riskIcons: Record<string, typeof ShieldCheck> = {
+      safe: ShieldCheck,
+      low: ShieldCheck,
+      medium: ShieldAlert,
+      high: ShieldAlert,
+      critical: ShieldAlert,
+    };
+
+    const Icon = riskIcons[skill.securityRisk] || ShieldQuestion;
+    const colorClass = riskColors[skill.securityRisk] || "text-muted-foreground";
+    const timeAgo = skill.lastSecurityScanAt
+      ? formatTimeAgo(skill.lastSecurityScanAt)
+      : "";
+
+    return (
+      <div
+        className={`flex items-center gap-1 ${colorClass}`}
+        title={`${skill.securityRisk.toUpperCase()} risk (Score: ${skill.securityScore ?? "N/A"})${timeAgo ? ` - Scanned ${timeAgo}` : ""}`}
+      >
+        <Icon className="h-4 w-4" />
+        <span className="text-xs capitalize">{skill.securityRisk}</span>
+      </div>
+    );
+  };
+
+  // Format time ago helper
+  const formatTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
 
   return (
     <div className="space-y-6">
@@ -168,6 +265,7 @@ export default function AdminSkillsPage() {
               <th className="text-left px-4 py-3 font-medium">Author</th>
               <th className="text-center px-4 py-3 font-medium">Downloads</th>
               <th className="text-center px-4 py-3 font-medium">Rating</th>
+              <th className="text-center px-4 py-3 font-medium">Security</th>
               <th className="text-center px-4 py-3 font-medium">Status</th>
               <th className="text-right px-4 py-3 font-medium">Actions</th>
             </tr>
@@ -178,10 +276,11 @@ export default function AdminSkillsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <a
-                      href={`/skills/${skill.slug}`}
+                      href={`/skills/${skill.slug}?admin=true`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium hover:underline flex items-center gap-1"
+                      title="View skill (admin mode)"
                     >
                       {skill.name}
                       <ExternalLink className="h-3 w-3 text-muted-foreground" />
@@ -204,6 +303,9 @@ export default function AdminSkillsPage() {
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {renderSecurityBadge(skill)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-1">
@@ -294,6 +396,21 @@ export default function AdminSkillsPage() {
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     )}
+
+                    {/* Security rescan */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRescan(skill._id, skill.name)}
+                      disabled={loadingActions[`scan-${skill._id}`] || scanningSkills.has(skill._id)}
+                      title={scanningSkills.has(skill._id) ? "Scan in progress..." : "Rescan security"}
+                    >
+                      {loadingActions[`scan-${skill._id}`] ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                   </div>
                 </td>
               </tr>

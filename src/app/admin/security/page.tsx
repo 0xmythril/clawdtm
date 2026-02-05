@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useAdminRole } from "@/components/admin/admin-guard";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,94 @@ import {
   Eye,
   EyeOff,
   SlidersHorizontal,
+  RotateCcw,
+  CheckCircle,
+  Users,
+  Github,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../../../convex/_generated/dataModel";
+
+// Separate component for Author Sync to keep state isolated
+function AuthorSyncCard({ stats }: { stats: { total?: number; unscanned?: number } | undefined }) {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    gitHubSkillsFound: number;
+    skillsNeedingEnrichment: number;
+    matched: number;
+    unmatched: number;
+    updated: number;
+    notFoundInDb: number;
+  } | null>(null);
+  
+  const triggerAuthorSync = useAction(api.clawdhubSync.triggerGitHubAuthorSync);
+  
+  const handleAuthorSync = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await triggerAuthorSync();
+      setSyncResult(result);
+    } catch (error) {
+      console.error("Author sync failed:", error);
+      alert(error instanceof Error ? error.message : "Author sync failed");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Github className="h-4 w-4" />
+          GitHub Author Sync
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Sync author data from the GitHub openclaw/skills archive. 
+          Required before security scanning can fetch skill content.
+        </p>
+        
+        {syncResult && (
+          <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
+            <div className="flex items-center gap-2 text-green-600 mb-2">
+              <CheckCircle className="h-4 w-4" />
+              <span className="font-medium">Sync completed</span>
+            </div>
+            <p>GitHub skills found: {syncResult.gitHubSkillsFound}</p>
+            <p>Skills needing enrichment: {syncResult.skillsNeedingEnrichment}</p>
+            <p>Matched: {syncResult.matched}</p>
+            <p>Updated: {syncResult.updated}</p>
+            {syncResult.unmatched > 0 && (
+              <p className="text-yellow-600">Not in GitHub: {syncResult.unmatched}</p>
+            )}
+          </div>
+        )}
+        
+        <Button 
+          onClick={handleAuthorSync}
+          disabled={isSyncing}
+          variant="outline"
+          className="w-full"
+        >
+          {isSyncing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Syncing authors...
+            </>
+          ) : (
+            <>
+              <Users className="h-4 w-4 mr-2" />
+              Sync Authors from GitHub
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 type RiskLevel = "safe" | "low" | "medium" | "high" | "critical";
 
@@ -70,14 +155,18 @@ const SCORE_PRESETS = [
 type FilterMode = "risk" | "score";
 
 export default function AdminSecurityPage() {
-  const { clerkId } = useAdminRole();
+  const { clerkId, isAdmin } = useAdminRole();
   const [filterMode, setFilterMode] = useState<FilterMode>("risk");
   const [selectedRisk, setSelectedRisk] = useState<RiskLevel | null>(null);
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 50]);
   const [scanningSkillId, setScanningSkillId] = useState<Id<"cachedSkills"> | null>(null);
+  const [isTriggering, setIsTriggering] = useState(false);
 
   // Get security stats
   const stats = useQuery(api.security.getSecurityStats);
+  
+  // Get rescan status
+  const rescanStatus = useQuery(api.security.getRescanStatus);
 
   // Get skills by risk level (when in risk mode)
   const skillsByRisk = useQuery(
@@ -96,7 +185,21 @@ export default function AdminSecurityPage() {
 
   // Mutations
   const triggerScan = useMutation(api.security.triggerManualScan);
+  const triggerFullRescan = useMutation(api.security.triggerFullRescan);
   const hideSkill = useMutation(api.admin.adminHideSkill);
+
+  const handleTriggerFullRescan = async () => {
+    if (!clerkId || !isAdmin) return;
+    setIsTriggering(true);
+    try {
+      await triggerFullRescan({ clerkId });
+    } catch (error) {
+      console.error("Trigger rescan failed:", error);
+      alert(error instanceof Error ? error.message : "Failed to trigger rescan");
+    } finally {
+      setIsTriggering(false);
+    }
+  };
 
   const handleScan = async (skillId: Id<"cachedSkills">) => {
     if (!clerkId) return;
@@ -181,6 +284,104 @@ export default function AdminSecurityPage() {
           );
         })}
       </div>
+
+      {/* GitHub Author Sync & Full Rescan Control */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <AuthorSyncCard stats={stats} />
+          <Card className={cn(
+            rescanStatus?.status === "running" && "ring-2 ring-blue-500"
+          )}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Full Security Rescan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {rescanStatus?.status === "running" ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  <span className="font-medium">Rescan in progress...</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>{rescanStatus.scannedCount} / {rescanStatus.totalSkills} skills</span>
+                    <span>{rescanStatus.progress}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 transition-all duration-500"
+                      style={{ width: `${rescanStatus.progress}%` }}
+                    />
+                  </div>
+                </div>
+                {rescanStatus.startedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Started: {new Date(rescanStatus.startedAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            ) : rescanStatus?.status === "completed" ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-medium">Last rescan completed</span>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>Scanned: {rescanStatus.scannedCount} / {rescanStatus.totalSkills} skills</p>
+                  {rescanStatus.completedAt && (
+                    <p>Completed: {new Date(rescanStatus.completedAt).toLocaleString()}</p>
+                  )}
+                </div>
+                <Button 
+                  onClick={handleTriggerFullRescan}
+                  disabled={isTriggering}
+                  className="w-full"
+                >
+                  {isTriggering ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Start New Full Rescan
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Trigger a full rescan of all {stats?.total ?? 0} skills with the new security scanner. 
+                  This will reset all previous scan results and re-analyze every skill.
+                </p>
+                <Button 
+                  onClick={handleTriggerFullRescan}
+                  disabled={isTriggering}
+                  className="w-full"
+                >
+                  {isTriggering ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Start Full Rescan
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </div>
+      )}
 
       {/* Score Range Slider Filter */}
       <Card className={cn(
@@ -349,9 +550,10 @@ export default function AdminSecurityPage() {
                         asChild
                       >
                         <a
-                          href={`/skills/${skill.slug}`}
+                          href={`/skills/${skill.slug}?admin=true`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          title="View skill (admin mode - includes hidden)"
                         >
                           <Eye className="h-4 w-4" />
                         </a>

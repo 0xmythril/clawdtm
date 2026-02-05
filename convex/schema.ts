@@ -674,7 +674,7 @@ const adminAuditLogs = defineTable({
   // Actor identity - one of these will be set
   actorClerkId: v.optional(v.string()),     // Human moderator/admin
   actorBotAgentId: v.optional(v.id('botAgents')), // Bot moderator/admin
-  actorType: v.union(v.literal('human'), v.literal('bot')),
+  actorType: v.union(v.literal('human'), v.literal('bot'), v.literal('system')),
   actorName: v.optional(v.string()),        // Cached name for display
   
   // Action performed
@@ -683,6 +683,7 @@ const adminAuditLogs = defineTable({
     v.literal('unhide_skill'),
     v.literal('hide_skills_by_author'),
     v.literal('unhide_skills_by_author'),
+    v.literal('auto_block_author'),
     v.literal('set_featured'),
     v.literal('set_verified'),
     v.literal('set_user_role'),
@@ -707,6 +708,8 @@ const adminAuditLogs = defineTable({
     oldValue: v.optional(v.any()),          // Previous state
     newValue: v.optional(v.any()),          // New state
     count: v.optional(v.number()),          // For bulk operations
+    triggerSkill: v.optional(v.string()),   // For auto-block: skill that triggered the action
+    riskLevel: v.optional(v.string()),      // For auto-block: risk level that triggered the action
   })),
   
   createdAt: v.number(),
@@ -716,6 +719,27 @@ const adminAuditLogs = defineTable({
   .index('by_action', ['action', 'createdAt'])
   .index('by_target', ['targetType', 'targetId', 'createdAt'])
   .index('by_created', ['createdAt'])
+
+// Security rescan state (for tracking manual full rescans)
+const securityRescanState = defineTable({
+  key: v.literal('full_rescan'),
+  status: v.union(v.literal('idle'), v.literal('running'), v.literal('completed')),
+  startedAt: v.optional(v.number()),
+  completedAt: v.optional(v.number()),
+  totalSkills: v.optional(v.number()),
+  scannedCount: v.optional(v.number()),
+  cursor: v.optional(v.number()), // For resuming if interrupted (last skill index)
+  triggeredBy: v.optional(v.string()), // clerkId of admin who triggered
+  lastError: v.optional(v.string()),
+}).index('by_key', ['key'])
+
+// GitHub commit sync state (for tracking last processed commit)
+const gitHubCommitSyncState = defineTable({
+  key: v.literal('commits'),
+  lastCommitSha: v.optional(v.string()),
+  lastCheckedAt: v.optional(v.number()),
+  lastSkillsRescanned: v.optional(v.array(v.string())), // List of slugs rescanned in last check
+}).index('by_key', ['key'])
 
 // Security scan logs (AI and VirusTotal analysis results)
 const securityScanLogs = defineTable({
@@ -735,6 +759,14 @@ const securityScanLogs = defineTable({
   flags: v.array(v.string()),                 // ["remote_execution", "obfuscated_code", etc.]
   summary: v.string(),                        // Brief human-readable summary
   reasoning: v.string(),                      // Detailed AI reasoning
+  
+  // Structured security checks (new format)
+  securityChecks: v.optional(v.any()),        // { check_name: { status, details } }
+  dataSources: v.optional(v.object({          // What data was available for analysis
+    skillContent: v.boolean(),
+    userComments: v.boolean(),
+    virusTotal: v.boolean(),
+  })),
   
   // VirusTotal results (if scanType === 'virustotal')
   vtPositives: v.optional(v.number()),        // Number of engines flagging as malicious
@@ -790,5 +822,7 @@ export default defineSchema({
   skillReviews,
   categorizationLogs,
   adminAuditLogs,
+  securityRescanState,
   securityScanLogs,
+  gitHubCommitSyncState,
 })

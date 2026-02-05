@@ -1938,10 +1938,10 @@ export const syncAuthorsFromGitHub = internalAction({
     const slugToOwner = parseSkillPaths(data.tree)
     console.log(`Found ${slugToOwner.size} skills with owner info`)
     
-    // Get all skills that need author enrichment
+    // Get all skills that need author enrichment (increased limit to handle full backlog)
     const skillsNeedingEnrichment: Array<{ _id: string; slug: string }> = await ctx.runQuery(
       internal.clawdhubSync.getSkillsNeedingAuthorEnrichment,
-      { limit: 1000 }
+      { limit: 10000 }
     )
     
     console.log(`${skillsNeedingEnrichment.length} skills need author enrichment`)

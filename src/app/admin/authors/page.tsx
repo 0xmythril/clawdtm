@@ -8,10 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Loader2,
   UserX,
   UserCheck,
   Search,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +34,32 @@ export default function AdminAuthorsPage() {
     api.admin.getAuthorsWithCounts,
     clerkId ? { clerkId, includeHidden: true } : "skip"
   );
+
+  // Get auto-block audit logs
+  const autoBlockLogs = useQuery(
+    api.admin.listAuditLogs,
+    clerkId ? { clerkId, actionFilter: "auto_block_author", limit: 100 } : "skip"
+  );
+
+  // Build a map of auto-blocked authors with their trigger info
+  const autoBlockedAuthors = useMemo(() => {
+    const map = new Map<string, { triggerSkill?: string; riskLevel?: string; blockedAt: number }>();
+    if (!autoBlockLogs?.logs) return map;
+    
+    for (const log of autoBlockLogs.logs) {
+      if (log.action === "auto_block_author" && log.targetId) {
+        // Only keep the most recent auto-block for each author
+        if (!map.has(log.targetId)) {
+          map.set(log.targetId, {
+            triggerSkill: log.details?.triggerSkill,
+            riskLevel: log.details?.riskLevel,
+            blockedAt: log.createdAt,
+          });
+        }
+      }
+    }
+    return map;
+  }, [autoBlockLogs]);
 
   // Filter authors by search
   const filteredAuthors = useMemo(() => {
@@ -124,13 +158,44 @@ export default function AdminAuthorsPage() {
               {filteredAuthors.map((author) => {
                 const allBlocked = author.hidden === author.total && author.total > 0;
                 const someBlocked = author.hidden > 0 && author.hidden < author.total;
+                const autoBlockInfo = autoBlockedAuthors.get(author.author);
+                const isAutoBlocked = allBlocked && autoBlockInfo;
                 
                 return (
                   <tr 
                     key={author.author} 
                     className={cn(allBlocked && "bg-destructive/5")}
                   >
-                    <td className="px-4 py-3 font-medium">{author.author}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <div className="flex items-center gap-2">
+                        {author.author}
+                        {isAutoBlocked && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <ShieldAlert className="h-4 w-4 text-destructive" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">Auto-blocked by Security Scanner</p>
+                                {autoBlockInfo.triggerSkill && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Trigger: {autoBlockInfo.triggerSkill}
+                                  </p>
+                                )}
+                                {autoBlockInfo.riskLevel && (
+                                  <p className="text-xs">
+                                    Risk: <span className={cn(
+                                      autoBlockInfo.riskLevel === "critical" && "text-red-500",
+                                      autoBlockInfo.riskLevel === "high" && "text-orange-500"
+                                    )}>{autoBlockInfo.riskLevel}</span>
+                                  </p>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-center">{author.total}</td>
                     <td className="px-4 py-3 text-center">
                       {author.hidden > 0 ? (
@@ -141,7 +206,16 @@ export default function AdminAuthorsPage() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       {allBlocked ? (
-                        <Badge variant="destructive">Blocked</Badge>
+                        <div className="flex items-center justify-center gap-1">
+                          {isAutoBlocked ? (
+                            <Badge variant="destructive" className="gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Auto-Blocked
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">Blocked</Badge>
+                          )}
+                        </div>
                       ) : someBlocked ? (
                         <Badge variant="outline" className="text-yellow-600 border-yellow-600">Partial</Badge>
                       ) : (

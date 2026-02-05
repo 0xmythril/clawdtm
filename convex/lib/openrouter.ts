@@ -8,7 +8,8 @@
  */
 
 // Default model - can be overridden via env var
-const DEFAULT_MODEL = 'google/gemini-2.0-flash-001'
+// Using Claude 3.5 Haiku for better security analysis quality
+const DEFAULT_MODEL = 'anthropic/claude-3.5-haiku'
 
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant'
