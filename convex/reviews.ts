@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
+import { isHumanAdmin } from './admin'
 
 // ============================================
 // Constants
@@ -654,6 +655,71 @@ export const getSkillBySlug = query({
       securityFlags: skill.securityFlags,
       lastSecurityScanAt: skill.lastSecurityScanAt,
       vtAnalysisUrl: skill.vtAnalysisUrl,
+    }
+  },
+})
+
+/**
+ * Get skill by slug - Admin version that can view hidden skills
+ * Requires clerkId for admin verification
+ */
+export const getSkillBySlugAdmin = query({
+  args: {
+    slug: v.string(),
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Verify admin status
+    const { isAdmin } = await isHumanAdmin(ctx, args.clerkId)
+    if (!isAdmin) {
+      return null // Non-admins get null (same as not found)
+    }
+
+    const skill = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_slug', (q) => q.eq('slug', args.slug))
+      .unique()
+
+    if (!skill) {
+      return null
+    }
+
+    // Return skill even if hidden (for admin review)
+    return {
+      _id: skill._id,
+      slug: skill.slug,
+      name: skill.name ?? skill.displayName ?? skill.slug,
+      description: skill.description ?? skill.summary ?? '',
+      author: skill.author ?? 'Unknown',
+      authorHandle: skill.authorHandle,
+      category: skill.category,
+      tags: skill.tags,
+      version: skill.latestVersion ?? skill.version,
+      hasNix: skill.hasNix,
+      // Stats
+      downloads: skill.downloads,
+      stars: skill.stars,
+      installs: skill.installs,
+      // Review stats
+      reviewCount: skill.reviewCount ?? 0,
+      humanReviewCount: skill.humanReviewCount ?? 0,
+      botReviewCount: skill.botReviewCount ?? 0,
+      avgRating: skill.avgRating ?? null,
+      avgRatingHuman: skill.avgRatingHuman ?? null,
+      avgRatingBot: skill.avgRatingBot ?? null,
+      // Timestamps
+      createdAt: skill.externalCreatedAt ?? skill.createdAt,
+      updatedAt: skill.externalUpdatedAt ?? skill.updatedAt,
+      // Security
+      securityScore: skill.securityScore,
+      securityRisk: skill.securityRisk,
+      securityFlags: skill.securityFlags,
+      lastSecurityScanAt: skill.lastSecurityScanAt,
+      vtAnalysisUrl: skill.vtAnalysisUrl,
+      // Hidden status (for admin awareness)
+      hidden: skill.hidden ?? false,
+      hiddenReason: skill.hiddenReason,
+      hiddenAt: skill.hiddenAt,
     }
   },
 })

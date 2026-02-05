@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Shield,
+  ShieldQuestion,
 } from "lucide-react";
 import {
   Tooltip,
@@ -79,7 +80,7 @@ const SECURITY_OPTIONS = [
   { value: "safe", label: "Safe (90+)", icon: ShieldCheck, color: "text-green-500" },
   { value: "low", label: "Low Risk (70+)", icon: ShieldCheck, color: "text-green-600" },
   { value: "medium", label: "Medium (50+)", icon: Shield, color: "text-yellow-500" },
-  { value: "scanned", label: "All Scanned", icon: Shield, color: "text-blue-500" },
+  { value: "pending", label: "Pending Scan", icon: ShieldQuestion, color: "text-gray-500" },
 ] as const;
 
 export type SecurityFilter = typeof SECURITY_OPTIONS[number]["value"] | "any";
@@ -259,7 +260,7 @@ export function Sidebar({
             {onSecurityFilterChange && (
               <Collapsible open={securityOpen} onOpenChange={setSecurityOpen}>
                 <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
+                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/70 dark:bg-muted/20 rounded-md text-foreground hover:bg-muted/90 dark:hover:bg-muted/30">
                     <span className="flex items-center gap-2">
                       <Shield className="h-3.5 w-3.5" />
                       Security
@@ -304,7 +305,7 @@ export function Sidebar({
             {onMinRatingChange && (
               <Collapsible open={ratingsOpen} onOpenChange={setRatingsOpen} className="mt-3">
                 <CollapsibleTrigger asChild>
-                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
+                  <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/70 dark:bg-muted/20 rounded-md text-foreground hover:bg-muted/90 dark:hover:bg-muted/30">
                     <span className="flex items-center gap-2">
                       <span className="text-sm">🦞</span>
                       Min Rating
@@ -346,7 +347,7 @@ export function Sidebar({
             {/* Tags Section */}
             <Collapsible open={tagsOpen} onOpenChange={setTagsOpen} className="mt-3">
               <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/40 rounded-md text-foreground hover:bg-muted/60">
+                <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer bg-muted/70 dark:bg-muted/20 rounded-md text-foreground hover:bg-muted/90 dark:hover:bg-muted/30">
                   <span className="flex items-center gap-2">
                     <Cpu className="h-3.5 w-3.5" />
                     Tags by AI

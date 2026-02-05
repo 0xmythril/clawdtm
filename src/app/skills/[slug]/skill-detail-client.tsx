@@ -63,14 +63,19 @@ type SkillData = {
   securityFlags?: string[];
   lastSecurityScanAt?: number;
   vtAnalysisUrl?: string;
+  // Hidden status (admin only)
+  hidden?: boolean;
+  hiddenReason?: string;
+  hiddenAt?: number;
 };
 
 type Props = {
   slug: string;
   initialSkill: SkillData;
+  isAdminView?: boolean;
 };
 
-export function SkillDetailClient({ slug, initialSkill }: Props) {
+export function SkillDetailClient({ slug, initialSkill, isAdminView }: Props) {
   const { user, isLoaded: userLoaded } = useUser();
   const [copied, setCopied] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<"combined" | "human" | "bot">("combined");
@@ -139,6 +144,30 @@ export function SkillDetailClient({ slug, initialSkill }: Props) {
           <ThemeToggle />
         </div>
       </header>
+
+      {/* Admin: Hidden skill warning banner */}
+      {isAdminView && initialSkill.hidden && (
+        <div className="bg-red-500/10 border-b border-red-500/30">
+          <div className="max-w-4xl mx-auto px-4 md:px-6 py-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-red-600 dark:text-red-400">
+                  This skill is hidden from public view
+                </p>
+                <p className="text-red-600/80 dark:text-red-400/80 mt-1">
+                  {initialSkill.hiddenReason || "No reason provided"}
+                </p>
+                {initialSkill.hiddenAt && (
+                  <p className="text-red-600/60 dark:text-red-400/60 text-xs mt-1">
+                    Hidden on {new Date(initialSkill.hiddenAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <main className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
@@ -422,9 +451,63 @@ function SkillContent({
   );
 }
 
+// Types for structured security checks
+type CheckStatus = "pass" | "fail" | "warn" | "unknown";
+
+interface SecurityCheck {
+  status: CheckStatus;
+  details: string;
+}
+
+interface SecurityChecks {
+  remote_execution?: SecurityCheck;
+  obfuscated_code?: SecurityCheck;
+  sensitive_data_access?: SecurityCheck;
+  shell_commands?: SecurityCheck;
+  network_requests?: SecurityCheck;
+  permission_escalation?: SecurityCheck;
+  data_exfiltration?: SecurityCheck;
+  persistence?: SecurityCheck;
+}
+
+interface DataSources {
+  skillContent?: boolean;
+  userComments?: boolean;
+  virusTotal?: boolean;
+}
+
+// Check labels for display
+const CHECK_LABELS: Record<keyof SecurityChecks, string> = {
+  remote_execution: "Remote Execution",
+  obfuscated_code: "Obfuscated Code",
+  sensitive_data_access: "Sensitive Data",
+  shell_commands: "Shell Commands",
+  network_requests: "Network Requests",
+  permission_escalation: "Permission Escalation",
+  data_exfiltration: "Data Exfiltration",
+  persistence: "Persistence",
+};
+
+// Status badge config
+const STATUS_CONFIG: Record<CheckStatus, { label: string; color: string; bgColor: string }> = {
+  pass: { label: "PASS", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/40" },
+  fail: { label: "FAIL", color: "text-red-600", bgColor: "bg-red-100 dark:bg-red-900/40" },
+  warn: { label: "WARN", color: "text-yellow-600", bgColor: "bg-yellow-100 dark:bg-yellow-900/40" },
+  unknown: { label: "???", color: "text-gray-500", bgColor: "bg-gray-100 dark:bg-gray-800" },
+};
+
 // Security section component
 function SecuritySection({ skill }: { skill: SkillData }) {
-  const { securityScore, securityRisk, securityFlags, lastSecurityScanAt, vtAnalysisUrl } = skill;
+  const { securityScore, securityRisk, lastSecurityScanAt, vtAnalysisUrl } = skill;
+  
+  // Fetch scan history to get the structured checks
+  const scanHistory = useQuery(
+    api.security.getSkillScanHistory,
+    { slug: skill.slug, limit: 1 }
+  );
+  const latestScan = scanHistory?.[0];
+  const securityChecks = latestScan?.securityChecks as SecurityChecks | undefined;
+  const dataSources = latestScan?.dataSources as DataSources | undefined;
   
   // Security risk config
   const riskConfig = {
@@ -470,22 +553,6 @@ function SecuritySection({ skill }: { skill: SkillData }) {
     },
   };
 
-  // Flag descriptions
-  const flagDescriptions: Record<string, string> = {
-    remote_execution: "Downloads and executes external code",
-    obfuscated_code: "Contains obfuscated or encoded scripts",
-    sensitive_data_access: "Accesses passwords, credentials, or wallets",
-    shell_commands: "Executes shell commands",
-    network_requests: "Makes requests to external servers",
-    permission_escalation: "Requests elevated permissions",
-    data_exfiltration: "May send data to external servers",
-    persistence: "Sets up persistent processes",
-    external_url: "Contains external download URLs",
-    vt_threats_detected: "VirusTotal detected threats in linked files",
-    parse_error: "Analysis could not complete - review manually",
-    scan_error: "Scan failed - manual review recommended",
-  };
-
   // Not scanned yet
   if (!securityRisk) {
     return (
@@ -504,20 +571,119 @@ function SecuritySection({ skill }: { skill: SkillData }) {
       </Card>
     );
   }
+  
+  // Check if this is an unverified scan (content couldn't be fetched)
+  const isUnverified = latestScan?.flags?.includes('content_unavailable') || 
+                       latestScan?.flags?.includes('unverified') ||
+                       (dataSources && !dataSources.skillContent);
+  
+  // Show special unverified state
+  if (isUnverified && securityRisk === 'medium') {
+    return (
+      <Card className="border-dashed border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30">
+        <CardHeader className="pb-0">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ShieldQuestion className="h-5 w-5 text-yellow-500" />
+            Security Analysis
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="font-semibold text-yellow-600">Unverified</span>
+              <p className="text-xs text-muted-foreground">
+                Could not fetch skill content for analysis
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-yellow-500">?</span>
+            </div>
+          </div>
+          
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              The actual skill.md content could not be retrieved from Clawhub. 
+              This skill&apos;s security status cannot be verified. 
+              <strong className="text-foreground"> Review the skill manually before use.</strong>
+            </p>
+          </div>
+
+          {/* Data Sources */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium mb-2">Data Sources Checked</p>
+            <div className="bg-muted/30 rounded-lg p-3">
+              <div className="flex items-center justify-between py-1 border-b border-border/30">
+                <span className="text-sm">Skill Content (skill.md)</span>
+                <span className="px-2 py-0.5 text-xs font-bold rounded bg-red-100 dark:bg-red-900/40 text-red-600">
+                  UNAVAILABLE
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-border/30">
+                <span className="text-sm">User Comments</span>
+                <span className={`px-2 py-0.5 text-xs font-bold rounded ${
+                  dataSources?.userComments 
+                    ? "bg-green-100 dark:bg-green-900/40 text-green-600" 
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                }`}>
+                  {dataSources?.userComments ? "YES" : "NO"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-sm">VirusTotal Scan</span>
+                <span className="px-2 py-0.5 text-xs font-bold rounded bg-gray-100 dark:bg-gray-800 text-gray-500">
+                  -
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs text-muted-foreground">
+            <span>
+              {lastSecurityScanAt 
+                ? `Checked ${new Date(lastSecurityScanAt).toLocaleDateString()}`
+                : "Recently checked"
+              }
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const config = riskConfig[securityRisk];
   const Icon = config.icon;
-  const flags = securityFlags ?? [];
+
+  // Render a single check row
+  const renderCheckRow = (key: keyof SecurityChecks, check?: SecurityCheck) => {
+    const status = check?.status ?? "unknown";
+    const statusConfig = STATUS_CONFIG[status];
+    const details = check?.details ?? "Not analyzed";
+    
+    return (
+      <div key={key} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium">{CHECK_LABELS[key]}</span>
+          <p className="text-xs text-muted-foreground truncate" title={details}>
+            {details}
+          </p>
+        </div>
+        <span className={`ml-2 px-2 py-0.5 text-xs font-bold rounded ${statusConfig.bgColor} ${statusConfig.color}`}>
+          {statusConfig.label}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <Card className={`${config.bgColor} ${config.borderColor}`}>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-0">
         <CardTitle className="text-lg flex items-center gap-2">
           <Icon className={`h-5 w-5 ${config.color}`} />
           Security Analysis
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="pt-3 space-y-4">
         {/* Risk level and score */}
         <div className="flex items-center justify-between">
           <div>
@@ -550,49 +716,64 @@ function SecuritySection({ skill }: { skill: SkillData }) {
           </div>
         )}
 
-        {/* Flags */}
-        {flags.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Detected Issues:</p>
-            <div className="flex flex-wrap gap-2">
-              {flags.map((flag) => (
-                <Badge
-                  key={flag}
-                  variant="outline"
-                  className="text-xs flex items-center gap-1"
-                  title={flagDescriptions[flag] ?? flag}
-                >
-                  <AlertTriangle className="h-3 w-3" />
-                  {flag.replace(/_/g, " ")}
-                </Badge>
-              ))}
-            </div>
+        {/* AI Summary */}
+        {latestScan?.summary && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">{latestScan.summary}</p>
           </div>
         )}
 
-        {/* How we analyze - collapsible summary */}
-        <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
-            How is this analyzed?
-          </summary>
-          <div className="mt-2 p-3 bg-muted/50 rounded-lg space-y-2 text-muted-foreground">
-            <p>
-              Skills are automatically analyzed using AI to detect potential security risks in their code and configuration.
-            </p>
-            <p className="font-medium text-foreground">We check for:</p>
-            <ul className="list-disc list-inside space-y-1 pl-2">
-              <li>Remote code execution (downloading external binaries)</li>
-              <li>Obfuscated or encoded scripts</li>
-              <li>Access to sensitive data (passwords, keys, wallets)</li>
-              <li>Dangerous shell commands</li>
-              <li>Suspicious network requests</li>
-              <li>Permission escalation attempts</li>
-            </ul>
-            <p className="text-xs opacity-75">
-              High-risk skills may also be scanned with VirusTotal for additional verification.
-            </p>
+        {/* Security Checks Checklist */}
+        <div className="space-y-1">
+          <p className="text-sm font-medium mb-2">Security Checks</p>
+          <div className="bg-muted/30 rounded-lg p-3">
+            {renderCheckRow("remote_execution", securityChecks?.remote_execution)}
+            {renderCheckRow("obfuscated_code", securityChecks?.obfuscated_code)}
+            {renderCheckRow("sensitive_data_access", securityChecks?.sensitive_data_access)}
+            {renderCheckRow("shell_commands", securityChecks?.shell_commands)}
+            {renderCheckRow("network_requests", securityChecks?.network_requests)}
+            {renderCheckRow("permission_escalation", securityChecks?.permission_escalation)}
+            {renderCheckRow("data_exfiltration", securityChecks?.data_exfiltration)}
+            {renderCheckRow("persistence", securityChecks?.persistence)}
           </div>
-        </details>
+        </div>
+
+        {/* Data Sources */}
+        <div className="space-y-1">
+          <p className="text-sm font-medium mb-2">Data Sources Checked</p>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <div className="flex items-center justify-between py-1 border-b border-border/30">
+              <span className="text-sm">Skill Content (skill.md)</span>
+              <span className={`px-2 py-0.5 text-xs font-bold rounded ${
+                dataSources?.skillContent 
+                  ? "bg-green-100 dark:bg-green-900/40 text-green-600" 
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+              }`}>
+                {dataSources?.skillContent ? "YES" : "NO"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1 border-b border-border/30">
+              <span className="text-sm">User Comments</span>
+              <span className={`px-2 py-0.5 text-xs font-bold rounded ${
+                dataSources?.userComments 
+                  ? "bg-green-100 dark:bg-green-900/40 text-green-600" 
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+              }`}>
+                {dataSources?.userComments ? "YES" : "NO"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm">VirusTotal Scan</span>
+              <span className={`px-2 py-0.5 text-xs font-bold rounded ${
+                dataSources?.virusTotal 
+                  ? "bg-green-100 dark:bg-green-900/40 text-green-600" 
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+              }`}>
+                {dataSources?.virusTotal ? "YES" : "-"}
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs text-muted-foreground">
@@ -601,6 +782,9 @@ function SecuritySection({ skill }: { skill: SkillData }) {
               ? `Scanned ${new Date(lastSecurityScanAt).toLocaleDateString()}`
               : "Recently scanned"
             }
+            {latestScan?.model && latestScan.model !== 'content-unavailable' && (
+              <span className="opacity-60"> · AI analysis</span>
+            )}
           </span>
           {vtAnalysisUrl && (
             <a

@@ -42,4 +42,12 @@ crons.weekly(
   internal.security.rescanOldSkills,
 )
 
+// Check GitHub commits for skill updates every 15 minutes
+// Auto-rescans skills that have been modified
+crons.interval(
+  'github-commit-check',
+  { minutes: 15 },
+  internal.security.checkGitHubCommits,
+)
+
 export default crons

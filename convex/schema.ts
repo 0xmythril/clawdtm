@@ -720,6 +720,27 @@ const adminAuditLogs = defineTable({
   .index('by_target', ['targetType', 'targetId', 'createdAt'])
   .index('by_created', ['createdAt'])
 
+// Security rescan state (for tracking manual full rescans)
+const securityRescanState = defineTable({
+  key: v.literal('full_rescan'),
+  status: v.union(v.literal('idle'), v.literal('running'), v.literal('completed')),
+  startedAt: v.optional(v.number()),
+  completedAt: v.optional(v.number()),
+  totalSkills: v.optional(v.number()),
+  scannedCount: v.optional(v.number()),
+  cursor: v.optional(v.number()), // For resuming if interrupted (last skill index)
+  triggeredBy: v.optional(v.string()), // clerkId of admin who triggered
+  lastError: v.optional(v.string()),
+}).index('by_key', ['key'])
+
+// GitHub commit sync state (for tracking last processed commit)
+const gitHubCommitSyncState = defineTable({
+  key: v.literal('commits'),
+  lastCommitSha: v.optional(v.string()),
+  lastCheckedAt: v.optional(v.number()),
+  lastSkillsRescanned: v.optional(v.array(v.string())), // List of slugs rescanned in last check
+}).index('by_key', ['key'])
+
 // Security scan logs (AI and VirusTotal analysis results)
 const securityScanLogs = defineTable({
   skillId: v.id('cachedSkills'),
@@ -738,6 +759,14 @@ const securityScanLogs = defineTable({
   flags: v.array(v.string()),                 // ["remote_execution", "obfuscated_code", etc.]
   summary: v.string(),                        // Brief human-readable summary
   reasoning: v.string(),                      // Detailed AI reasoning
+  
+  // Structured security checks (new format)
+  securityChecks: v.optional(v.any()),        // { check_name: { status, details } }
+  dataSources: v.optional(v.object({          // What data was available for analysis
+    skillContent: v.boolean(),
+    userComments: v.boolean(),
+    virusTotal: v.boolean(),
+  })),
   
   // VirusTotal results (if scanType === 'virustotal')
   vtPositives: v.optional(v.number()),        // Number of engines flagging as malicious
@@ -793,5 +822,7 @@ export default defineSchema({
   skillReviews,
   categorizationLogs,
   adminAuditLogs,
+  securityRescanState,
   securityScanLogs,
+  gitHubCommitSyncState,
 })

@@ -1,8 +1,10 @@
 import { v } from 'convex/values'
-import { mutation, query, internalMutation, internalAction } from './_generated/server'
+import { mutation, query, internalMutation, internalAction, internalQuery } from './_generated/server'
 import { internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import { analyzeWithAI, getDefaultModel } from './lib/openrouter'
 import { extractScannableUrls, scanUrls, isVTConfigured } from './lib/virustotal'
+import { isHumanAdmin } from './admin'
 
 // ============================================
 // Types
@@ -10,52 +12,158 @@ import { extractScannableUrls, scanUrls, isVTConfigured } from './lib/virustotal
 
 type RiskLevel = 'safe' | 'low' | 'medium' | 'high' | 'critical'
 
+type CheckStatus = 'pass' | 'fail' | 'warn' | 'unknown'
+
+interface SecurityCheck {
+  status: CheckStatus
+  details: string
+}
+
+interface SecurityChecks {
+  remote_execution: SecurityCheck
+  obfuscated_code: SecurityCheck
+  sensitive_data_access: SecurityCheck
+  shell_commands: SecurityCheck
+  network_requests: SecurityCheck
+  permission_escalation: SecurityCheck
+  data_exfiltration: SecurityCheck
+  persistence: SecurityCheck
+}
+
+interface DataSources {
+  skillContent: boolean
+  userComments: boolean
+  virusTotal: boolean
+}
+
 interface SecurityAnalysis {
   score: number
   riskLevel: RiskLevel
   flags: string[]
   summary: string
   reasoning: string
+  // New structured fields
+  checks: SecurityChecks
+  dataSources: DataSources
+}
+
+// Check names for display
+const CHECK_LABELS: Record<keyof SecurityChecks, string> = {
+  remote_execution: 'Remote Execution',
+  obfuscated_code: 'Obfuscated Code',
+  sensitive_data_access: 'Sensitive Data Access',
+  shell_commands: 'Shell Commands',
+  network_requests: 'Network Requests',
+  permission_escalation: 'Permission Escalation',
+  data_exfiltration: 'Data Exfiltration',
+  persistence: 'Persistence',
+}
+
+// For backwards compatibility - derive flags from checks
+function deriveFlags(checks: SecurityChecks): string[] {
+  const flags: string[] = []
+  for (const [key, check] of Object.entries(checks)) {
+    if (check.status === 'fail' || check.status === 'warn') {
+      flags.push(key)
+    }
+  }
+  return flags
 }
 
 // ============================================
 // Security Analysis Prompt
 // ============================================
 
-const SECURITY_PROMPT = `You are a security analyst evaluating an OpenClaw/ClawdBot skill for potential security risks.
+const SECURITY_PROMPT = `You are a PARANOID security analyst evaluating an OpenClaw/ClawdBot skill for potential security risks.
 
-Analyze the following skill and provide a security assessment in JSON format.
+Your job is to PROTECT USERS from malicious skills. When in doubt, flag it as suspicious. It is MUCH BETTER to have false positives than to let malware through.
+
+CRITICAL MINDSET - BE PARANOID:
+- Assume skills are GUILTY until proven innocent
+- Any shell command execution should raise immediate suspicion
+- Any network request to non-standard domains is suspicious
+- Any file access outside typical working directories is suspicious
+- curl|bash, wget|sh, or similar patterns are HIGH risk
+- Base64 encoded content is almost always malicious in this context
+- "Helpful" descriptions can hide malicious intent - focus on WHAT THE CODE DOES
 
 IMPORTANT CONTEXT:
 - OpenClaw skills can execute shell commands, access files, and make network requests
-- Malicious skills may disguise themselves as helpful tools but contain backdoors, stealers, or droppers
-- Common attack patterns include: downloading external binaries, obfuscated scripts, exfiltrating data
+- Malicious skills disguise themselves as helpful tools but contain backdoors, stealers, or droppers
+- Common attack patterns: downloading external binaries, obfuscated scripts, data exfiltration
+- Authors can easily change names/descriptions but not their code patterns
 
-SECURITY FLAGS TO CHECK:
-- remote_execution: Instructions to download and run external code/binaries
-- obfuscated_code: Base64 encoded payloads, encoded scripts, or unusual encoding
-- sensitive_data_access: Accesses passwords, wallets, credentials, SSH keys, API keys
-- shell_commands: Executes shell commands (especially dangerous ones like curl|bash, eval)
-- network_requests: Makes HTTP requests to untrusted/suspicious domains
-- permission_escalation: Requests sudo, admin, or elevated permissions
-- data_exfiltration: Sends local data to external servers
-- persistence: Sets up cron jobs, startup scripts, or other persistence mechanisms
-- external_url: Contains URLs to potentially dangerous downloads (flag for VT scan)
+SECURITY CHECKS TO PERFORM:
+You must evaluate EACH of these 8 checks and provide a status for each:
 
-RISK LEVELS:
-- safe (90-100): No concerning patterns, standard functionality
-- low (70-89): Minor concerns but likely benign
-- medium (50-69): Some suspicious patterns, warrants review
-- high (25-49): Multiple red flags, likely malicious
-- critical (0-24): Clear malicious intent, immediate threat
+1. remote_execution: Does this skill download and run external code/binaries?
+   - FAIL: curl|bash, wget|sh, downloading executables
+   - WARN: Downloads files that could be executed
+   - PASS: No download+execute patterns
+
+2. obfuscated_code: Does this contain encoded or hidden code?
+   - FAIL: Base64 payloads, encoded scripts, steganography
+   - WARN: Unusual encoding or minified code
+   - PASS: No obfuscation detected
+
+3. sensitive_data_access: Does this access credentials or sensitive files?
+   - FAIL: Reads ~/.ssh, ~/.aws, passwords, wallets, API keys
+   - WARN: Accesses config files that may contain secrets
+   - PASS: No sensitive data access
+
+4. shell_commands: Does this execute shell commands?
+   - FAIL: Uses eval, exec, or dangerous shell patterns
+   - WARN: Executes any shell commands
+   - PASS: No shell execution
+
+5. network_requests: Does this make external network requests?
+   - FAIL: Requests to unknown/suspicious domains
+   - WARN: Requests to external APIs (even known ones)
+   - PASS: No network requests
+
+6. permission_escalation: Does this request elevated permissions?
+   - FAIL: sudo, root, or admin access
+   - WARN: Requests additional permissions
+   - PASS: No elevation requested
+
+7. data_exfiltration: Does this send local data to external servers?
+   - FAIL: Collects and sends user data externally
+   - WARN: Sends any local data over network
+   - PASS: No data exfiltration patterns
+
+8. persistence: Does this set up persistent processes?
+   - FAIL: Creates cron jobs, startup scripts, daemons
+   - WARN: Modifies system configuration
+   - PASS: No persistence mechanisms
+
+STATUS VALUES:
+- "pass": Check passed, no concerns detected
+- "fail": Check failed, definite security risk
+- "warn": Potential concern, needs attention
+- "unknown": Cannot determine from available information
+
+SCORING GUIDANCE:
+- 90-100 (safe): All checks pass, no concerns
+- 70-89 (low): All pass or warn, no fails
+- 50-69 (medium): 1-2 warns, or cannot fully verify
+- 25-49 (high): Any fail, or multiple warns
+- 0-24 (critical): Multiple fails, clear malicious intent
 
 Respond with ONLY valid JSON in this exact format:
 {
   "score": <number 0-100>,
   "riskLevel": "<safe|low|medium|high|critical>",
-  "flags": ["<flag1>", "<flag2>"],
-  "summary": "<1-2 sentence summary of findings>",
-  "reasoning": "<detailed explanation of analysis>"
+  "checks": {
+    "remote_execution": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "obfuscated_code": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "sensitive_data_access": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "shell_commands": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "network_requests": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "permission_escalation": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "data_exfiltration": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" },
+    "persistence": { "status": "<pass|fail|warn|unknown>", "details": "<brief explanation>" }
+  },
+  "summary": "<1 sentence summary of overall findings>"
 }
 
 SKILL TO ANALYZE:
@@ -66,13 +174,199 @@ Description: {{description}}
 Tags: {{tags}}
 Category: {{category}}
 
-Content (skill.md or summary):
+FILES (ALL files from skill folder - PAY EXTRA ATTENTION TO CODE FILES):
 {{content}}
----`
+
+CRITICAL: Python, JavaScript, and Shell files contain EXECUTABLE CODE.
+Look specifically for:
+- Python: os.system(), subprocess, exec(), eval(), requests.post(), open() with /etc or ~
+- JavaScript: fetch(), eval(), child_process, fs.readFile with sensitive paths
+- Shell: curl|bash, wget|sh, sudo, reading ~/.ssh or ~/.aws
+
+USER COMMENTS (check for reports of malicious behavior):
+{{comments}}
+---
+
+If users report malware, scams, or suspicious behavior in comments, treat this as a STRONG signal and mark relevant checks as FAIL.`
+
+// ============================================
+// Content Fetching (GitHub Archive)
+// ============================================
+
+// File extensions to scan for security issues
+const SCANNABLE_EXTENSIONS = ['.md', '.py', '.js', '.mjs', '.ts', '.sh', '.bash', '.json']
+
+type SkillFileType = 'markdown' | 'python' | 'javascript' | 'shell' | 'config' | 'other'
+
+interface SkillFile {
+  name: string
+  content: string
+  type: SkillFileType
+}
+
+function getFileType(filename: string): SkillFileType {
+  const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase()
+  if (['.md'].includes(ext)) return 'markdown'
+  if (['.py'].includes(ext)) return 'python'
+  if (['.js', '.mjs', '.ts'].includes(ext)) return 'javascript'
+  if (['.sh', '.bash'].includes(ext)) return 'shell'
+  if (['.json'].includes(ext)) return 'config'
+  return 'other'
+}
+
+function isScannable(filename: string): boolean {
+  const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase()
+  return SCANNABLE_EXTENSIONS.includes(ext)
+}
+
+/**
+ * Fetch ALL files in a skill folder from the GitHub archive
+ * Returns an array of file objects with name, content, and type
+ */
+async function fetchAllSkillFiles(
+  slug: string,
+  author: string | undefined
+): Promise<SkillFile[]> {
+  // Skip if no author - can't construct GitHub URL
+  if (!author || author === 'unknown') {
+    console.log(`[Security] Cannot fetch files for ${slug}: author unknown`)
+    return []
+  }
+  
+  const files: SkillFile[] = []
+  const basePath = `skills/${author}/${slug}`
+  
+  try {
+    // 1. Get directory listing from GitHub API
+    const listUrl = `https://api.github.com/repos/openclaw/skills/contents/${basePath}`
+    const listResponse = await fetch(listUrl, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'ClawdTM-Security/1.0',
+      },
+    })
+    
+    if (!listResponse.ok) {
+      console.log(`[Security] Skill not in GitHub archive: ${author}/${slug} (${listResponse.status})`)
+      return []
+    }
+    
+    const items: Array<{ name: string; type: string; path: string }> = await listResponse.json()
+    
+    // 2. Fetch each scannable file
+    for (const item of items) {
+      if (item.type !== 'file') continue
+      if (!isScannable(item.name)) continue
+      if (item.name === '_meta.json') continue // Skip metadata file
+      
+      const rawUrl = `https://raw.githubusercontent.com/openclaw/skills/main/${basePath}/${item.name}`
+      const contentResponse = await fetch(rawUrl)
+      if (contentResponse.ok) {
+        const content = await contentResponse.text()
+        files.push({
+          name: item.name,
+          content,
+          type: getFileType(item.name),
+        })
+      }
+    }
+    
+    // 3. Recursively check subdirectories (e.g., scripts/)
+    for (const item of items) {
+      if (item.type !== 'dir') continue
+      
+      const subUrl = `https://api.github.com/repos/openclaw/skills/contents/${basePath}/${item.name}`
+      const subResponse = await fetch(subUrl, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'ClawdTM-Security/1.0',
+        },
+      })
+      
+      if (!subResponse.ok) continue
+      
+      const subItems: Array<{ name: string; type: string }> = await subResponse.json()
+      
+      for (const subItem of subItems) {
+        if (subItem.type !== 'file') continue
+        if (!isScannable(subItem.name)) continue
+        
+        const rawUrl = `https://raw.githubusercontent.com/openclaw/skills/main/${basePath}/${item.name}/${subItem.name}`
+        const contentResponse = await fetch(rawUrl)
+        if (contentResponse.ok) {
+          const content = await contentResponse.text()
+          files.push({
+            name: `${item.name}/${subItem.name}`,
+            content,
+            type: getFileType(subItem.name),
+          })
+        }
+      }
+    }
+    
+    console.log(`[Security] Fetched ${files.length} files for ${author}/${slug}`)
+    return files
+  } catch (error) {
+    console.error(`[Security] Failed to fetch files for ${author}/${slug}:`, error)
+    return []
+  }
+}
+
+/**
+ * Legacy function for backwards compatibility - concatenates all files into single content string
+ */
+async function fetchSkillContent(slug: string, author?: string): Promise<string | null> {
+  const files = await fetchAllSkillFiles(slug, author)
+  if (files.length === 0) return null
+  
+  // Concatenate all files with headers
+  const content = files
+    .map(f => `=== ${f.name} (${f.type}) ===\n${f.content}`)
+    .join('\n\n')
+  
+  return content
+}
+
+/**
+ * Fetch user comments from Clawhub to check for reports of malicious behavior
+ */
+async function fetchSkillComments(slug: string): Promise<string[]> {
+  try {
+    const url = `https://clawhub.ai/api/v1/skills/${slug}/comments`
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+    })
+    if (response.ok) {
+      const data = await response.json()
+      // Handle various response formats
+      const comments = data.comments ?? data.data ?? data
+      if (Array.isArray(comments)) {
+        return comments
+          .map((c: { body?: string; text?: string; content?: string }) => 
+            c.body || c.text || c.content || ''
+          )
+          .filter((text: string) => text.length > 0)
+      }
+    }
+    return []
+  } catch (error) {
+    console.error(`[Security] Failed to fetch comments for ${slug}:`, error)
+    return []
+  }
+}
 
 // ============================================
 // Internal Helpers
 // ============================================
+
+// Truncate content to stay within token limits (~4 chars per token)
+const MAX_CONTENT_CHARS = 12000 // ~3000 tokens for content
+const MAX_COMMENTS_CHARS = 2000 // ~500 tokens for comments
+
+function truncateContent(content: string, maxChars: number): string {
+  if (content.length <= maxChars) return content
+  return content.slice(0, maxChars) + '\n\n[... TRUNCATED - Full content too large for analysis ...]'
+}
 
 function buildAnalysisPrompt(skill: {
   name?: string
@@ -81,17 +375,61 @@ function buildAnalysisPrompt(skill: {
   tags?: string[]
   category?: string
   content?: string
+  comments?: string[]
 }): string {
+  const commentsText = skill.comments && skill.comments.length > 0
+    ? truncateContent(skill.comments.join('\n---\n'), MAX_COMMENTS_CHARS)
+    : 'No user comments available'
+  
+  const contentText = truncateContent(
+    skill.content ?? skill.description ?? 'No content available',
+    MAX_CONTENT_CHARS
+  )
+  
   return SECURITY_PROMPT
     .replace('{{name}}', skill.name ?? 'Unknown')
     .replace('{{author}}', skill.author ?? 'Unknown')
     .replace('{{description}}', skill.description ?? 'No description')
     .replace('{{tags}}', (skill.tags ?? []).join(', ') || 'None')
     .replace('{{category}}', skill.category ?? 'Unknown')
-    .replace('{{content}}', skill.content ?? skill.description ?? 'No content available')
+    .replace('{{content}}', contentText)
+    .replace('{{comments}}', commentsText)
 }
 
-function parseAnalysisResponse(content: string): SecurityAnalysis {
+// Default check result for when parsing fails or check is missing
+function defaultCheck(status: CheckStatus = 'unknown'): SecurityCheck {
+  return { status, details: 'Could not determine' }
+}
+
+// Create default checks object
+function defaultChecks(): SecurityChecks {
+  return {
+    remote_execution: defaultCheck(),
+    obfuscated_code: defaultCheck(),
+    sensitive_data_access: defaultCheck(),
+    shell_commands: defaultCheck(),
+    network_requests: defaultCheck(),
+    permission_escalation: defaultCheck(),
+    data_exfiltration: defaultCheck(),
+    persistence: defaultCheck(),
+  }
+}
+
+// Validate and normalize a single check
+function normalizeCheck(check: unknown): SecurityCheck {
+  if (!check || typeof check !== 'object') {
+    return defaultCheck()
+  }
+  const c = check as Record<string, unknown>
+  const validStatuses: CheckStatus[] = ['pass', 'fail', 'warn', 'unknown']
+  const status = validStatuses.includes(c.status as CheckStatus) 
+    ? (c.status as CheckStatus) 
+    : 'unknown'
+  const details = typeof c.details === 'string' ? c.details : 'No details provided'
+  return { status, details }
+}
+
+function parseAnalysisResponse(content: string, dataSources: DataSources): SecurityAnalysis {
   try {
     // Try to extract JSON from the response
     const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -101,29 +439,55 @@ function parseAnalysisResponse(content: string): SecurityAnalysis {
     
     const parsed = JSON.parse(jsonMatch[0])
     
-    // Validate and sanitize
+    // Validate and sanitize score
     const score = Math.max(0, Math.min(100, Number(parsed.score) || 50))
     const validLevels: RiskLevel[] = ['safe', 'low', 'medium', 'high', 'critical']
     const riskLevel = validLevels.includes(parsed.riskLevel) 
       ? parsed.riskLevel as RiskLevel 
       : scoreToRiskLevel(score)
     
+    // Parse structured checks
+    const parsedChecks = parsed.checks ?? {}
+    const checks: SecurityChecks = {
+      remote_execution: normalizeCheck(parsedChecks.remote_execution),
+      obfuscated_code: normalizeCheck(parsedChecks.obfuscated_code),
+      sensitive_data_access: normalizeCheck(parsedChecks.sensitive_data_access),
+      shell_commands: normalizeCheck(parsedChecks.shell_commands),
+      network_requests: normalizeCheck(parsedChecks.network_requests),
+      permission_escalation: normalizeCheck(parsedChecks.permission_escalation),
+      data_exfiltration: normalizeCheck(parsedChecks.data_exfiltration),
+      persistence: normalizeCheck(parsedChecks.persistence),
+    }
+    
+    // Derive flags from checks for backwards compatibility
+    const flags = deriveFlags(checks)
+    
+    // Build reasoning from check details
+    const reasoning = Object.entries(checks)
+      .map(([key, check]) => `${CHECK_LABELS[key as keyof SecurityChecks]}: [${check.status.toUpperCase()}] ${check.details}`)
+      .join('\n')
+    
     return {
       score,
       riskLevel,
-      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
+      flags,
       summary: String(parsed.summary || 'Analysis complete'),
-      reasoning: String(parsed.reasoning || 'No detailed reasoning provided'),
+      reasoning,
+      checks,
+      dataSources,
     }
   } catch (error) {
     console.error('Failed to parse AI response:', error, content)
-    // Return a conservative fallback
+    // Return a conservative fallback with all unknown checks
+    const checks = defaultChecks()
     return {
       score: 50,
       riskLevel: 'medium',
       flags: ['parse_error'],
       summary: 'Failed to parse AI analysis - manual review recommended',
       reasoning: `Parse error: ${error}. Raw response: ${content.slice(0, 500)}`,
+      checks,
+      dataSources,
     }
   }
 }
@@ -159,6 +523,13 @@ export const recordScanResult = internalMutation({
     flags: v.array(v.string()),
     summary: v.string(),
     reasoning: v.string(),
+    // New structured fields
+    securityChecks: v.optional(v.any()),
+    dataSources: v.optional(v.object({
+      skillContent: v.boolean(),
+      userComments: v.boolean(),
+      virusTotal: v.boolean(),
+    })),
     vtPositives: v.optional(v.number()),
     vtTotal: v.optional(v.number()),
     vtPermalink: v.optional(v.string()),
@@ -179,6 +550,8 @@ export const recordScanResult = internalMutation({
       flags: args.flags,
       summary: args.summary,
       reasoning: args.reasoning,
+      securityChecks: args.securityChecks,
+      dataSources: args.dataSources,
       vtPositives: args.vtPositives,
       vtTotal: args.vtTotal,
       vtPermalink: args.vtPermalink,
@@ -201,6 +574,9 @@ export const recordScanResult = internalMutation({
       })
       
       // Auto-block author if high or critical risk detected
+      // TEMPORARILY DISABLED - Testing security scan quality first
+      // TODO: Re-enable after validating scan accuracy
+      /*
       if (args.riskLevel === 'high' || args.riskLevel === 'critical') {
         const skill = await ctx.db.get(args.skillId)
         if (skill?.author && skill.author !== 'unknown' && skill.author !== 'community') {
@@ -249,6 +625,7 @@ export const recordScanResult = internalMutation({
           }
         }
       }
+      */
     }
   },
 })
@@ -337,11 +714,67 @@ export const analyzeSkill = internalAction({
     tags: v.optional(v.array(v.string())),
     category: v.optional(v.string()),
     content: v.optional(v.string()),
+    comments: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args): Promise<{ success: boolean; analysis?: SecurityAnalysis; error?: string }> => {
     const startTime = Date.now()
     
+    // Track data sources
+    const dataSources: DataSources = {
+      skillContent: !!(args.content && args.content.trim().length > 0),
+      userComments: !!(args.comments && args.comments.length > 0),
+      virusTotal: false, // Updated later if VT scan is performed
+    }
+    
     try {
+      // If we couldn't fetch skill.md content, we can still analyze the description
+      // but should mark all checks as "unknown" and not give a false sense of security
+      const hasFullContent = !!(args.content && args.content.trim().length > 0)
+      const hasDescription = !!(args.description && args.description.trim().length > 0)
+      
+      // If we have nothing to analyze at all, mark as unverified
+      if (!hasFullContent && !hasDescription) {
+        console.log(`[Security] No content or description for ${args.slug} - marking as unverified`)
+        
+        // All checks are unknown since we can't analyze anything
+        const unknownChecks = defaultChecks()
+        
+        const unverifiedAnalysis: SecurityAnalysis = {
+          score: 50,  // Medium - genuinely unknown
+          riskLevel: 'medium',
+          flags: ['content_unavailable', 'unverified'],
+          summary: 'Could not fetch skill content for analysis - status unverified',
+          reasoning: 'Neither the skill.md content nor a description could be retrieved. This skill cannot be verified and should be reviewed manually before use.',
+          checks: unknownChecks,
+          dataSources,
+        }
+        
+        // Record the result
+        await ctx.runMutation(internal.security.recordScanResult, {
+          skillId: args.skillId,
+          skillSlug: args.slug,
+          scanType: 'ai',
+          securityScore: unverifiedAnalysis.score,
+          riskLevel: unverifiedAnalysis.riskLevel,
+          flags: unverifiedAnalysis.flags,
+          summary: unverifiedAnalysis.summary,
+          reasoning: unverifiedAnalysis.reasoning,
+          securityChecks: unverifiedAnalysis.checks,
+          dataSources: unverifiedAnalysis.dataSources,
+          model: 'content-unavailable',
+          durationMs: Date.now() - startTime,
+          status: 'success',
+        })
+        
+        return { success: true, analysis: unverifiedAnalysis }
+      }
+      
+      // If we only have description (not full skill.md), still analyze but note the limitation
+      if (!hasFullContent && hasDescription) {
+        console.log(`[Security] Only description available for ${args.slug} - limited analysis`)
+        dataSources.skillContent = false // Mark that we don't have full content
+      }
+      
       // Build the prompt
       const prompt = buildAnalysisPrompt({
         name: args.name,
@@ -350,16 +783,17 @@ export const analyzeSkill = internalAction({
         tags: args.tags,
         category: args.category,
         content: args.content,
+        comments: args.comments,
       })
 
       // Call OpenRouter
       const aiResult = await analyzeWithAI(prompt, { 
         jsonMode: true,
-        maxTokens: 1024,
+        maxTokens: 1000, // Reduced to stay within credit limits
       })
 
-      // Parse the response
-      const analysis = parseAnalysisResponse(aiResult.content)
+      // Parse the response with data sources info
+      const analysis = parseAnalysisResponse(aiResult.content, dataSources)
       const durationMs = Date.now() - startTime
 
       // Check for external URLs that should be scanned by VT
@@ -371,6 +805,8 @@ export const analyzeSkill = internalAction({
         // Scan URLs with VirusTotal if configured
         if (isVTConfigured()) {
           vtResult = await scanUrls(urls)
+          dataSources.virusTotal = true
+          analysis.dataSources.virusTotal = true
           
           // Adjust score based on VT results
           if (vtResult.hasThreats) {
@@ -392,6 +828,8 @@ export const analyzeSkill = internalAction({
         flags: analysis.flags,
         summary: analysis.summary,
         reasoning: analysis.reasoning,
+        securityChecks: analysis.checks,
+        dataSources: analysis.dataSources,
         vtPositives: vtResult?.totalPositives,
         vtTotal: vtResult?.totalScanned,
         vtPermalink: vtResult?.results[0]?.permalink,
@@ -405,8 +843,10 @@ export const analyzeSkill = internalAction({
     } catch (error) {
       const durationMs = Date.now() - startTime
       const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`[Security] analyzeSkill failed for ${args.slug}:`, errorMessage)
       
-      // Record the error
+      // Record the error with unknown checks
+      const errorChecks = defaultChecks()
       await ctx.runMutation(internal.security.recordScanResult, {
         skillId: args.skillId,
         skillSlug: args.slug,
@@ -416,6 +856,8 @@ export const analyzeSkill = internalAction({
         flags: ['scan_error'],
         summary: 'Scan failed - manual review recommended',
         reasoning: errorMessage,
+        securityChecks: errorChecks,
+        dataSources,
         model: getDefaultModel(),
         durationMs,
         status: 'error',
@@ -446,14 +888,30 @@ export const scanBatch = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
+        // Skip skills without author - can't fetch from GitHub
+        if (!skill.author || skill.author === 'unknown') {
+          console.log(`[Security] Skipping ${skill.slug}: author unknown (pending enrichment)`)
+          continue
+        }
+        
+        // Fetch ALL files from GitHub and user comments
+        const [content, comments] = await Promise.all([
+          fetchSkillContent(skill.slug, skill.author),
+          fetchSkillComments(skill.slug),
+        ])
+        
+        console.log(`[Security] Fetched content for ${skill.author}/${skill.slug}: ${content ? `${content.length} chars` : 'unavailable'}, ${comments.length} comments`)
+        
         const result = await ctx.runAction(internal.security.analyzeSkill, {
           skillId: skill._id,
           slug: skill.slug,
           name: skill.name,
           author: skill.author,
           description: skill.description,
-          tags: skill.tags,
+          tags: Array.isArray(skill.tags) ? skill.tags : undefined,
           category: skill.category,
+          content: content ?? undefined,
+          comments: comments.length > 0 ? comments : undefined,
         })
         
         if (result.success) {
@@ -488,14 +946,28 @@ export const rescanOldSkills = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
+        // Skip skills without author - can't fetch from GitHub
+        if (!skill.author || skill.author === 'unknown') {
+          console.log(`[Security] Skipping rescan ${skill.slug}: author unknown`)
+          continue
+        }
+        
+        // Fetch ALL files from GitHub and user comments
+        const [content, comments] = await Promise.all([
+          fetchSkillContent(skill.slug, skill.author),
+          fetchSkillComments(skill.slug),
+        ])
+        
         const result = await ctx.runAction(internal.security.analyzeSkill, {
           skillId: skill._id,
           slug: skill.slug,
           name: skill.name,
           author: skill.author,
           description: skill.description,
-          tags: skill.tags,
+          tags: Array.isArray(skill.tags) ? skill.tags : undefined,
           category: skill.category,
+          content: content ?? undefined,
+          comments: comments.length > 0 ? comments : undefined,
         })
         
         if (result.success) {
@@ -678,6 +1150,7 @@ export const getSecurityStats = query({
 
 /**
  * Trigger a manual scan for a specific skill (admin only)
+ * This fetches ALL files from GitHub and runs a comprehensive analysis
  */
 export const triggerManualScan = mutation({
   args: {
@@ -700,17 +1173,773 @@ export const triggerManualScan = mutation({
       throw new Error('Skill not found')
     }
 
-    // Schedule the scan (will run as action)
-    await ctx.scheduler.runAfter(0, internal.security.analyzeSkill, {
+    // If author is unknown, run description-only analysis directly
+    if (!skill.author || skill.author === 'unknown') {
+      // Run analysis with just the description (no GitHub content)
+      await ctx.scheduler.runAfter(0, internal.security.analyzeSkill, {
+        skillId: args.skillId,
+        slug: skill.slug,
+        name: skill.name ?? skill.displayName,
+        author: skill.author,
+        description: skill.description ?? skill.summary,
+        tags: Array.isArray(skill.tags) ? skill.tags : undefined,
+        category: skill.category,
+        content: undefined, // No GitHub content available
+        comments: undefined,
+      })
+      return { success: true, message: 'Scan scheduled (description-only, author unknown)' }
+    }
+
+    // Schedule the action that fetches content from GitHub
+    await ctx.scheduler.runAfter(0, internal.security.rescanSingleSkill, {
       skillId: args.skillId,
-      slug: skill.slug,
-      name: skill.name ?? skill.displayName,
-      author: skill.author,
-      description: skill.description ?? skill.summary,
-      tags: Array.isArray(skill.tags) ? skill.tags : [],
-      category: skill.category,
+      clerkId: args.clerkId,
     })
 
-    return { success: true, message: 'Scan scheduled' }
+    return { success: true, message: 'Scan scheduled (fetching from GitHub)' }
+  },
+})
+
+// ============================================
+// Full Rescan Management
+// ============================================
+
+/**
+ * Get current rescan status (for admin dashboard)
+ */
+export const getRescanStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const state = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (!state) {
+      return {
+        status: 'idle' as const,
+        startedAt: null,
+        completedAt: null,
+        totalSkills: 0,
+        scannedCount: 0,
+        progress: 0,
+        triggeredBy: null,
+      }
+    }
+    
+    return {
+      status: state.status,
+      startedAt: state.startedAt ?? null,
+      completedAt: state.completedAt ?? null,
+      totalSkills: state.totalSkills ?? 0,
+      scannedCount: state.scannedCount ?? 0,
+      progress: state.totalSkills ? Math.round((state.scannedCount ?? 0) / state.totalSkills * 100) : 0,
+      triggeredBy: state.triggeredBy ?? null,
+      lastError: state.lastError ?? null,
+    }
+  },
+})
+
+/**
+ * Trigger a full rescan of all skills (admin only)
+ */
+export const triggerFullRescan = mutation({
+  args: {
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check if user is admin
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId))
+      .unique()
+    
+    if (!user || user.role !== 'admin') {
+      throw new Error('Unauthorized: Admin role required')
+    }
+
+    // Check if a rescan is already running
+    const existing = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (existing?.status === 'running') {
+      throw new Error('A rescan is already in progress')
+    }
+
+    // Count total skills to scan
+    const allSkills = await ctx.db
+      .query('cachedSkills')
+      .filter((q) => q.neq(q.field('hidden'), true))
+      .collect()
+    
+    const totalSkills = allSkills.length
+
+    // Create or update rescan state
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: 'running',
+        startedAt: Date.now(),
+        completedAt: undefined,
+        totalSkills,
+        scannedCount: 0,
+        cursor: 0,
+        triggeredBy: args.clerkId,
+        lastError: undefined,
+      })
+    } else {
+      await ctx.db.insert('securityRescanState', {
+        key: 'full_rescan',
+        status: 'running',
+        startedAt: Date.now(),
+        totalSkills,
+        scannedCount: 0,
+        cursor: 0,
+        triggeredBy: args.clerkId,
+      })
+    }
+
+    // Reset all lastSecurityScanAt to null so they get rescanned
+    for (const skill of allSkills) {
+      if (skill.lastSecurityScanAt) {
+        await ctx.db.patch(skill._id, {
+          lastSecurityScanAt: undefined,
+        })
+      }
+    }
+
+    // Schedule the rescan batch action
+    await ctx.scheduler.runAfter(0, internal.security.runFullRescanBatch, {})
+
+    return { 
+      success: true, 
+      message: `Full rescan started for ${totalSkills} skills`,
+      totalSkills,
+    }
+  },
+})
+
+/**
+ * Pause/stop a running rescan (admin only)
+ */
+export const pauseRescan = mutation({
+  args: {
+    clerkId: v.optional(v.string()), // Optional for internal use
+  },
+  handler: async (ctx, args) => {
+    // Check if user is admin (skip if no clerkId - internal call)
+    if (args.clerkId) {
+      const user = await ctx.db
+        .query('clerkUsers')
+        .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId as string))
+        .unique()
+      
+      if (!user || user.role !== 'admin') {
+        throw new Error('Unauthorized: Admin role required')
+      }
+    }
+
+    const state = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (!state || state.status !== 'running') {
+      return { success: false, message: 'No rescan is currently running' }
+    }
+
+    // Set status to idle to stop the rescan
+    await ctx.db.patch(state._id, {
+      status: 'idle',
+    })
+
+    return { 
+      success: true, 
+      message: `Rescan paused at ${state.scannedCount}/${state.totalSkills} skills`,
+      scannedCount: state.scannedCount,
+      totalSkills: state.totalSkills,
+    }
+  },
+})
+
+/**
+ * Internal mutation to update rescan progress
+ */
+export const updateRescanProgress = internalMutation({
+  args: {
+    scannedCount: v.number(),
+    cursor: v.number(),
+    status: v.optional(v.union(v.literal('running'), v.literal('completed'), v.literal('idle'))),
+    lastError: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const state = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (!state) return
+    
+    const updates: Record<string, unknown> = {
+      scannedCount: args.scannedCount,
+      cursor: args.cursor,
+    }
+    
+    if (args.status) {
+      updates.status = args.status
+      if (args.status === 'completed') {
+        updates.completedAt = Date.now()
+      }
+    }
+    
+    if (args.lastError !== undefined) {
+      updates.lastError = args.lastError
+    }
+    
+    await ctx.db.patch(state._id, updates)
+  },
+})
+
+/**
+ * Internal action to run full rescan in batches
+ */
+export const runFullRescanBatch = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ completed: boolean; scanned: number }> => {
+    // Get current rescan state
+    const state = await ctx.runQuery(internal.security.getRescanStateInternal, {})
+    
+    if (!state || state.status !== 'running') {
+      console.log('[Security] Rescan not running, stopping')
+      return { completed: true, scanned: 0 }
+    }
+
+    // Get unscanned skills (batch of 25 for full rescan)
+    const skills = await ctx.runMutation(internal.security.getUnscannedSkills, { limit: 25 })
+    
+    if (skills.length === 0) {
+      // All done!
+      await ctx.runMutation(internal.security.updateRescanProgress, {
+        scannedCount: state.scannedCount ?? 0,
+        cursor: state.cursor ?? 0,
+        status: 'completed',
+      })
+      console.log(`[Security] Full rescan completed! Total scanned: ${state.scannedCount}`)
+      return { completed: true, scanned: state.scannedCount ?? 0 }
+    }
+
+    console.log(`[Security] Full rescan batch: ${skills.length} skills (progress: ${state.scannedCount}/${state.totalSkills})`)
+    
+    let successCount = 0
+    for (const skill of skills) {
+      try {
+        // Skip skills without author - can't fetch from GitHub
+        if (!skill.author || skill.author === 'unknown') {
+          console.log(`[Security] Skipping full rescan ${skill.slug}: author unknown`)
+          continue
+        }
+        
+        // Fetch ALL files from GitHub and user comments
+        const [content, comments] = await Promise.all([
+          fetchSkillContent(skill.slug, skill.author),
+          fetchSkillComments(skill.slug),
+        ])
+        
+        const result = await ctx.runAction(internal.security.analyzeSkill, {
+          skillId: skill._id,
+          slug: skill.slug,
+          name: skill.name,
+          author: skill.author,
+          description: skill.description,
+          tags: Array.isArray(skill.tags) ? skill.tags : undefined,
+          category: skill.category,
+          content: content ?? undefined,
+          comments: comments.length > 0 ? comments : undefined,
+        })
+        
+        if (result.success) {
+          successCount++
+        }
+      } catch (error) {
+        console.error(`[Security] Failed to scan ${skill.slug}:`, error)
+      }
+    }
+
+    // Update progress
+    const newScannedCount = (state.scannedCount ?? 0) + successCount
+    await ctx.runMutation(internal.security.updateRescanProgress, {
+      scannedCount: newScannedCount,
+      cursor: (state.cursor ?? 0) + skills.length,
+    })
+
+    // Schedule next batch
+    await ctx.scheduler.runAfter(1000, internal.security.runFullRescanBatch, {})
+    
+    return { completed: false, scanned: successCount }
+  },
+})
+
+/**
+ * Internal query to get rescan state (for actions)
+ */
+export const getRescanStateInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+  },
+})
+
+// ============================================
+// GitHub Commit Tracking (Auto-rescan on updates)
+// ============================================
+
+/**
+ * Get the GitHub commit sync state
+ */
+export const getGitHubCommitSyncState = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query('gitHubCommitSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'commits'))
+      .unique()
+  },
+})
+
+/**
+ * Update the GitHub commit sync state
+ */
+export const updateGitHubCommitSyncState = internalMutation({
+  args: {
+    lastCommitSha: v.optional(v.string()),
+    lastSkillsRescanned: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('gitHubCommitSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'commits'))
+      .unique()
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        lastCommitSha: args.lastCommitSha,
+        lastCheckedAt: Date.now(),
+        lastSkillsRescanned: args.lastSkillsRescanned,
+      })
+    } else {
+      await ctx.db.insert('gitHubCommitSyncState', {
+        key: 'commits',
+        lastCommitSha: args.lastCommitSha,
+        lastCheckedAt: Date.now(),
+        lastSkillsRescanned: args.lastSkillsRescanned,
+      })
+    }
+  },
+})
+
+/**
+ * Rescan a skill by slug (used for commit-triggered rescans)
+ */
+export const rescanBySlug = internalAction({
+  args: { slug: v.string() },
+  handler: async (ctx, args): Promise<{ success: boolean; reason?: string; slug?: string }> => {
+    // Find the skill in cachedSkills
+    const skill = await ctx.runQuery(internal.security.getSkillBySlug, { slug: args.slug }) as {
+      _id: string
+      slug: string
+      name?: string
+      author?: string
+      description?: string
+      tags?: unknown // Can be array or object from different API versions
+      category?: string
+    } | null
+    
+    if (!skill) {
+      console.log(`[Security] Commit rescan: skill not found in DB: ${args.slug}`)
+      return { success: false, reason: 'not_found' }
+    }
+    
+    if (!skill.author || skill.author === 'unknown') {
+      console.log(`[Security] Commit rescan: author unknown for ${args.slug}`)
+      return { success: false, reason: 'author_unknown' }
+    }
+    
+    console.log(`[Security] Commit rescan triggered for ${skill.author}/${args.slug}`)
+    
+    // Fetch content and comments
+    const [content, comments] = await Promise.all([
+      fetchSkillContent(args.slug, skill.author),
+      fetchSkillComments(args.slug),
+    ])
+    
+    // Run analysis
+    const analysisResult = await ctx.runAction(internal.security.analyzeSkill, {
+      skillId: skill._id as Id<'cachedSkills'>,
+      slug: args.slug,
+      name: skill.name,
+      author: skill.author,
+      description: skill.description,
+      tags: Array.isArray(skill.tags) ? skill.tags : undefined,
+      category: skill.category,
+      content: content ?? undefined,
+      comments: comments.length > 0 ? comments : undefined,
+    }) as { success: boolean }
+    
+    return { success: analysisResult.success, slug: args.slug }
+  },
+})
+
+/**
+ * Internal query to get skill by slug
+ */
+export const getSkillBySlug = internalQuery({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_slug', (q) => q.eq('slug', args.slug))
+      .unique()
+  },
+})
+
+/**
+ * Check GitHub commits and trigger rescans for modified skills
+ * This should be run as a cron job every 15 minutes
+ */
+export const checkGitHubCommits = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ checked: number; rescanned: number; skills: string[] }> => {
+    console.log('[Security] Checking GitHub commits for skill updates...')
+    
+    // 1. Get last processed commit SHA
+    const state = await ctx.runQuery(internal.security.getGitHubCommitSyncState)
+    const lastSha = state?.lastCommitSha
+    
+    // 2. Fetch recent commits from GitHub
+    const response = await fetch(
+      'https://api.github.com/repos/openclaw/skills/commits?per_page=100',
+      {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'ClawdTM-Security/1.0',
+        },
+      }
+    )
+    
+    if (!response.ok) {
+      console.error(`[Security] GitHub commits API returned ${response.status}`)
+      return { checked: 0, rescanned: 0, skills: [] }
+    }
+    
+    const commits: Array<{ sha: string; commit: { message: string } }> = await response.json()
+    
+    if (commits.length === 0) {
+      return { checked: 0, rescanned: 0, skills: [] }
+    }
+    
+    // If no previous SHA, just store the latest and return
+    if (!lastSha) {
+      console.log('[Security] First run: storing latest commit SHA')
+      await ctx.runMutation(internal.security.updateGitHubCommitSyncState, {
+        lastCommitSha: commits[0].sha,
+        lastSkillsRescanned: [],
+      })
+      return { checked: 0, rescanned: 0, skills: [] }
+    }
+    
+    // 3. Find new commits since last check
+    const newCommits: typeof commits = []
+    for (const commit of commits) {
+      if (commit.sha === lastSha) break
+      newCommits.push(commit)
+    }
+    
+    if (newCommits.length === 0) {
+      console.log('[Security] No new commits since last check')
+      return { checked: 0, rescanned: 0, skills: [] }
+    }
+    
+    console.log(`[Security] Found ${newCommits.length} new commits to process`)
+    
+    // 4. Extract affected skills from commit file changes
+    const affectedSlugs = new Set<string>()
+    
+    for (const commit of newCommits) {
+      try {
+        const detailResponse = await fetch(
+          `https://api.github.com/repos/openclaw/skills/commits/${commit.sha}`,
+          {
+            headers: {
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'ClawdTM-Security/1.0',
+            },
+          }
+        )
+        
+        if (!detailResponse.ok) continue
+        
+        const detail: { files?: Array<{ filename: string }> } = await detailResponse.json()
+        
+        for (const file of detail.files || []) {
+          // Extract slug from path: skills/{owner}/{slug}/...
+          const match = file.filename.match(/^skills\/([^/]+)\/([^/]+)\//)
+          if (match) {
+            const slug = match[2] // slug (not owner/slug, just the skill name)
+            affectedSlugs.add(slug)
+          }
+        }
+      } catch (error) {
+        console.error(`[Security] Failed to fetch commit details for ${commit.sha}:`, error)
+      }
+    }
+    
+    console.log(`[Security] ${affectedSlugs.size} skills affected by new commits`)
+    
+    // 5. Trigger rescan for affected skills (with delay to avoid rate limiting)
+    const rescannedSlugs: string[] = []
+    let delay = 0
+    
+    for (const slug of affectedSlugs) {
+      await ctx.scheduler.runAfter(delay, internal.security.rescanBySlug, { slug })
+      rescannedSlugs.push(slug)
+      delay += 2000 // 2 second delay between rescans to avoid rate limiting
+    }
+    
+    // 6. Update last processed SHA
+    await ctx.runMutation(internal.security.updateGitHubCommitSyncState, {
+      lastCommitSha: commits[0].sha,
+      lastSkillsRescanned: rescannedSlugs,
+    })
+    
+    console.log(`[Security] Scheduled ${rescannedSlugs.length} skills for rescan`)
+    
+    return {
+      checked: newCommits.length,
+      rescanned: rescannedSlugs.length,
+      skills: rescannedSlugs,
+    }
+  },
+})
+
+/**
+ * Rescan a single skill by ID (for admin use)
+ */
+export const rescanSingleSkill = internalAction({
+  args: {
+    skillId: v.id('cachedSkills'),
+    clerkId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
+    // Get the skill
+    const skill = await ctx.runQuery(internal.security.getSkillById, { skillId: args.skillId }) as {
+      _id: string
+      slug: string
+      name?: string
+      author?: string
+      description?: string
+      tags?: unknown // Can be array or object from different API versions
+      category?: string
+    } | null
+    
+    if (!skill) {
+      throw new Error('Skill not found')
+    }
+    
+    if (!skill.author || skill.author === 'unknown') {
+      throw new Error('Cannot rescan: author unknown')
+    }
+    
+    console.log(`[Security] Admin rescan triggered for ${skill.author}/${skill.slug}`)
+    
+    // Fetch content and comments
+    const [content, comments] = await Promise.all([
+      fetchSkillContent(skill.slug, skill.author),
+      fetchSkillComments(skill.slug),
+    ])
+    
+    // Run analysis
+    const analysisResult = await ctx.runAction(internal.security.analyzeSkill, {
+      skillId: skill._id as Id<'cachedSkills'>,
+      slug: skill.slug,
+      name: skill.name,
+      author: skill.author,
+      description: skill.description,
+      tags: Array.isArray(skill.tags) ? skill.tags : undefined,
+      category: skill.category,
+      content: content ?? undefined,
+      comments: comments.length > 0 ? comments : undefined,
+    }) as { success: boolean }
+    
+    // Log audit if clerkId provided
+    if (args.clerkId) {
+      await ctx.runMutation(internal.security.logAdminRescan, {
+        clerkId: args.clerkId,
+        skillSlug: skill.slug,
+        success: analysisResult.success,
+      })
+    }
+    
+    return analysisResult
+  },
+})
+
+/**
+ * Get skill by ID (internal)
+ */
+export const getSkillById = internalQuery({
+  args: { skillId: v.id('cachedSkills') },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.skillId)
+  },
+})
+
+/**
+ * Log admin rescan action
+ */
+export const logAdminRescan = internalMutation({
+  args: {
+    clerkId: v.string(),
+    skillSlug: v.string(),
+    success: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert('adminAuditLogs', {
+      actorClerkId: args.clerkId,
+      actorType: 'human',
+      action: 'hide_skill', // TODO: Add 'rescan_skill' to audit action types
+      targetType: 'skill',
+      targetId: args.skillSlug,
+      details: {
+        reason: 'Manual security rescan',
+        newValue: args.success ? 'rescanned' : 'rescan_failed',
+      },
+      createdAt: Date.now(),
+    })
+  },
+})
+
+/**
+ * Reset security data in batches - internal mutation for batch processing
+ */
+export const resetSecurityBatch = internalMutation({
+  args: {
+    batchType: v.union(v.literal('skills'), v.literal('logs')),
+    limit: v.number(),
+  },
+  handler: async (ctx, args): Promise<{ processed: number; hasMore: boolean }> => {
+    let processed = 0
+    
+    if (args.batchType === 'skills') {
+      // Get skills with security data
+      const skills = await ctx.db
+        .query('cachedSkills')
+        .filter((q) => q.neq(q.field('securityScore'), undefined))
+        .take(args.limit)
+      
+      for (const skill of skills) {
+        await ctx.db.patch(skill._id, {
+          securityScore: undefined,
+          securityRisk: undefined,
+          securityFlags: undefined,
+          lastSecurityScanAt: undefined,
+          vtAnalysisUrl: undefined,
+          // Unhide skills that were auto-hidden by security scanner
+          ...(skill.hiddenBy === 'system:security-scanner' ? {
+            hidden: undefined,
+            hiddenAt: undefined,
+            hiddenBy: undefined,
+            hiddenReason: undefined,
+          } : {}),
+        })
+        processed++
+      }
+      
+      return { processed, hasMore: skills.length === args.limit }
+    } else {
+      // Delete scan logs
+      const logs = await ctx.db.query('securityScanLogs').take(args.limit)
+      
+      for (const log of logs) {
+        await ctx.db.delete(log._id)
+        processed++
+      }
+      
+      return { processed, hasMore: logs.length === args.limit }
+    }
+  },
+})
+
+/**
+ * Reset all security data - orchestrator action
+ * Processes in batches to avoid Convex limits
+ */
+export const resetAllSecurityData = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ skillsReset: number; logsDeleted: number }> => {
+    const BATCH_SIZE = 200
+    let totalSkillsReset = 0
+    let totalLogsDeleted = 0
+    
+    // 1. Reset skills in batches
+    console.log('[Security] Starting skill reset...')
+    let hasMoreSkills = true
+    while (hasMoreSkills) {
+      const result = await ctx.runMutation(internal.security.resetSecurityBatch, {
+        batchType: 'skills',
+        limit: BATCH_SIZE,
+      })
+      totalSkillsReset += result.processed
+      hasMoreSkills = result.hasMore
+      if (result.processed > 0) {
+        console.log(`[Security] Reset ${totalSkillsReset} skills so far...`)
+      }
+    }
+    
+    // 2. Delete logs in batches
+    console.log('[Security] Starting log deletion...')
+    let hasMoreLogs = true
+    while (hasMoreLogs) {
+      const result = await ctx.runMutation(internal.security.resetSecurityBatch, {
+        batchType: 'logs',
+        limit: BATCH_SIZE,
+      })
+      totalLogsDeleted += result.processed
+      hasMoreLogs = result.hasMore
+      if (result.processed > 0) {
+        console.log(`[Security] Deleted ${totalLogsDeleted} logs so far...`)
+      }
+    }
+    
+    // 3. Reset rescan state
+    await ctx.runMutation(internal.security.resetRescanState, {})
+    
+    console.log(`[Security] Reset complete: ${totalSkillsReset} skills reset, ${totalLogsDeleted} logs deleted`)
+    
+    return { skillsReset: totalSkillsReset, logsDeleted: totalLogsDeleted }
+  },
+})
+
+/**
+ * Reset rescan state
+ */
+export const resetRescanState = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const rescanState = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (rescanState) {
+      await ctx.db.patch(rescanState._id, {
+        status: 'idle',
+        scannedCount: 0,
+        cursor: 0,
+      })
+    }
   },
 })

@@ -509,6 +509,10 @@ export const listSkillsForAdmin = query({
         verifiedAt: s.verifiedAt,
         reviewCount: s.reviewCount ?? 0,
         avgRating: s.avgRating,
+        // Security info
+        securityScore: s.securityScore,
+        securityRisk: s.securityRisk,
+        lastSecurityScanAt: s.lastSecurityScanAt,
       })),
       total,
       hasMore: offset + limit < total,
