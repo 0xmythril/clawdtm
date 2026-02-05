@@ -19,7 +19,7 @@ const DESKTOP_TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Welcome! Discover skills for your Claude agent and see what the community recommends. 🎉
+          Welcome! Discover skills for your OpenClaw agent and see what the community recommends. 🎉
         </p>
       </div>
     ),
@@ -111,7 +111,7 @@ const MOBILE_TOUR_STEPS: Step[] = [
     content: (
       <div className="text-left">
         <p className="text-sm">
-          Welcome! Discover skills for your Claude agent and see what the community recommends. 🎉
+          Welcome! Discover skills for your OpenClaw agent and see what the community recommends. 🎉
         </p>
       </div>
     ),
