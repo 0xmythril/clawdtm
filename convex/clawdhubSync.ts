@@ -1920,12 +1920,15 @@ export const syncAuthorsFromGitHub = internalAction({
     console.log('Fetching skill tree from GitHub archive...')
     
     // Fetch the recursive tree from GitHub
-    const response = await fetch(GITHUB_SKILLS_TREE_URL, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'ClawdTM-Sync/1.0',
-      },
-    })
+    const githubToken = process.env.GITHUB_TOKEN
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'ClawdTM-Sync/1.0',
+    }
+    if (githubToken) {
+      headers['Authorization'] = `token ${githubToken}`
+    }
+    const response = await fetch(GITHUB_SKILLS_TREE_URL, { headers })
     
     if (!response.ok) {
       throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`)
