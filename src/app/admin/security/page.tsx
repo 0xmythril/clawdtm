@@ -193,6 +193,15 @@ export default function AdminSecurityPage() {
 
   const handleTriggerFullRescan = async () => {
     if (!clerkId || !isAdmin) return;
+    const confirmed = window.confirm(
+      "⚠️ WARNING: Full Rescan\n\n" +
+      "This will DELETE all existing security scan results and re-scan every skill from scratch.\n\n" +
+      `• ${stats?.scanned ?? 0} existing scan results will be erased\n` +
+      `• ${stats?.total ?? 0} skills will need to be re-scanned\n` +
+      "• This process can take several hours\n\n" +
+      "Are you sure? Use 'Scan Unscanned' instead if you only want to scan new skills."
+    );
+    if (!confirmed) return;
     setIsTriggering(true);
     try {
       await triggerFullRescan({ clerkId });
@@ -352,11 +361,11 @@ export default function AdminSecurityPage() {
                     <p>Completed: {new Date(rescanStatus.completedAt).toLocaleString()}</p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   <Button 
                     onClick={handleScanUnscanned}
                     disabled={isScanningUnscanned || isTriggering}
-                    className="flex-1"
+                    className="w-full"
                     variant="default"
                   >
                     {isScanningUnscanned ? (
@@ -374,13 +383,19 @@ export default function AdminSecurityPage() {
                   <Button 
                     onClick={handleTriggerFullRescan}
                     disabled={isTriggering || isScanningUnscanned}
-                    variant="outline"
-                    title="Reset & rescan all skills from scratch"
+                    variant="destructive"
+                    className="w-full"
                   >
                     {isTriggering ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
                     ) : (
-                      <DatabaseBackup className="h-4 w-4" />
+                      <>
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Full Rescan (Deletes All Results)
+                      </>
                     )}
                   </Button>
                 </div>
@@ -390,11 +405,11 @@ export default function AdminSecurityPage() {
                 <p className="text-sm text-muted-foreground">
                   Scan unscanned skills or reset &amp; rescan all {stats?.total ?? 0} skills from scratch.
                 </p>
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   <Button 
                     onClick={handleScanUnscanned}
                     disabled={isScanningUnscanned || isTriggering}
-                    className="flex-1"
+                    className="w-full"
                     variant="default"
                   >
                     {isScanningUnscanned ? (
@@ -412,13 +427,19 @@ export default function AdminSecurityPage() {
                   <Button 
                     onClick={handleTriggerFullRescan}
                     disabled={isTriggering || isScanningUnscanned}
-                    variant="outline"
-                    title="Reset & rescan all skills from scratch"
+                    variant="destructive"
+                    className="w-full"
                   >
                     {isTriggering ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
                     ) : (
-                      <DatabaseBackup className="h-4 w-4" />
+                      <>
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Full Rescan (Deletes All Results)
+                      </>
                     )}
                   </Button>
                 </div>
