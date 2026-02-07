@@ -161,6 +161,7 @@ export default function AdminSecurityPage() {
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 50]);
   const [scanningSkillId, setScanningSkillId] = useState<Id<"cachedSkills"> | null>(null);
   const [isTriggering, setIsTriggering] = useState(false);
+  const [isScanningUnscanned, setIsScanningUnscanned] = useState(false);
 
   // Get security stats
   const stats = useQuery(api.security.getSecurityStats);
@@ -186,6 +187,7 @@ export default function AdminSecurityPage() {
   // Mutations
   const triggerScan = useMutation(api.security.triggerManualScan);
   const triggerFullRescan = useMutation(api.security.triggerFullRescan);
+  const triggerScanUnscanned = useMutation(api.security.triggerScanUnscanned);
   const hideSkill = useMutation(api.admin.adminHideSkill);
 
   const handleTriggerFullRescan = async () => {
@@ -198,6 +200,20 @@ export default function AdminSecurityPage() {
       alert(error instanceof Error ? error.message : "Failed to trigger rescan");
     } finally {
       setIsTriggering(false);
+    }
+  };
+
+  const handleScanUnscanned = async () => {
+    if (!clerkId || !isAdmin) return;
+    setIsScanningUnscanned(true);
+    try {
+      const result = await triggerScanUnscanned({ clerkId });
+      alert(result.message);
+    } catch (error) {
+      console.error("Scan unscanned failed:", error);
+      alert(error instanceof Error ? error.message : "Failed to start scan");
+    } finally {
+      setIsScanningUnscanned(false);
     }
   };
 
@@ -335,23 +351,38 @@ export default function AdminSecurityPage() {
                     <p>Completed: {new Date(rescanStatus.completedAt).toLocaleString()}</p>
                   )}
                 </div>
-                <Button 
-                  onClick={handleTriggerFullRescan}
-                  disabled={isTriggering}
-                  className="w-full"
-                >
-                  {isTriggering ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Starting...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Start New Full Rescan
-                    </>
-                  )}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleScanUnscanned}
+                    disabled={isScanningUnscanned || isTriggering}
+                    className="flex-1"
+                    variant="default"
+                  >
+                    {isScanningUnscanned ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Scan Unscanned ({stats?.unscanned ?? 0})
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={handleTriggerFullRescan}
+                    disabled={isTriggering || isScanningUnscanned}
+                    variant="outline"
+                    title="Full rescan (resets all)"
+                  >
+                    {isTriggering ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -359,23 +390,37 @@ export default function AdminSecurityPage() {
                   Trigger a full rescan of all {stats?.total ?? 0} skills with the new security scanner. 
                   This will reset all previous scan results and re-analyze every skill.
                 </p>
-                <Button 
-                  onClick={handleTriggerFullRescan}
-                  disabled={isTriggering}
-                  className="w-full"
-                >
-                  {isTriggering ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Starting...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Start Full Rescan
-                    </>
-                  )}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleScanUnscanned}
+                    disabled={isScanningUnscanned || isTriggering}
+                    className="flex-1"
+                    variant="default"
+                  >
+                    {isScanningUnscanned ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Scan Unscanned ({stats?.unscanned ?? 0})
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={handleTriggerFullRescan}
+                    disabled={isTriggering || isScanningUnscanned}
+                    variant="outline"
+                  >
+                    {isTriggering ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

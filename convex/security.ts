@@ -1331,6 +1331,82 @@ export const triggerFullRescan = mutation({
 })
 
 /**
+ * Trigger scan of only unscanned skills (doesn't reset existing results)
+ * Admin only - schedules the scanBatch action repeatedly until all are scanned
+ */
+export const triggerScanUnscanned = mutation({
+  args: {
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId))
+      .unique()
+    
+    if (!user || user.role !== 'admin') {
+      throw new Error('Unauthorized: Admin role required')
+    }
+
+    // Check if a rescan is already running
+    const existing = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (existing?.status === 'running') {
+      throw new Error('A scan is already in progress')
+    }
+
+    // Count unscanned skills
+    const unscanned = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_last_security_scan', (q) => q.eq('lastSecurityScanAt', undefined))
+      .filter((q) => q.neq(q.field('hidden'), true))
+      .collect()
+    
+    const unscannedCount = unscanned.length
+
+    if (unscannedCount === 0) {
+      return { success: true, message: 'All skills are already scanned', totalSkills: 0 }
+    }
+
+    // Create/update rescan state for tracking
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: 'running',
+        startedAt: Date.now(),
+        completedAt: undefined,
+        scannedCount: 0,
+        totalSkills: unscannedCount,
+        cursor: 0,
+        triggeredBy: args.clerkId,
+        lastError: undefined,
+      })
+    } else {
+      await ctx.db.insert('securityRescanState', {
+        key: 'full_rescan',
+        status: 'running',
+        startedAt: Date.now(),
+        scannedCount: 0,
+        totalSkills: unscannedCount,
+        cursor: 0,
+        triggeredBy: args.clerkId,
+      })
+    }
+
+    // Schedule the rescan batch action (reuses same batch runner)
+    await ctx.scheduler.runAfter(0, internal.security.runFullRescanBatch, {})
+
+    return { 
+      success: true, 
+      message: `Scanning ${unscannedCount} unscanned skills (existing results preserved)`,
+      totalSkills: unscannedCount,
+    }
+  },
+})
+
+/**
  * Pause/stop a running rescan (admin only)
  */
 export const pauseRescan = mutation({
