@@ -23,6 +23,7 @@ import {
   CheckCircle,
   Users,
   Github,
+  DatabaseBackup,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -374,12 +375,12 @@ export default function AdminSecurityPage() {
                     onClick={handleTriggerFullRescan}
                     disabled={isTriggering || isScanningUnscanned}
                     variant="outline"
-                    title="Full rescan (resets all)"
+                    title="Reset & rescan all skills from scratch"
                   >
                     {isTriggering ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <RotateCcw className="h-4 w-4" />
+                      <DatabaseBackup className="h-4 w-4" />
                     )}
                   </Button>
                 </div>
@@ -387,8 +388,7 @@ export default function AdminSecurityPage() {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Trigger a full rescan of all {stats?.total ?? 0} skills with the new security scanner. 
-                  This will reset all previous scan results and re-analyze every skill.
+                  Scan unscanned skills or reset &amp; rescan all {stats?.total ?? 0} skills from scratch.
                 </p>
                 <div className="flex gap-2">
                   <Button 
@@ -413,11 +413,12 @@ export default function AdminSecurityPage() {
                     onClick={handleTriggerFullRescan}
                     disabled={isTriggering || isScanningUnscanned}
                     variant="outline"
+                    title="Reset & rescan all skills from scratch"
                   >
                     {isTriggering ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <RotateCcw className="h-4 w-4" />
+                      <DatabaseBackup className="h-4 w-4" />
                     )}
                   </Button>
                 </div>
