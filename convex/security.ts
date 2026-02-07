@@ -236,15 +236,20 @@ async function fetchAllSkillFiles(
   const files: SkillFile[] = []
   const basePath = `skills/${author}/${slug}`
   
+  // Build headers with GitHub token for rate limiting
+  const githubToken = process.env.GITHUB_TOKEN
+  const apiHeaders: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'ClawdTM-Security/1.0',
+  }
+  if (githubToken) {
+    apiHeaders['Authorization'] = `token ${githubToken}`
+  }
+  
   try {
     // 1. Get directory listing from GitHub API
     const listUrl = `https://api.github.com/repos/openclaw/skills/contents/${basePath}`
-    const listResponse = await fetch(listUrl, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'ClawdTM-Security/1.0',
-      },
-    })
+    const listResponse = await fetch(listUrl, { headers: apiHeaders })
     
     if (!listResponse.ok) {
       console.log(`[Security] Skill not in GitHub archive: ${author}/${slug} (${listResponse.status})`)
@@ -276,12 +281,7 @@ async function fetchAllSkillFiles(
       if (item.type !== 'dir') continue
       
       const subUrl = `https://api.github.com/repos/openclaw/skills/contents/${basePath}/${item.name}`
-      const subResponse = await fetch(subUrl, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'ClawdTM-Security/1.0',
-        },
-      })
+      const subResponse = await fetch(subUrl, { headers: apiHeaders })
       
       if (!subResponse.ok) continue
       
@@ -640,14 +640,22 @@ export const getUnscannedSkills = internalMutation({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 10
     
+    // Over-fetch to ensure we get enough skills after filtering
+    const overFetchLimit = limit * 3
+    
     // Get skills that have never been scanned
     const unscanned = await ctx.db
       .query('cachedSkills')
       .withIndex('by_last_security_scan', (q) => q.eq('lastSecurityScanAt', undefined))
       .filter((q) => q.neq(q.field('hidden'), true))
-      .take(limit)
+      .take(overFetchLimit)
     
-    return unscanned.map(s => ({
+    // Prioritize skills with known authors (full GitHub scan) over unknown (description-only)
+    const withAuthor = unscanned.filter(s => s.author && s.author !== 'unknown')
+    const withoutAuthor = unscanned.filter(s => !s.author || s.author === 'unknown')
+    const prioritized = [...withAuthor, ...withoutAuthor].slice(0, limit)
+    
+    return prioritized.map(s => ({
       _id: s._id,
       slug: s.slug,
       name: s.name ?? s.displayName ?? s.slug,
@@ -888,19 +896,21 @@ export const scanBatch = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
-        // Skip skills without author - can't fetch from GitHub
-        if (!skill.author || skill.author === 'unknown') {
-          console.log(`[Security] Skipping ${skill.slug}: author unknown (pending enrichment)`)
-          continue
+        let content: string | undefined = undefined
+        let comments: string[] = []
+
+        // If author is known, fetch full content from GitHub
+        if (skill.author && skill.author !== 'unknown') {
+          const [fetchedContent, fetchedComments] = await Promise.all([
+            fetchSkillContent(skill.slug, skill.author),
+            fetchSkillComments(skill.slug),
+          ])
+          content = fetchedContent ?? undefined
+          comments = fetchedComments
+          console.log(`[Security] Fetched content for ${skill.author}/${skill.slug}: ${content ? `${content.length} chars` : 'unavailable'}, ${comments.length} comments`)
+        } else {
+          console.log(`[Security] Scanning ${skill.slug} with description only (author unknown)`)
         }
-        
-        // Fetch ALL files from GitHub and user comments
-        const [content, comments] = await Promise.all([
-          fetchSkillContent(skill.slug, skill.author),
-          fetchSkillComments(skill.slug),
-        ])
-        
-        console.log(`[Security] Fetched content for ${skill.author}/${skill.slug}: ${content ? `${content.length} chars` : 'unavailable'}, ${comments.length} comments`)
         
         const result = await ctx.runAction(internal.security.analyzeSkill, {
           skillId: skill._id,
@@ -910,7 +920,7 @@ export const scanBatch = internalAction({
           description: skill.description,
           tags: Array.isArray(skill.tags) ? skill.tags : undefined,
           category: skill.category,
-          content: content ?? undefined,
+          content,
           comments: comments.length > 0 ? comments : undefined,
         })
         
@@ -1321,6 +1331,82 @@ export const triggerFullRescan = mutation({
 })
 
 /**
+ * Trigger scan of only unscanned skills (doesn't reset existing results)
+ * Admin only - schedules the scanBatch action repeatedly until all are scanned
+ */
+export const triggerScanUnscanned = mutation({
+  args: {
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query('clerkUsers')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', args.clerkId))
+      .unique()
+    
+    if (!user || user.role !== 'admin') {
+      throw new Error('Unauthorized: Admin role required')
+    }
+
+    // Check if a rescan is already running
+    const existing = await ctx.db
+      .query('securityRescanState')
+      .withIndex('by_key', (q) => q.eq('key', 'full_rescan'))
+      .unique()
+    
+    if (existing?.status === 'running') {
+      throw new Error('A scan is already in progress')
+    }
+
+    // Count unscanned skills
+    const unscanned = await ctx.db
+      .query('cachedSkills')
+      .withIndex('by_last_security_scan', (q) => q.eq('lastSecurityScanAt', undefined))
+      .filter((q) => q.neq(q.field('hidden'), true))
+      .collect()
+    
+    const unscannedCount = unscanned.length
+
+    if (unscannedCount === 0) {
+      return { success: true, message: 'All skills are already scanned', totalSkills: 0 }
+    }
+
+    // Create/update rescan state for tracking
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: 'running',
+        startedAt: Date.now(),
+        completedAt: undefined,
+        scannedCount: 0,
+        totalSkills: unscannedCount,
+        cursor: 0,
+        triggeredBy: args.clerkId,
+        lastError: undefined,
+      })
+    } else {
+      await ctx.db.insert('securityRescanState', {
+        key: 'full_rescan',
+        status: 'running',
+        startedAt: Date.now(),
+        scannedCount: 0,
+        totalSkills: unscannedCount,
+        cursor: 0,
+        triggeredBy: args.clerkId,
+      })
+    }
+
+    // Schedule the rescan batch action (reuses same batch runner)
+    await ctx.scheduler.runAfter(0, internal.security.runFullRescanBatch, {})
+
+    return { 
+      success: true, 
+      message: `Scanning ${unscannedCount} unscanned skills (existing results preserved)`,
+      totalSkills: unscannedCount,
+    }
+  },
+})
+
+/**
  * Pause/stop a running rescan (admin only)
  */
 export const pauseRescan = mutation({
@@ -1434,17 +1520,19 @@ export const runFullRescanBatch = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
-        // Skip skills without author - can't fetch from GitHub
-        if (!skill.author || skill.author === 'unknown') {
-          console.log(`[Security] Skipping full rescan ${skill.slug}: author unknown`)
-          continue
+        let content: string | undefined = undefined
+        let comments: string[] = []
+
+        if (skill.author && skill.author !== 'unknown') {
+          const [fetchedContent, fetchedComments] = await Promise.all([
+            fetchSkillContent(skill.slug, skill.author),
+            fetchSkillComments(skill.slug),
+          ])
+          content = fetchedContent ?? undefined
+          comments = fetchedComments
+        } else {
+          console.log(`[Security] Full rescan ${skill.slug}: description only (author unknown)`)
         }
-        
-        // Fetch ALL files from GitHub and user comments
-        const [content, comments] = await Promise.all([
-          fetchSkillContent(skill.slug, skill.author),
-          fetchSkillComments(skill.slug),
-        ])
         
         const result = await ctx.runAction(internal.security.analyzeSkill, {
           skillId: skill._id,
@@ -1454,7 +1542,7 @@ export const runFullRescanBatch = internalAction({
           description: skill.description,
           tags: Array.isArray(skill.tags) ? skill.tags : undefined,
           category: skill.category,
-          content: content ?? undefined,
+          content,
           comments: comments.length > 0 ? comments : undefined,
         })
         
@@ -1620,14 +1708,17 @@ export const checkGitHubCommits = internalAction({
     const lastSha = state?.lastCommitSha
     
     // 2. Fetch recent commits from GitHub
+    const githubToken = process.env.GITHUB_TOKEN
+    const commitHeaders: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'ClawdTM-Security/1.0',
+    }
+    if (githubToken) {
+      commitHeaders['Authorization'] = `token ${githubToken}`
+    }
     const response = await fetch(
       'https://api.github.com/repos/openclaw/skills/commits?per_page=100',
-      {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'ClawdTM-Security/1.0',
-        },
-      }
+      { headers: commitHeaders }
     )
     
     if (!response.ok) {

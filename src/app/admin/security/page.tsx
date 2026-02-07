@@ -23,6 +23,7 @@ import {
   CheckCircle,
   Users,
   Github,
+  DatabaseBackup,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -161,6 +162,7 @@ export default function AdminSecurityPage() {
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 50]);
   const [scanningSkillId, setScanningSkillId] = useState<Id<"cachedSkills"> | null>(null);
   const [isTriggering, setIsTriggering] = useState(false);
+  const [isScanningUnscanned, setIsScanningUnscanned] = useState(false);
 
   // Get security stats
   const stats = useQuery(api.security.getSecurityStats);
@@ -186,10 +188,20 @@ export default function AdminSecurityPage() {
   // Mutations
   const triggerScan = useMutation(api.security.triggerManualScan);
   const triggerFullRescan = useMutation(api.security.triggerFullRescan);
+  const triggerScanUnscanned = useMutation(api.security.triggerScanUnscanned);
   const hideSkill = useMutation(api.admin.adminHideSkill);
 
   const handleTriggerFullRescan = async () => {
     if (!clerkId || !isAdmin) return;
+    const confirmed = window.confirm(
+      "⚠️ WARNING: Full Rescan\n\n" +
+      "This will DELETE all existing security scan results and re-scan every skill from scratch.\n\n" +
+      `• ${stats?.scanned ?? 0} existing scan results will be erased\n` +
+      `• ${stats?.total ?? 0} skills will need to be re-scanned\n` +
+      "• This process can take several hours\n\n" +
+      "Are you sure? Use 'Scan Unscanned' instead if you only want to scan new skills."
+    );
+    if (!confirmed) return;
     setIsTriggering(true);
     try {
       await triggerFullRescan({ clerkId });
@@ -198,6 +210,20 @@ export default function AdminSecurityPage() {
       alert(error instanceof Error ? error.message : "Failed to trigger rescan");
     } finally {
       setIsTriggering(false);
+    }
+  };
+
+  const handleScanUnscanned = async () => {
+    if (!clerkId || !isAdmin) return;
+    setIsScanningUnscanned(true);
+    try {
+      const result = await triggerScanUnscanned({ clerkId });
+      alert(result.message);
+    } catch (error) {
+      console.error("Scan unscanned failed:", error);
+      alert(error instanceof Error ? error.message : "Failed to start scan");
+    } finally {
+      setIsScanningUnscanned(false);
     }
   };
 
@@ -335,47 +361,88 @@ export default function AdminSecurityPage() {
                     <p>Completed: {new Date(rescanStatus.completedAt).toLocaleString()}</p>
                   )}
                 </div>
-                <Button 
-                  onClick={handleTriggerFullRescan}
-                  disabled={isTriggering}
-                  className="w-full"
-                >
-                  {isTriggering ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Starting...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Start New Full Rescan
-                    </>
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    onClick={handleScanUnscanned}
+                    disabled={isScanningUnscanned || isTriggering}
+                    className="w-full"
+                    variant="default"
+                  >
+                    {isScanningUnscanned ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Scan Unscanned ({stats?.unscanned ?? 0})
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={handleTriggerFullRescan}
+                    disabled={isTriggering || isScanningUnscanned}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    {isTriggering ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Full Rescan (Deletes All Results)
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Trigger a full rescan of all {stats?.total ?? 0} skills with the new security scanner. 
-                  This will reset all previous scan results and re-analyze every skill.
+                  Scan unscanned skills or reset &amp; rescan all {stats?.total ?? 0} skills from scratch.
                 </p>
-                <Button 
-                  onClick={handleTriggerFullRescan}
-                  disabled={isTriggering}
-                  className="w-full"
-                >
-                  {isTriggering ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Starting...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Start Full Rescan
-                    </>
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    onClick={handleScanUnscanned}
+                    disabled={isScanningUnscanned || isTriggering}
+                    className="w-full"
+                    variant="default"
+                  >
+                    {isScanningUnscanned ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Scan Unscanned ({stats?.unscanned ?? 0})
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={handleTriggerFullRescan}
+                    disabled={isTriggering || isScanningUnscanned}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    {isTriggering ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Full Rescan (Deletes All Results)
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

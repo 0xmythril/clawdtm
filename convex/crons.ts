@@ -20,12 +20,12 @@ crons.interval(
   { limit: 100 },
 )
 
-// Enrich skills with author info every 6 hours (new skills are rare)
+// Sync authors from GitHub tree (bulk match - handles all skills in one shot)
+// Runs after skill sync would have added new skills
 crons.interval(
-  'clawdhub-author-enrichment',
-  { hours: 6 },
-  internal.clawdhubSync.enrichSkillAuthors,
-  { limit: 50 },
+  'github-author-sync',
+  { hours: 2 },
+  internal.clawdhubSync.syncAuthorsFromGitHub,
 )
 
 // Security scan unscanned skills every 5 minutes (batch of 50 for faster initial scan)
