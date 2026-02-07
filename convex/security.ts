@@ -888,19 +888,21 @@ export const scanBatch = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
-        // Skip skills without author - can't fetch from GitHub
-        if (!skill.author || skill.author === 'unknown') {
-          console.log(`[Security] Skipping ${skill.slug}: author unknown (pending enrichment)`)
-          continue
+        let content: string | undefined = undefined
+        let comments: string[] = []
+
+        // If author is known, fetch full content from GitHub
+        if (skill.author && skill.author !== 'unknown') {
+          const [fetchedContent, fetchedComments] = await Promise.all([
+            fetchSkillContent(skill.slug, skill.author),
+            fetchSkillComments(skill.slug),
+          ])
+          content = fetchedContent ?? undefined
+          comments = fetchedComments
+          console.log(`[Security] Fetched content for ${skill.author}/${skill.slug}: ${content ? `${content.length} chars` : 'unavailable'}, ${comments.length} comments`)
+        } else {
+          console.log(`[Security] Scanning ${skill.slug} with description only (author unknown)`)
         }
-        
-        // Fetch ALL files from GitHub and user comments
-        const [content, comments] = await Promise.all([
-          fetchSkillContent(skill.slug, skill.author),
-          fetchSkillComments(skill.slug),
-        ])
-        
-        console.log(`[Security] Fetched content for ${skill.author}/${skill.slug}: ${content ? `${content.length} chars` : 'unavailable'}, ${comments.length} comments`)
         
         const result = await ctx.runAction(internal.security.analyzeSkill, {
           skillId: skill._id,
@@ -910,7 +912,7 @@ export const scanBatch = internalAction({
           description: skill.description,
           tags: Array.isArray(skill.tags) ? skill.tags : undefined,
           category: skill.category,
-          content: content ?? undefined,
+          content,
           comments: comments.length > 0 ? comments : undefined,
         })
         
@@ -1434,17 +1436,19 @@ export const runFullRescanBatch = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
-        // Skip skills without author - can't fetch from GitHub
-        if (!skill.author || skill.author === 'unknown') {
-          console.log(`[Security] Skipping full rescan ${skill.slug}: author unknown`)
-          continue
+        let content: string | undefined = undefined
+        let comments: string[] = []
+
+        if (skill.author && skill.author !== 'unknown') {
+          const [fetchedContent, fetchedComments] = await Promise.all([
+            fetchSkillContent(skill.slug, skill.author),
+            fetchSkillComments(skill.slug),
+          ])
+          content = fetchedContent ?? undefined
+          comments = fetchedComments
+        } else {
+          console.log(`[Security] Full rescan ${skill.slug}: description only (author unknown)`)
         }
-        
-        // Fetch ALL files from GitHub and user comments
-        const [content, comments] = await Promise.all([
-          fetchSkillContent(skill.slug, skill.author),
-          fetchSkillComments(skill.slug),
-        ])
         
         const result = await ctx.runAction(internal.security.analyzeSkill, {
           skillId: skill._id,
@@ -1454,7 +1458,7 @@ export const runFullRescanBatch = internalAction({
           description: skill.description,
           tags: Array.isArray(skill.tags) ? skill.tags : undefined,
           category: skill.category,
-          content: content ?? undefined,
+          content,
           comments: comments.length > 0 ? comments : undefined,
         })
         
