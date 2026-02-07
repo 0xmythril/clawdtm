@@ -236,15 +236,20 @@ async function fetchAllSkillFiles(
   const files: SkillFile[] = []
   const basePath = `skills/${author}/${slug}`
   
+  // Build headers with GitHub token for rate limiting
+  const githubToken = process.env.GITHUB_TOKEN
+  const apiHeaders: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'ClawdTM-Security/1.0',
+  }
+  if (githubToken) {
+    apiHeaders['Authorization'] = `token ${githubToken}`
+  }
+  
   try {
     // 1. Get directory listing from GitHub API
     const listUrl = `https://api.github.com/repos/openclaw/skills/contents/${basePath}`
-    const listResponse = await fetch(listUrl, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'ClawdTM-Security/1.0',
-      },
-    })
+    const listResponse = await fetch(listUrl, { headers: apiHeaders })
     
     if (!listResponse.ok) {
       console.log(`[Security] Skill not in GitHub archive: ${author}/${slug} (${listResponse.status})`)
@@ -276,12 +281,7 @@ async function fetchAllSkillFiles(
       if (item.type !== 'dir') continue
       
       const subUrl = `https://api.github.com/repos/openclaw/skills/contents/${basePath}/${item.name}`
-      const subResponse = await fetch(subUrl, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'ClawdTM-Security/1.0',
-        },
-      })
+      const subResponse = await fetch(subUrl, { headers: apiHeaders })
       
       if (!subResponse.ok) continue
       
@@ -1632,14 +1632,17 @@ export const checkGitHubCommits = internalAction({
     const lastSha = state?.lastCommitSha
     
     // 2. Fetch recent commits from GitHub
+    const githubToken = process.env.GITHUB_TOKEN
+    const commitHeaders: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'ClawdTM-Security/1.0',
+    }
+    if (githubToken) {
+      commitHeaders['Authorization'] = `token ${githubToken}`
+    }
     const response = await fetch(
       'https://api.github.com/repos/openclaw/skills/commits?per_page=100',
-      {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'ClawdTM-Security/1.0',
-        },
-      }
+      { headers: commitHeaders }
     )
     
     if (!response.ok) {
