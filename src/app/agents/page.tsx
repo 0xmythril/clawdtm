@@ -413,12 +413,9 @@ export default function AgentsPage() {
       {/* Mobile Bottom Navigation */}
       <MobileNav
         tags={[]}
-        activeCategory="all"
         selectedTags={[]}
-        onCategoryChange={noopCategory}
         onTagToggle={noopTag}
         onClearTags={noopClear}
-        onSearchFocus={() => {}}
       />
     </div>
   );
