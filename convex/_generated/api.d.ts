@@ -13,6 +13,7 @@ import type * as botAgents from "../botAgents.js";
 import type * as categorization from "../categorization.js";
 import type * as clawdhubSync from "../clawdhubSync.js";
 import type * as crons from "../crons.js";
+import type * as feedback from "../feedback.js";
 import type * as http from "../http.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_openrouter from "../lib/openrouter.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   categorization: typeof categorization;
   clawdhubSync: typeof clawdhubSync;
   crons: typeof crons;
+  feedback: typeof feedback;
   http: typeof http;
   "lib/embeddings": typeof lib_embeddings;
   "lib/openrouter": typeof lib_openrouter;

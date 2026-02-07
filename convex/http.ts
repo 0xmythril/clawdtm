@@ -218,6 +218,135 @@ http.route({
   }),
 })
 
+// GET /api/v1/skills/search - Search skills with security + community data
+http.route({
+  path: '/api/v1/skills/search',
+  method: 'GET',
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url)
+    const q = url.searchParams.get('q')
+    
+    if (!q || !q.trim()) {
+      return jsonResponse({
+        success: false,
+        error: 'Missing required parameter: q',
+        hint: 'Provide a search query, e.g. ?q=memory+persistence',
+      }, 400)
+    }
+
+    const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '5', 10), 50)
+    const sort = url.searchParams.get('sort') ?? 'relevance'
+    const category = url.searchParams.get('category') ?? undefined
+    const minRating = url.searchParams.get('min_rating')
+      ? parseFloat(url.searchParams.get('min_rating')!)
+      : undefined
+    const includeRisky = url.searchParams.get('include_risky') === 'true'
+    // Legacy: safe_only still supported (overrides default filter to only show low-risk)
+    const safeOnly = url.searchParams.get('safe_only') === 'true'
+
+    // By default, exclude skills with security score < 50 (High/Critical risk).
+    // Callers can set include_risky=true to see all skills regardless of score.
+    const minSecurityScore = includeRisky ? 0 : 50
+
+    // Validate sort parameter
+    const validSorts = ['relevance', 'downloads', 'stars', 'installs', 'rating', 'reviews', 'votes', 'recent']
+    const sortBy = validSorts.includes(sort) ? sort as 'relevance' | 'downloads' | 'stars' | 'installs' | 'rating' | 'reviews' | 'votes' | 'recent' : 'relevance'
+
+    const searchResults = await ctx.runQuery(api.clawdhubSync.searchCachedSkills, {
+      query: q.trim(),
+      limit: safeOnly ? limit * 3 : limit, // Fetch extra if filtering by safety
+      sortBy,
+      category,
+      minRating,
+      minSecurityScore,
+    })
+
+    // Map to bot-friendly response shape
+    let results = searchResults.skills.map((s: {
+      slug: string
+      name: string
+      description?: string
+      author: string
+      downloads: number
+      stars: number
+      installs: number
+      category?: string
+      version?: string
+      avgRating?: number
+      reviewCount?: number
+      humanReviewCount?: number
+      botReviewCount?: number
+      clawdtmUpvotes: number
+      clawdtmDownvotes: number
+      isVerified: boolean
+      isFeatured: boolean
+      securityScore?: number
+      securityRisk?: string
+      securityFlags?: string[]
+      lastSecurityScanAt?: number
+    }) => ({
+      slug: s.slug,
+      name: s.name,
+      author: s.author,
+      description: s.description ?? null,
+      category: s.category ?? null,
+      version: s.version ?? null,
+      downloads: s.downloads,
+      stars: s.stars,
+      installs: s.installs,
+      security: {
+        score: s.securityScore ?? null,
+        risk: s.securityRisk ?? null,
+        flags: s.securityFlags ?? [],
+        last_scanned_at: s.lastSecurityScanAt ?? null,
+      },
+      community: {
+        avg_rating: s.avgRating ?? null,
+        review_count: s.reviewCount ?? 0,
+        human_reviews: s.humanReviewCount ?? 0,
+        bot_reviews: s.botReviewCount ?? 0,
+        clawdtm_upvotes: s.clawdtmUpvotes,
+        clawdtm_downvotes: s.clawdtmDownvotes,
+        is_verified: s.isVerified,
+        is_featured: s.isFeatured,
+      },
+      install_command: `clawhub install ${s.slug}`,
+      clawdtm_url: `https://clawdtm.com/skills/${s.slug}`,
+    }))
+
+    // Filter by safety if requested
+    if (safeOnly) {
+      results = results.filter((r: { security: { risk: string | null } }) =>
+        r.security.risk === 'safe' || r.security.risk === 'low'
+      )
+      results = results.slice(0, limit)
+    }
+
+    return jsonResponse({
+      success: true,
+      query: q.trim(),
+      result_count: results.length,
+      results,
+    })
+  }),
+})
+
+// CORS preflight for search endpoint
+http.route({
+  path: '/api/v1/skills/search',
+  method: 'OPTIONS',
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    })
+  }),
+})
+
 // POST /api/v1/skills/:slug/upvote - Upvote a skill (bot auth)
 http.route({
   path: '/api/v1/skills/upvote',

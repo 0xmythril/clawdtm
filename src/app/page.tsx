@@ -11,9 +11,10 @@ import { SearchBar, type SearchBarRef, type ReviewerFilter } from "@/components/
 import { SkillCard, type Skill } from "@/components/skill-card";
 import { InstallModal } from "@/components/install-modal";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Copy, Check, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { OnboardingTour } from "@/components/onboarding-tour";
+import { FirstVisitModal } from "@/components/first-visit-modal";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   trackSearch,
@@ -68,6 +69,11 @@ function SkillsContent() {
   const [installOpen, setInstallOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
+  const [tourFinished, setTourFinished] = useState(false);
+  const [mobileAdvisorDismissed, setMobileAdvisorDismissed] = useState(false);
+  const [mobileAdvisorCopied, setMobileAdvisorCopied] = useState(false);
+  const [displayCount, setDisplayCount] = useState(4000);
+  const countAnimated = useRef(false);
 
   // Load view mode from localStorage
   useEffect(() => {
@@ -100,6 +106,25 @@ function SkillsContent() {
   const categoriesData = useQuery(api.clawdhubSync.getCategories, {});
   const tagsData = useQuery(api.clawdhubSync.getTags, {});
   const syncStatus = useQuery(api.clawdhubSync.getSyncStatus, {});
+
+  // Animated skill count — starts at 4000, counts up to real value
+  const targetCount = syncStatus?.totalCached ?? 0;
+  useEffect(() => {
+    if (targetCount <= 0 || countAnimated.current) return;
+    countAnimated.current = true;
+    const start = 4000;
+    const end = targetCount;
+    const duration = 1200;
+    const startTime = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayCount(Math.round(start + (end - start) * eased));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [targetCount]);
 
   const cachedResult = useQuery(api.clawdhubSync.listCachedSkillsWithFilters, {
     limit: 24,
@@ -218,8 +243,6 @@ function SkillsContent() {
     if (urlSecurityFilter !== "any") {
       result = result.filter((s) => {
         switch (urlSecurityFilter) {
-          case "safe":
-            return s.securityScore !== undefined && s.securityScore >= 90;
           case "low":
             return s.securityScore !== undefined && s.securityScore >= 70;
           case "medium":
@@ -348,10 +371,27 @@ function SkillsContent() {
     searchBarRef.current?.focus();
   };
 
+  // Full-page initial loading state
+  const initialLoading = syncStatus === undefined && cachedResult === undefined;
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center w-full">
+        <div className="flex flex-col items-center gap-3">
+          <Logo collapsed asSpan size={48} />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-dvh flex w-full overflow-x-hidden">
       {/* Onboarding Tour for first-time visitors */}
-      <OnboardingTour />
+      <OnboardingTour onTourFinished={() => setTourFinished(true)} />
+      
+      {/* First-visit modal - shows after tour completes */}
+      <FirstVisitModal tourFinished={tourFinished} />
       
       {/* Desktop Sidebar */}
       <Sidebar
@@ -368,31 +408,28 @@ function SkillsContent() {
       />
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-screen">
+      <main className="flex-1 flex flex-col min-h-dvh min-w-0">
         {/* Mobile header removed - logo integrated into headline */}
 
         <div className="flex-1 px-4 py-4 md:px-6 lg:px-8">
           {/* Page header */}
           <div className="mb-4">
-            <h1 className="text-xl md:text-2xl font-bold mb-1 flex flex-wrap items-center gap-x-2">
-              {/* Mobile: Show logo inline */}
-              <span className="md:hidden" data-tour="mobile-logo">
-                <Logo collapsed asSpan size={28} />
+            <h1 className="text-xl md:text-2xl font-bold mb-1">
+              <span>
+                <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
+                  {displayCount.toLocaleString()}+
+                </span>{" "}
+                vetted skills for your OpenClaw agent
               </span>
-              <span className="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
-                Superskill
-              </span>{" "}
-              <span>your <span className="line-through opacity-60">Clawdbot</span> OpenClaw</span>
             </h1>
-            <p className="text-muted-foreground text-sm">
-              {syncStatus?.totalCached ?? 0} skills ready to install
+            <p className="text-muted-foreground text-sm hidden md:block">
               {(syncStatus?.totalHidden ?? 0) > 0 && (
                 <span className="text-orange-500 dark:text-orange-400">
-                  {" "}(& protecting you from {syncStatus?.totalHidden} blocked skills)
+                  {syncStatus?.totalHidden} blocked for your protection
                 </span>
               )}
               {syncStatus?.status === "running" && (
-                <span className="ml-2 inline-flex items-center gap-1">
+                <span className={`inline-flex items-center gap-1 ${(syncStatus?.totalHidden ?? 0) > 0 ? "ml-2" : ""}`}>
                   <RefreshCw className="h-3 w-3 animate-spin" />
                   Syncing...
                 </span>
@@ -417,6 +454,38 @@ function SkillsContent() {
             isSearching={query.trim().length > 0 && searchResult === undefined}
             resultCount={query.trim() ? skills.length : undefined}
           />
+
+          {/* Mobile: Inline Advisor CTA */}
+          {!mobileAdvisorDismissed && (
+            <div className="md:hidden mt-4 rounded-lg border border-orange-500/30 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-yellow-500/10 px-3 py-2.5 flex items-center gap-2.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground">Skill Advisor</p>
+                <p className="text-[11px] text-muted-foreground truncate">Give your agent access to {(syncStatus?.totalCached ?? 0).toLocaleString()}+ vetted skills.</p>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 text-xs gap-1 shrink-0 cursor-pointer"
+                onClick={async () => {
+                  if (typeof window === "undefined") return;
+                  const instruction = `Read ${window.location.origin}/api/advisor/skill.md — learn this skill so you can help me search, evaluate, and install skills whenever I ask`;
+                  await navigator.clipboard.writeText(instruction);
+                  setMobileAdvisorCopied(true);
+                  setTimeout(() => setMobileAdvisorCopied(false), 2000);
+                }}
+              >
+                {mobileAdvisorCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                {mobileAdvisorCopied ? "Copied" : "Copy"}
+              </Button>
+              <button
+                onClick={() => setMobileAdvisorDismissed(true)}
+                className="p-1.5 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           {/* Skills grid/list */}
           <div className="mt-6">
@@ -541,14 +610,13 @@ function SkillsContent() {
       {/* Mobile Bottom Navigation */}
       <MobileNav
         tags={tagsData?.tags ?? []}
-        activeCategory={urlCategory}
         selectedTags={urlTags}
-        onCategoryChange={handleCategoryChange}
         onTagToggle={handleTagToggle}
         onClearTags={handleClearTags}
-        onSearchFocus={handleSearchFocus}
         minRating={urlMinRating}
         onMinRatingChange={handleMinRatingChange}
+        securityFilter={urlSecurityFilter}
+        onSecurityFilterChange={handleSecurityFilterChange}
       />
 
       {/* Install modal */}

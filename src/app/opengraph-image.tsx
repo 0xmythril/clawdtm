@@ -115,7 +115,7 @@ export default async function Image() {
               letterSpacing: "0.5px",
             }}
           >
-            Superskill your OpenClaw
+            5,000+ vetted skills for your OpenClaw agent
           </div>
 
           {/* Stats row */}
@@ -147,10 +147,10 @@ export default async function Image() {
                   color: "transparent",
                 }}
               >
-                1000+
+                5,000+
               </span>
               <span style={{ fontSize: 16, color: "#71717a", fontWeight: 500 }}>
-                Skills
+                Vetted Skills
               </span>
             </div>
             <div
@@ -177,10 +177,10 @@ export default async function Image() {
                   color: "transparent",
                 }}
               >
-                10
+                8
               </span>
               <span style={{ fontSize: 16, color: "#71717a", fontWeight: 500 }}>
-                Categories
+                Security Checks
               </span>
             </div>
             <div

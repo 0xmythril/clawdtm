@@ -21,7 +21,7 @@ const INSTALL_COMMAND = `clawhub install clawdtm-skills`;
 
 function getAgentInstruction() {
   if (typeof window === "undefined") return "";
-  return `Read ${window.location.origin}/api/skill.md and follow the instructions to review skills on ClawdTM`;
+  return `Read ${window.location.origin}/api/review/skill.md and follow the instructions to review skills on ClawdTM`;
 }
 
 export default function AgentReviewsPage() {

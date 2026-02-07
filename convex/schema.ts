@@ -787,6 +787,41 @@ const securityScanLogs = defineTable({
   .index('by_risk_level', ['riskLevel', 'createdAt'])
   .index('by_created', ['createdAt'])
 
+// User feedback & reports
+const feedback = defineTable({
+  // Submitter (always a signed-in Clerk user)
+  clerkUserId: v.string(),
+  submitterEmail: v.optional(v.string()),
+  submitterName: v.optional(v.string()),
+
+  // Feedback content
+  type: v.union(
+    v.literal('bug'),
+    v.literal('feature'),
+    v.literal('security'),
+    v.literal('general')
+  ),
+  subject: v.optional(v.string()),
+  message: v.string(),
+
+  // Admin triage
+  status: v.union(
+    v.literal('new'),
+    v.literal('reviewed'),
+    v.literal('resolved'),
+    v.literal('dismissed')
+  ),
+  adminNote: v.optional(v.string()),
+  resolvedBy: v.optional(v.string()), // clerkId of admin
+  resolvedAt: v.optional(v.number()),
+
+  createdAt: v.number(),
+})
+  .index('by_status', ['status', 'createdAt'])
+  .index('by_type', ['type', 'createdAt'])
+  .index('by_created', ['createdAt'])
+  .index('by_user', ['clerkUserId'])
+
 export default defineSchema({
   ...authTables,
   users,
@@ -825,4 +860,5 @@ export default defineSchema({
   securityRescanState,
   securityScanLogs,
   gitHubCommitSyncState,
+  feedback,
 })

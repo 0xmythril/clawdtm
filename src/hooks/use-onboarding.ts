@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 const STORAGE_KEY_DESKTOP = "clawdtm_tour_completed_desktop";
 const STORAGE_KEY_MOBILE = "clawdtm_tour_completed_mobile";
 const SESSION_FORCE_KEY = "clawdtm_force_tour";
-const TOUR_VERSION = "1"; // Increment to re-show tour after major updates
+const TOUR_VERSION = "2"; // Increment to re-show tour after major updates
 
 // Breakpoint matching Tailwind's md: (768px)
 const MOBILE_BREAKPOINT = 768;
@@ -15,6 +15,7 @@ type DeviceType = "mobile" | "desktop";
 type UseOnboardingReturn = {
   shouldShowTour: boolean;
   runTour: boolean;
+  tourFinished: boolean;
   startTour: () => void;
   completeTour: () => void;
   resetTour: () => void;
@@ -34,6 +35,7 @@ function getStorageKey(deviceType: DeviceType): string {
 export function useOnboarding(): UseOnboardingReturn {
   const [shouldShowTour, setShouldShowTour] = useState(false);
   const [runTour, setRunTour] = useState(false);
+  const [tourFinished, setTourFinished] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [deviceType, setDeviceType] = useState<DeviceType>("desktop");
 
@@ -137,6 +139,7 @@ export function useOnboarding(): UseOnboardingReturn {
     }
     setShouldShowTour(false);
     setRunTour(false);
+    setTourFinished(true);
   }, [deviceType]);
 
   const resetTour = useCallback(() => {
@@ -168,6 +171,7 @@ export function useOnboarding(): UseOnboardingReturn {
   return {
     shouldShowTour: isClient && shouldShowTour,
     runTour: isClient && runTour,
+    tourFinished: isClient && tourFinished,
     startTour,
     completeTour,
     resetTour,

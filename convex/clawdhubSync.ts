@@ -843,6 +843,7 @@ export const searchCachedSkills = query({
       v.literal('bot')
     )),
     category: v.optional(v.string()),
+    minSecurityScore: v.optional(v.number()), // Default: caller decides; 0 = show all
   },
   handler: async (ctx, args) => {
     const searchTerm = args.query.trim()
@@ -854,6 +855,7 @@ export const searchCachedSkills = query({
     const sortBy = args.sortBy ?? 'relevance'
     const reviewerFilter = args.reviewerFilter ?? 'all'
     const category = args.category
+    const minSecurityScore = args.minSecurityScore
     
     // OPTIMIZATION: Use Convex full-text search index
     // This searches ALL skills efficiently without loading them all into memory
@@ -864,6 +866,13 @@ export const searchCachedSkills = query({
     
     // Filter out hidden skills
     let visibleSkills = searchResults.filter(s => !s.hidden)
+    
+    // Filter by minimum security score (skills with no score are excluded when filter is active)
+    if (minSecurityScore !== undefined && minSecurityScore > 0) {
+      visibleSkills = visibleSkills.filter(s =>
+        s.securityScore !== undefined && s.securityScore >= minSecurityScore
+      )
+    }
     
     // Filter by category (verified/featured)
     if (category === 'verified') {
@@ -1160,20 +1169,25 @@ export const listCachedSkillsWithFilters = query({
             skillIds.slice(0, 200).map(id => ctx.db.get(id))
           )
           const filtered = skillsForFilter.filter((s): s is NonNullable<typeof s> => 
-            s !== null && (s.avgRating ?? 0) >= args.minRating!
+            s !== null && !s.hidden && (s.avgRating ?? 0) >= args.minRating!
           )
           skillIds = filtered.map(s => s._id)
         }
         
-        // Paginate from cached IDs
-        const totalCount = skillIds.length
-        const paginatedIds = skillIds.slice(offset, offset + limit)
-        const skills = await Promise.all(paginatedIds.map(id => ctx.db.get(id)))
-        // Filter out nulls and assert non-null type
-        const validSkills = skills.filter((s): s is NonNullable<typeof s> => s !== null)
+        // Fetch skills, filter out hidden and nulls, then paginate
+        // We need to fetch more than the page size since some may be hidden
+        const fetchLimit = Math.min(skillIds.length, offset + limit + 200)
+        const prefetchIds = skillIds.slice(0, fetchLimit)
+        const prefetchedSkills = await Promise.all(prefetchIds.map(id => ctx.db.get(id)))
+        const visibleSkills = prefetchedSkills.filter((s): s is NonNullable<typeof s> => 
+          s !== null && !s.hidden
+        )
+        
+        const totalCount = visibleSkills.length
+        const paginatedSkills = visibleSkills.slice(offset, offset + limit)
         
         return {
-          skills: validSkills,
+          skills: paginatedSkills,
           hasMore: offset + limit < totalCount,
           nextCursor: offset + limit < totalCount ? offset + limit : undefined,
           totalCount,

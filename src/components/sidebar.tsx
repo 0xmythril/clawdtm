@@ -11,17 +11,23 @@ import {
   ChevronDown,
   ChevronRight,
   Cpu,
-  HelpCircle,
   Search,
   X,
   LogIn,
   PanelLeftClose,
   PanelLeft,
-  Bot,
   ShieldCheck,
   ShieldAlert,
   Shield,
   ShieldQuestion,
+  BookOpen,
+  Copy,
+  Check,
+  Bot,
+  MessageSquare,
+  Info,
+  ExternalLink,
+  Github,
 } from "lucide-react";
 import {
   Tooltip,
@@ -39,8 +45,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Logo } from "./logo";
-import { GettingStartedModal } from "./getting-started-modal";
-import { AgentReviewsModal } from "./agent-reviews-modal";
 import Link from "next/link";
 
 // Tag color palette
@@ -77,7 +81,6 @@ const RATING_OPTIONS = [
 
 // Security filter options (click again to deselect)
 const SECURITY_OPTIONS = [
-  { value: "safe", label: "Safe (90+)", icon: ShieldCheck, color: "text-green-500" },
   { value: "low", label: "Low Risk (70+)", icon: ShieldCheck, color: "text-green-600" },
   { value: "medium", label: "Medium (50+)", icon: Shield, color: "text-yellow-500" },
   { value: "pending", label: "Pending Scan", icon: ShieldQuestion, color: "text-gray-500" },
@@ -86,22 +89,27 @@ const SECURITY_OPTIONS = [
 export type SecurityFilter = typeof SECURITY_OPTIONS[number]["value"] | "any";
 
 type SidebarProps = {
-  tags: TagData[];
-  activeCategory: string;
-  selectedTags: string[];
-  onCategoryChange: (category: string) => void;
-  onTagToggle: (tag: string) => void;
-  onClearTags: () => void;
+  tags?: TagData[];
+  activeCategory?: string;
+  selectedTags?: string[];
+  onCategoryChange?: (category: string) => void;
+  onTagToggle?: (tag: string) => void;
+  onClearTags?: () => void;
   minRating?: number;
   onMinRatingChange?: (rating: number) => void;
   securityFilter?: SecurityFilter;
   onSecurityFilterChange?: (filter: SecurityFilter) => void;
 };
 
+function getAdvisorInstruction() {
+  if (typeof window === "undefined") return "";
+  return `Read ${window.location.origin}/api/advisor/skill.md — learn this skill so you can help me search, evaluate, and install skills whenever I ask`;
+}
+
 export function Sidebar({
-  tags,
-  activeCategory,
-  selectedTags,
+  tags = [],
+  activeCategory = "all",
+  selectedTags = [],
   onCategoryChange,
   onTagToggle,
   onClearTags,
@@ -120,12 +128,16 @@ export function Sidebar({
   const [tagsOpen, setTagsOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+  const [copiedAdvisor, setCopiedAdvisor] = useState(false);
+  const [advisorInstruction, setAdvisorInstruction] = useState("");
 
   // Determine current page
   const isSkillsPage = pathname === "/" || pathname === "";
+  const isLearnPage = pathname.startsWith("/learn");
 
   useEffect(() => {
     setMounted(true);
+    setAdvisorInstruction(getAdvisorInstruction());
     // Load collapsed state from localStorage
     const savedCollapsed = localStorage.getItem("sidebar-collapsed");
     const savedTagsOpen = localStorage.getItem("sidebar-tags-open");
@@ -144,6 +156,13 @@ export function Sidebar({
       localStorage.setItem("sidebar-tags-open", String(tagsOpen));
     }
   }, [tagsOpen, mounted]);
+
+  const copyAdvisorInstruction = async () => {
+    const instruction = getAdvisorInstruction();
+    await navigator.clipboard.writeText(instruction);
+    setCopiedAdvisor(true);
+    setTimeout(() => setCopiedAdvisor(false), 2000);
+  };
 
   // Filter and limit tags
   const filteredTags = useMemo(() => {
@@ -184,13 +203,12 @@ export function Sidebar({
       {/* Navigation - scrollable area */}
       <ScrollArea className="flex-1 min-h-0">
         <div className={`py-4 ${collapsed ? "px-2" : "px-3"}`}>
-        <nav className="space-y-1 mb-6">
+        <nav className="space-y-1 mb-4">
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
                 href="/"
                 onClick={() => {
-                  // Expand sidebar when clicking Skills while collapsed
                   if (collapsed) setCollapsed(false);
                 }}
                 className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors relative ${
@@ -208,43 +226,115 @@ export function Sidebar({
                 {!collapsed && "Skills"}
               </Link>
             </TooltipTrigger>
-            {collapsed && <TooltipContent side="right">Skills (click to expand)</TooltipContent>}
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <GettingStartedModal
-                trigger={
-                  <button className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
-                    collapsed ? "justify-center" : ""
-                  }`}>
-                    <HelpCircle className="h-4 w-4 shrink-0" />
-                    {!collapsed && "Getting Started"}
-                  </button>
-                }
-              />
-            </TooltipTrigger>
-            {collapsed && <TooltipContent side="right">Getting Started</TooltipContent>}
+            {collapsed && <TooltipContent side="right">Skills</TooltipContent>}
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <AgentReviewsModal
-                trigger={
-                  <button 
-                    data-tour="agent-reviews"
-                    className={`flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors w-full cursor-pointer ${
-                    collapsed ? "justify-center" : ""
-                  }`}>
-                    <Bot className="h-4 w-4 shrink-0" />
-                    {!collapsed && "Let your agent review!"}
-                  </button>
-                }
-              />
+              <Link
+                href="/learn"
+                onClick={() => {
+                  if (collapsed) setCollapsed(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors relative ${
+                  collapsed ? "justify-center" : ""
+                } ${
+                  isLearnPage
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                }`}
+              >
+                {isLearnPage && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
+                )}
+                <BookOpen className="h-4 w-4 shrink-0" />
+                {!collapsed && "About ClawdTM"}
+              </Link>
             </TooltipTrigger>
-            {collapsed && <TooltipContent side="right">Let your agent review!</TooltipContent>}
+            {collapsed && <TooltipContent side="right">About ClawdTM</TooltipContent>}
           </Tooltip>
         </nav>
+
+        {/* Install Skill Advisor - always visible, non-collapsible */}
+        {!collapsed && (
+          <div className="mb-4" data-tour="advisor-skill">
+            <div className="px-3 mb-2">
+              <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">
+                Install Skill Advisor
+              </span>
+            </div>
+            <div className="mx-2 rounded-lg bg-blue-500/10 border border-blue-500/20 p-2.5">
+              <p className="text-xs text-muted-foreground leading-snug mb-2">
+                Give your agent access to 5,000+ vetted skills.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs cursor-pointer gap-1.5"
+                onClick={copyAdvisorInstruction}
+              >
+                {copiedAdvisor ? (
+                  <>
+                    <Check className="h-3 w-3 text-green-500" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    Copy & send to your agent
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* About sub-nav - Only shown on About/Learn pages and when not collapsed */}
+        {isLearnPage && !collapsed && (
+          <div>
+            <div className="px-3 mb-2">
+              <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">
+                About
+              </span>
+            </div>
+            <nav className="space-y-0.5 px-2">
+              {[
+                { href: "/learn", label: "About ClawdTM", icon: Info, exact: true },
+                { href: "/learn/filtering", label: "Our Filter Process", icon: Shield },
+                { href: "/learn/advisor", label: "Skill Advisor", icon: Bot },
+                { href: "/learn/reviews", label: "Agent Reviews", icon: MessageSquare },
+                { href: "/learn/faq", label: "FAQ", icon: BookOpen },
+                { href: "/learn/feedback", label: "Feedback & Report", icon: MessageSquare },
+              ].map(({ href, label, icon: Icon, exact }) => {
+                const isActive = exact ? pathname === href : pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-2.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      isActive
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {label}
+                  </Link>
+                );
+              })}
+              <a
+                href="https://github.com/0xmythril/clawdtm"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors"
+              >
+                <Github className="h-3.5 w-3.5 shrink-0" />
+                GitHub Repo
+                <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
+              </a>
+            </nav>
+          </div>
+        )}
 
         {/* Skill Filters - Only shown on Skills page and when not collapsed */}
         {isSkillsPage && !collapsed && (
@@ -285,7 +375,7 @@ export function Sidebar({
                     return (
                       <button
                         key={option.value}
-                        onClick={() => onSecurityFilterChange(isActive ? "any" : option.value)}
+                        onClick={() => onSecurityFilterChange?.(isActive ? "any" : option.value)}
                         className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
                           isActive
                             ? "bg-primary text-primary-foreground"
@@ -329,7 +419,7 @@ export function Sidebar({
                     return (
                       <button
                         key={option.value}
-                        onClick={() => onMinRatingChange(isActive ? 0 : option.value)}
+                        onClick={() => onMinRatingChange?.(isActive ? 0 : option.value)}
                         className={`flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${
                           isActive
                             ? "bg-primary text-primary-foreground"
@@ -396,7 +486,7 @@ export function Sidebar({
                                 ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
                                 : "hover:ring-1 hover:ring-primary/50"
                             } ${getTagColor(tag)}`}
-                            onClick={() => onTagToggle(tag)}
+                            onClick={() => onTagToggle?.(tag)}
                           >
                             {tag}
                             <span className="ml-1 opacity-60">{count}</span>
@@ -420,7 +510,7 @@ export function Sidebar({
                     variant="ghost"
                     size="sm"
                     className="mx-3 mt-1 h-7 px-2 text-xs w-auto justify-start"
-                    onClick={onClearTags}
+                    onClick={() => onClearTags?.()}
                   >
                     Clear selected tags
                   </Button>

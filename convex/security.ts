@@ -1098,16 +1098,16 @@ export const getSkillsByScoreRange = query({
 export const getSecurityStats = query({
   args: {},
   handler: async (ctx) => {
-    // Count skills by risk level
+    // Count ALL skills including hidden — admins need the full picture
     const allSkills = await ctx.db
       .query('cachedSkills')
-      .filter((q) => q.neq(q.field('hidden'), true))
       .collect()
     
     const stats = {
       total: allSkills.length,
       scanned: 0,
       unscanned: 0,
+      hidden: 0,
       safe: 0,
       low: 0,
       medium: 0,
@@ -1116,6 +1116,7 @@ export const getSecurityStats = query({
     }
     
     for (const skill of allSkills) {
+      if (skill.hidden) stats.hidden++
       if (skill.lastSecurityScanAt) {
         stats.scanned++
         if (skill.securityRisk) {
