@@ -145,22 +145,23 @@ export function SkillDetailClient({ slug, initialSkill, isAdminView }: Props) {
         </div>
       </header>
 
-      {/* Admin: Hidden skill warning banner */}
-      {isAdminView && initialSkill.hidden && (
+      {/* Security warning banner for hidden/blocked skills */}
+      {initialSkill.hidden && (
         <div className="bg-red-500/10 border-b border-red-500/30">
           <div className="max-w-4xl mx-auto px-4 md:px-6 py-3">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-red-600 dark:text-red-400">
-                  This skill is hidden from public view
+                  This skill has been flagged and blocked by our security scanner
                 </p>
                 <p className="text-red-600/80 dark:text-red-400/80 mt-1">
-                  {initialSkill.hiddenReason || "No reason provided"}
+                  This skill is not listed publicly. It may contain unsafe code, suspicious behavior, or other security concerns. Proceed with caution.
                 </p>
-                {initialSkill.hiddenAt && (
-                  <p className="text-red-600/60 dark:text-red-400/60 text-xs mt-1">
-                    Hidden on {new Date(initialSkill.hiddenAt).toLocaleDateString()}
+                {isAdminView && (
+                  <p className="text-red-600/60 dark:text-red-400/60 text-xs mt-2 font-mono">
+                    Admin: {initialSkill.hiddenReason || "No reason provided"}
+                    {initialSkill.hiddenAt && ` • Hidden on ${new Date(initialSkill.hiddenAt).toLocaleDateString()}`}
                   </p>
                 )}
               </div>

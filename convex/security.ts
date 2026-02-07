@@ -565,67 +565,43 @@ export const recordScanResult = internalMutation({
 
     // Update skill with latest scan results (only on success)
     if (args.status === 'success') {
+      const now = Date.now()
+      
+      // Auto-hide skills with security score below 50
+      const shouldAutoHide = args.securityScore < 50
+      
       await ctx.db.patch(args.skillId, {
         securityScore: args.securityScore,
         securityRisk: args.riskLevel,
         securityFlags: args.flags,
-        lastSecurityScanAt: Date.now(),
+        lastSecurityScanAt: now,
         vtAnalysisUrl: args.vtPermalink,
+        ...(shouldAutoHide ? {
+          hidden: true,
+          hiddenReason: `Auto-blocked: Security score ${args.securityScore}/100 (${args.riskLevel} risk)`,
+          hiddenAt: now,
+          hiddenBy: 'system:security-scanner',
+        } : {}),
       })
       
-      // Auto-block author if high or critical risk detected
-      // TEMPORARILY DISABLED - Testing security scan quality first
-      // TODO: Re-enable after validating scan accuracy
-      /*
-      if (args.riskLevel === 'high' || args.riskLevel === 'critical') {
-        const skill = await ctx.db.get(args.skillId)
-        if (skill?.author && skill.author !== 'unknown' && skill.author !== 'community') {
-          const author = skill.author
-          
-          // Get all skills by this author
-          const authorSkills = await ctx.db
-            .query('cachedSkills')
-            .withIndex('by_author', (q) => q.eq('author', author))
-            .collect()
-          
-          // Hide all skills that aren't already hidden
-          let hiddenCount = 0
-          const now = Date.now()
-          for (const s of authorSkills) {
-            if (!s.hidden) {
-              await ctx.db.patch(s._id, {
-                hidden: true,
-                hiddenReason: `Auto-blocked: Author has skill "${args.skillSlug}" flagged as ${args.riskLevel} risk`,
-                hiddenAt: now,
-                hiddenBy: 'system:security-scanner',
-              })
-              hiddenCount++
-            }
-          }
-          
-          // Log to audit if any skills were hidden
-          if (hiddenCount > 0) {
-            await ctx.db.insert('adminAuditLogs', {
-              actorType: 'system',
-              actorName: 'Security Scanner',
-              action: 'auto_block_author',
-              targetType: 'author',
-              targetId: author,
-              targetName: author,
-              details: {
-                triggerSkill: args.skillSlug,
-                riskLevel: args.riskLevel,
-                count: hiddenCount,
-                reason: `Auto-blocked due to ${args.riskLevel} risk skill: ${args.skillSlug}`,
-              },
-              createdAt: now,
-            })
-            
-            console.log(`[Security] Auto-blocked author "${author}": ${hiddenCount} skills hidden (triggered by ${args.skillSlug})`)
-          }
-        }
+      if (shouldAutoHide) {
+        console.log(`[Security] Auto-hidden "${args.skillSlug}": score ${args.securityScore} (${args.riskLevel})`)
+        
+        // Log to audit
+        await ctx.db.insert('adminAuditLogs', {
+          actorType: 'system',
+          actorName: 'Security Scanner',
+          action: 'hide_skill',
+          targetType: 'skill',
+          targetId: args.skillSlug,
+          targetName: args.skillSlug,
+          details: {
+            reason: `Auto-blocked: Security score ${args.securityScore}/100 (${args.riskLevel} risk)`,
+            riskLevel: args.riskLevel,
+          },
+          createdAt: now,
+        })
       }
-      */
     }
   },
 })
@@ -1122,16 +1098,16 @@ export const getSkillsByScoreRange = query({
 export const getSecurityStats = query({
   args: {},
   handler: async (ctx) => {
-    // Count skills by risk level
+    // Count ALL skills including hidden — admins need the full picture
     const allSkills = await ctx.db
       .query('cachedSkills')
-      .filter((q) => q.neq(q.field('hidden'), true))
       .collect()
     
     const stats = {
       total: allSkills.length,
       scanned: 0,
       unscanned: 0,
+      hidden: 0,
       safe: 0,
       low: 0,
       medium: 0,
@@ -1140,6 +1116,7 @@ export const getSecurityStats = query({
     }
     
     for (const skill of allSkills) {
+      if (skill.hidden) stats.hidden++
       if (skill.lastSecurityScanAt) {
         stats.scanned++
         if (skill.securityRisk) {
@@ -2011,6 +1988,43 @@ export const resetAllSecurityData = internalAction({
     console.log(`[Security] Reset complete: ${totalSkillsReset} skills reset, ${totalLogsDeleted} logs deleted`)
     
     return { skillsReset: totalSkillsReset, logsDeleted: totalLogsDeleted }
+  },
+})
+
+/**
+ * Hide all visible skills with security score below threshold
+ * Used as a one-time cleanup or can be triggered by admin
+ */
+export const hideUnsafeSkills = internalMutation({
+  args: {
+    threshold: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const threshold = args.threshold ?? 50
+    const now = Date.now()
+    
+    // Get all visible skills with low scores
+    const allSkills = await ctx.db
+      .query('cachedSkills')
+      .collect()
+    
+    const unsafeVisible = allSkills.filter(
+      s => !s.hidden && s.securityScore !== undefined && s.securityScore < threshold
+    )
+    
+    let hiddenCount = 0
+    for (const skill of unsafeVisible) {
+      await ctx.db.patch(skill._id, {
+        hidden: true,
+        hiddenReason: `Auto-blocked: Security score ${skill.securityScore}/100 (${skill.securityRisk ?? 'unknown'} risk)`,
+        hiddenAt: now,
+        hiddenBy: 'system:security-scanner',
+      })
+      hiddenCount++
+    }
+    
+    console.log(`[Security] Hidden ${hiddenCount} skills with score below ${threshold}`)
+    return { hidden: hiddenCount, threshold }
   },
 })
 

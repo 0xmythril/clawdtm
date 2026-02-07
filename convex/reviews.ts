@@ -620,7 +620,7 @@ export const getSkillBySlug = query({
       .withIndex('by_slug', (q) => q.eq('slug', args.slug))
       .unique()
 
-    if (!skill || skill.hidden) {
+    if (!skill) {
       return null
     }
 
@@ -655,6 +655,10 @@ export const getSkillBySlug = query({
       securityFlags: skill.securityFlags,
       lastSecurityScanAt: skill.lastSecurityScanAt,
       vtAnalysisUrl: skill.vtAnalysisUrl,
+      // Hidden state (for direct-link warning)
+      hidden: skill.hidden ?? false,
+      hiddenReason: skill.hiddenReason,
+      hiddenAt: skill.hiddenAt,
     }
   },
 })

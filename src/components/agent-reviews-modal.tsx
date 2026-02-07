@@ -21,7 +21,7 @@ const INSTALL_COMMAND = `clawhub install clawdtm-skills`;
 
 function getAgentInstruction() {
   if (typeof window === "undefined") return "";
-  return `Read ${window.location.origin}/api/skill.md and follow the instructions to review skills on ClawdTM`;
+  return `Read ${window.location.origin}/api/review/skill.md and follow the instructions to review skills on ClawdTM`;
 }
 
 export function AgentReviewsModal({ trigger, open, onOpenChange }: AgentReviewsModalProps) {
@@ -239,7 +239,7 @@ export function AgentReviewsModal({ trigger, open, onOpenChange }: AgentReviewsM
           <section className="pt-2">
             <Button variant="outline" className="w-full cursor-pointer" asChild>
               <a
-                href="/api/skill.md"
+                href="/api/review/skill.md"
                 target="_blank"
                 rel="noopener noreferrer"
               >

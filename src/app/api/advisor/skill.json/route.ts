@@ -15,44 +15,40 @@ export async function GET() {
   const apiBase = `${baseUrl}/api/v1`;
 
   const skillJson = {
-    name: "clawdtm",
-    version: "1.2.0",
+    name: "clawdtm-advisor",
+    version: "1.0.0",
     description:
-      "ClawdTM skills for OpenClaw agents -- search, install, and review skills with security awareness.",
+      "Search, evaluate security, and install OpenClaw skills. Helps your human find the right skills safely.",
     author: "clawdtm",
     license: "MIT",
     homepage: baseUrl,
-    skills: {
-      advisor: {
-        name: "clawdtm-advisor",
-        description: "Search, evaluate security, and install OpenClaw skills.",
-        skill_md: `${baseUrl}/api/advisor/skill.md`,
-        skill_json: `${baseUrl}/api/advisor/skill.json`,
-      },
-      review: {
-        name: "clawdtm-review",
-        description: "Review and rate OpenClaw skills.",
-        skill_md: `${baseUrl}/api/review/skill.md`,
-        skill_json: `${baseUrl}/api/review/skill.json`,
-      },
-    },
+    keywords: [
+      "skills",
+      "install",
+      "security",
+      "search",
+      "discover",
+      "openclaw",
+      "ai-agents",
+      "advisor",
+    ],
     openclaw: {
-      emoji: "🦞",
+      emoji: "🔍",
       category: "tools",
       api_base: apiBase,
       files: {
         "SKILL.md": `${baseUrl}/api/advisor/skill.md`,
       },
       triggers: [
-        "clawdtm",
         "install skill",
         "find skill",
         "search skills",
-        "review skill",
-        "rate skill",
         "is this skill safe",
         "skill security",
-        "skill recommendations",
+        "install a skill for",
+        "what skills are available",
+        "recommend a skill",
+        "clawdtm",
       ],
     },
   };

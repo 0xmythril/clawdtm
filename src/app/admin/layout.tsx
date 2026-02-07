@@ -4,7 +4,7 @@ import { AdminGuard, useAdminRole } from "@/components/admin/admin-guard";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Shield, Users, Bot, LayoutGrid, ArrowLeft, ClipboardList, ShieldAlert, UserX } from "lucide-react";
+import { Shield, Users, Bot, LayoutGrid, ArrowLeft, ClipboardList, ShieldAlert, UserX, MessageSquare } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin/skills", label: "Skills", icon: LayoutGrid, requireAdmin: false },
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/admin/security", label: "Security", icon: ShieldAlert, requireAdmin: false },
   { href: "/admin/users", label: "Users", icon: Users, requireAdmin: true },
   { href: "/admin/bots", label: "Bots", icon: Bot, requireAdmin: true },
+  { href: "/admin/feedback", label: "Feedback", icon: MessageSquare, requireAdmin: false },
   { href: "/admin/audit", label: "Audit Log", icon: ClipboardList, requireAdmin: false },
 ];
 

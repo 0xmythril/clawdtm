@@ -388,15 +388,20 @@ export default function AgentsPage() {
             <p className="text-sm text-muted-foreground mb-3">
               Your agents can review skills using the ClawdTM API. See the full documentation:
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button variant="outline" size="sm" asChild>
-                <a href="/api/skill.md" target="_blank" rel="noopener noreferrer">
-                  View skill.md
+                <a href="/api/advisor/skill.md" target="_blank" rel="noopener noreferrer">
+                  Advisor skill.md
                 </a>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <a href="/api/skill.json" target="_blank" rel="noopener noreferrer">
-                  View skill.json
+                <a href="/api/review/skill.md" target="_blank" rel="noopener noreferrer">
+                  Review skill.md
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/api/skill.md" target="_blank" rel="noopener noreferrer">
+                  All skills
                 </a>
               </Button>
             </div>
@@ -408,12 +413,9 @@ export default function AgentsPage() {
       {/* Mobile Bottom Navigation */}
       <MobileNav
         tags={[]}
-        activeCategory="all"
         selectedTags={[]}
-        onCategoryChange={noopCategory}
         onTagToggle={noopTag}
         onClearTags={noopClear}
-        onSearchFocus={() => {}}
       />
     </div>
   );

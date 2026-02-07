@@ -79,15 +79,18 @@ const DESKTOP_TOUR_STEPS: Step[] = [
     placement: "right",
   },
   {
-    target: '[data-tour="agent-reviews"]',
+    target: '[data-tour="advisor-skill"]',
     content: (
       <div className="text-left">
-        <p className="text-sm">
-          <strong>Did you know?</strong> Your AI agent can review skills too! Click here to set it up and let your agent share its recommendations with the community.
+        <p className="text-sm mb-2">
+          <strong>Install the Skill Advisor</strong> and your agent can search, security-check, and install skills for you. Just say &ldquo;find me a skill for&hellip;&rdquo;
+        </p>
+        <p className="text-xs text-muted-foreground">
+          No API key needed &mdash; works out of the box!
         </p>
       </div>
     ),
-    title: "🤖 Let Your Agent Vote",
+    title: "🔍 Skill Advisor",
     placement: "right",
   },
   {
@@ -171,15 +174,18 @@ const MOBILE_TOUR_STEPS: Step[] = [
     placement: "top",
   },
   {
-    target: '[data-tour="mobile-agent-review"]',
+    target: '[data-tour="mobile-advisor-skill"]',
     content: (
       <div className="text-left">
-        <p className="text-sm">
-          <strong>Did you know?</strong> Your AI agent can review skills too! Tap here to set it up and let your agent share its recommendations.
+        <p className="text-sm mb-2">
+          <strong>Install the Skill Advisor</strong> and your agent can search, security-check, and install skills for you. Just say &ldquo;find me a skill for&hellip;&rdquo;
+        </p>
+        <p className="text-xs text-muted-foreground">
+          No API key needed!
         </p>
       </div>
     ),
-    title: "🤖 Let Your Agent Vote",
+    title: "🔍 Skill Advisor",
     placement: "top",
   },
   {
@@ -197,10 +203,14 @@ const MOBILE_TOUR_STEPS: Step[] = [
 ];
 
 // Step names for analytics
-const DESKTOP_STEP_NAMES = ["welcome", "search", "skill_card", "rating", "smart_filters", "agent_reviews", "signin"];
-const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "smart_filters", "agent_reviews", "settings"];
+const DESKTOP_STEP_NAMES = ["welcome", "search", "skill_card", "rating", "smart_filters", "advisor_skill", "signin"];
+const MOBILE_STEP_NAMES = ["welcome", "skill_card", "rating", "search", "smart_filters", "advisor_skill", "settings"];
 
-export function OnboardingTour() {
+type OnboardingTourProps = {
+  onTourFinished?: () => void;
+};
+
+export function OnboardingTour({ onTourFinished }: OnboardingTourProps) {
   const { resolvedTheme } = useTheme();
   const { runTour, completeTour, isMobile } = useOnboarding();
   const [mounted, setMounted] = useState(false);
@@ -250,18 +260,21 @@ export function OnboardingTour() {
       const duration = tourStartTime.current ? Date.now() - tourStartTime.current : 0;
       trackTourCompleted(stepsViewed.current.size, duration);
       completeTour();
+      onTourFinished?.();
     }
 
     // Handle tour skip
     if (status === STATUS.SKIPPED) {
       trackTourSkipped(stepName, index);
       completeTour();
+      onTourFinished?.();
     }
 
     // Handle close button click
     if (action === ACTIONS.CLOSE) {
       trackTourSkipped(stepName, index);
       completeTour();
+      onTourFinished?.();
     }
 
     // Handle step errors (element not found)

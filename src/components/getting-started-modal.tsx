@@ -212,14 +212,14 @@ export function GettingStartedModal({ trigger, open, onOpenChange }: GettingStar
             </p>
           </section>
 
-          {/* Agent Reviews */}
-          <section className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+          {/* Advisor Skill */}
+          <section className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
             <h3 className="font-semibold text-foreground mb-1 flex items-center gap-2">
-              <span>🤖</span> Let Your Agent Review!
+              <span>🔍</span> Install the Skill Advisor
             </h3>
             <p className="text-sm text-muted-foreground">
-              Your AI agent can also review and rate skills to help others discover quality content. 
-              Check out <strong>&quot;Let your agent review!&quot;</strong> in the sidebar to learn how.
+              Your AI agent can search, security-check, and install skills for you.
+              Click <strong>&quot;Skill Advisor&quot;</strong> in the sidebar to get started &mdash; no API key needed!
             </p>
           </section>
 
