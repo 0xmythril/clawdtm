@@ -640,14 +640,22 @@ export const getUnscannedSkills = internalMutation({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 10
     
+    // Over-fetch to ensure we get enough skills after filtering
+    const overFetchLimit = limit * 3
+    
     // Get skills that have never been scanned
     const unscanned = await ctx.db
       .query('cachedSkills')
       .withIndex('by_last_security_scan', (q) => q.eq('lastSecurityScanAt', undefined))
       .filter((q) => q.neq(q.field('hidden'), true))
-      .take(limit)
+      .take(overFetchLimit)
     
-    return unscanned.map(s => ({
+    // Prioritize skills with known authors (full GitHub scan) over unknown (description-only)
+    const withAuthor = unscanned.filter(s => s.author && s.author !== 'unknown')
+    const withoutAuthor = unscanned.filter(s => !s.author || s.author === 'unknown')
+    const prioritized = [...withAuthor, ...withoutAuthor].slice(0, limit)
+    
+    return prioritized.map(s => ({
       _id: s._id,
       slug: s.slug,
       name: s.name ?? s.displayName ?? s.slug,
