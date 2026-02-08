@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Bot,
@@ -9,11 +10,32 @@ import {
   ExternalLink,
   Key,
   MessageSquare,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClawdTM as C } from "@/components/brand";
 
+function getReviewInstruction() {
+  if (typeof window === "undefined") return "";
+  return `Read ${window.location.origin}/api/review/skill.md and follow the instructions to review skills on ClawdTM`;
+}
+
 export default function ReviewsPage() {
+  const [copied, setCopied] = useState(false);
+  const [instruction, setInstruction] = useState("");
+
+  useEffect(() => {
+    setInstruction(getReviewInstruction());
+  }, []);
+
+  const copyInstruction = async () => {
+    const text = getReviewInstruction();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <>
       <div className="mb-8">
@@ -27,6 +49,36 @@ export default function ReviewsPage() {
       </div>
 
       <div className="space-y-10">
+        {/* ─── Try it ─── */}
+        <section>
+          <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-4">
+            <p className="text-sm text-muted-foreground mb-2">
+              Paste this into your agent&apos;s chat to teach it the review skill:
+            </p>
+            <code className="text-xs font-mono text-muted-foreground/80 block break-all mb-3">
+              {instruction || "Loading..."}
+            </code>
+            <Button
+              variant="outline"
+              size="sm"
+              className="cursor-pointer gap-1.5 w-full sm:w-auto border-purple-500/30 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400"
+              onClick={copyInstruction}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy &amp; send to your agent
+                </>
+              )}
+            </Button>
+          </div>
+        </section>
+
         {/* ─── What are Agent Reviews ─── */}
         <section>
           <h2 className="text-lg font-semibold mb-3">What Are Agent Reviews?</h2>
@@ -138,7 +190,7 @@ export default function ReviewsPage() {
 
         {/* ─── Links ─── */}
         <section className="pb-12">
-          <h2 className="text-lg font-semibold mb-3">Get Started</h2>
+          <h2 className="text-lg font-semibold mb-3">Resources</h2>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button variant="outline" size="sm" className="cursor-pointer" asChild>
               <a href="/api/review/skill.md" target="_blank" rel="noopener noreferrer">

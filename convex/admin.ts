@@ -465,32 +465,75 @@ export const listSkillsForAdmin = query({
     const offset = args.offset ?? 0
     const filter = args.filter ?? 'all'
 
-    let skills = await ctx.db.query('cachedSkills').collect()
+    // Use search index when searching (avoids full table scan)
+    if (args.search && args.search.trim().length > 0) {
+      const searchResults = await ctx.db
+        .query('cachedSkills')
+        .withSearchIndex('search_skills', (q) => q.search('searchText', args.search!))
+        .take(500)
+      
+      let skills = searchResults
+      if (filter === 'hidden') skills = skills.filter((s) => s.hidden === true)
+      else if (filter === 'featured') skills = skills.filter((s) => s.isFeatured === true)
+      else if (filter === 'verified') skills = skills.filter((s) => s.isVerified === true)
+      
+      skills.sort((a, b) => b.downloads - a.downloads)
+      const total = skills.length
+      const paginated = skills.slice(offset, offset + limit)
 
-    // Apply filter
+      return {
+        skills: paginated.map((s) => ({
+          _id: s._id,
+          slug: s.slug,
+          name: s.name ?? s.displayName ?? s.slug,
+          author: s.author ?? 'unknown',
+          downloads: s.downloads,
+          category: s.category,
+          hidden: s.hidden ?? false,
+          hiddenReason: s.hiddenReason,
+          hiddenAt: s.hiddenAt,
+          isFeatured: s.isFeatured ?? false,
+          featuredAt: s.featuredAt,
+          isVerified: s.isVerified ?? false,
+          verifiedAt: s.verifiedAt,
+          reviewCount: s.reviewCount ?? 0,
+          avgRating: s.avgRating,
+          securityScore: s.securityScore,
+          securityRisk: s.securityRisk,
+          lastSecurityScanAt: s.lastSecurityScanAt,
+        })),
+        total,
+        hasMore: offset + limit < total,
+      }
+    }
+
+    // No search: use index-based queries to avoid full table scan
+    let skills
     if (filter === 'hidden') {
-      skills = skills.filter((s) => s.hidden === true)
+      skills = await ctx.db.query('cachedSkills').withIndex('by_hidden', (q) => q.eq('hidden', true)).take(500)
     } else if (filter === 'featured') {
-      skills = skills.filter((s) => s.isFeatured === true)
+      skills = await ctx.db.query('cachedSkills').withIndex('by_featured', (q) => q.eq('isFeatured', true)).take(500)
     } else if (filter === 'verified') {
-      skills = skills.filter((s) => s.isVerified === true)
+      skills = await ctx.db.query('cachedSkills').withIndex('by_verified', (q) => q.eq('isVerified', true)).take(500)
+    } else {
+      // 'all' — use downloads index for pre-sorted results, take a window
+      skills = await ctx.db.query('cachedSkills').withIndex('by_downloads').order('desc').take(offset + limit)
     }
 
-    // Apply search
-    if (args.search) {
-      const searchLower = args.search.toLowerCase()
-      skills = skills.filter((s) => 
-        s.slug.toLowerCase().includes(searchLower) ||
-        (s.name ?? s.displayName ?? '').toLowerCase().includes(searchLower) ||
-        (s.author ?? '').toLowerCase().includes(searchLower)
-      )
+    // For 'all' filter, we already have sorted results; for others, sort after
+    if (filter !== 'all') {
+      skills.sort((a, b) => b.downloads - a.downloads)
     }
 
-    // Sort by downloads desc
-    skills.sort((a, b) => b.downloads - a.downloads)
-
-    const total = skills.length
-    const paginated = skills.slice(offset, offset + limit)
+    let total: number
+    if (filter === 'all') {
+      const syncState = await ctx.db.query('clawdhubSyncState').withIndex('by_key', (q) => q.eq('key', 'skills')).unique()
+      const cached = syncState?.securityStats as { totalInDb?: number } | undefined
+      total = cached?.totalInDb ?? (syncState?.totalSynced ?? skills.length)
+    } else {
+      total = skills.length
+    }
+    const paginated = filter === 'all' ? skills.slice(offset) : skills.slice(offset, offset + limit)
 
     return {
       skills: paginated.map((s) => ({
@@ -1100,25 +1143,21 @@ export const getAuthorsWithCounts = query({
   handler: async (ctx, args): Promise<{ author: string; total: number; hidden: number }[]> => {
     await requireModerator(ctx, { clerkId: args.clerkId })
 
-    const skills = await ctx.db.query('cachedSkills').collect()
+    // Read from cached author counts (computed by updateCachedCounts)
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
     
-    const authorMap = new Map<string, { total: number; hidden: number }>()
-    
-    for (const skill of skills) {
-      const author = skill.author ?? 'unknown'
-      const current = authorMap.get(author) ?? { total: 0, hidden: 0 }
-      current.total++
-      if (skill.hidden) current.hidden++
-      authorMap.set(author, current)
+    if (state?.authorCounts && Array.isArray(state.authorCounts)) {
+      const result = state.authorCounts as { author: string; total: number; hidden: number }[]
+      return args.includeHidden
+        ? result
+        : result.filter(a => a.hidden < a.total)
     }
 
-    const result = Array.from(authorMap.entries())
-      .map(([author, counts]) => ({ author, ...counts }))
-      .sort((a, b) => b.total - a.total) // Sort by total skills descending
-
-    return args.includeHidden 
-      ? result 
-      : result.filter(a => a.hidden < a.total) // Exclude fully hidden authors
+    // Fallback: empty (cache will be populated on next sync)
+    return []
   },
 })
 

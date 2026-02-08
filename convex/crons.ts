@@ -28,10 +28,10 @@ crons.interval(
   internal.clawdhubSync.syncAuthorsFromGitHub,
 )
 
-// Security scan unscanned skills every 5 minutes (batch of 50 for faster initial scan)
+// Security scan unscanned skills every 15 minutes (reduced from 5 to save bandwidth)
 crons.interval(
   'security-scan-batch',
-  { minutes: 5 },
+  { minutes: 15 },
   internal.security.scanBatch,
 )
 

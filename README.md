@@ -4,13 +4,14 @@
 
 ---
 
-**Superskill your ~~Clawdbot~~ OpenClaw** — a web app to browse, search, and install community skills from [Clawdhub](https://clawdhub.com) for [OpenClaw](https://openclaw.ai/).
+**Vetted skills for your OpenClaw** — a web app to browse, search, and install community skills from [Clawdhub](https://clawdhub.com) for [OpenClaw](https://openclaw.ai/).
 
-**What it is:** A public skill catalog and installer for OpenClaw. Skills are community-built add-ons (tools, workflows, integrations). This app syncs the catalog from Clawdhub, lets users search and filter by category/tags, and provides install instructions. Think “npm for OpenClaw” or “skill store.”
+**What it is:** A curated skill directory and installer for OpenClaw. Skills are community-built add-ons (tools, workflows, integrations). This app syncs the catalog from Clawdhub, adds security scanning and moderation, and lets users search and filter by category, tags, ratings, and security level. Think "npm for OpenClaw" with a safety layer on top.
 
 - **Stack:** Next.js 16 (App Router), React 19, Convex, Tailwind 4
-- **Data:** Skills synced from Clawdhub API into Convex; categories/tags; full-text search
-- **UI:** Sidebar filters (category, tags), search bar, card/list view, install modal, mobile bottom nav
+- **Data:** Skills synced from Clawdhub API into Convex; categories/tags; full-text search; security scores and risk levels
+- **UI:** Sidebar filters (ratings, security, tags), search bar, card/list view, install modal, mobile bottom nav, About (learn) section
+- **API:** Public HTTP API at `/api/v1/skills/search` and `/api/v1/skills/install` for the Skill Advisor; search excludes high/critical risk by default; install blocks low-score skills unless `acknowledge_risk=true`
 
 ## Quick start
 
@@ -44,22 +45,23 @@ Run Convex CLI from project root: `npx convex dev`, `npx convex deploy`, `npx co
 
 ```
 src/
-  app/           # Next App Router: page, layout, providers, meta images
-  components/    # Sidebar, SearchBar, SkillCard, InstallModal, mobile nav, UI primitives
-  lib/           # analytics (GA4), utils
+  app/           # Next App Router: pages, layouts, API routes (v1 skills, advisor, review)
+  components/   # Sidebar, SearchBar, SkillCard, InstallModal, mobile nav, UI primitives
+  lib/          # analytics (GA4), utils
 convex/
-  clawdhubSync.ts   # Clawdhub API sync, cached skills CRUD, public queries
+  clawdhubSync.ts   # Clawdhub API sync, GitHub author sync, removed-skill detection, cached skills CRUD
   categorization.ts # Logic-based category/tag assignment (cron)
-  crons.ts          # Cron definitions (sync every 15m, categorization every 1h)
-  schema.ts         # Convex schema (cachedSkills, clawdhubSyncState, etc.)
-  lib/embeddings.ts # Embedding config (for future semantic search)
+  security.ts      # AI security scanning, risk scoring, auto-hide low-score skills, rescan state
+  crons.ts         # Sync (2h), categorization (4h), GitHub author sync (2h), security scan (5m), commit check (15m)
+  schema.ts        # Convex schema (cachedSkills, clawdhubSyncState, securityRescanState, etc.)
+  lib/             # openrouter (AI scan), virustotal, embeddings
 public/         # Favicons, logo, static assets
 ```
 
 ## Architecture
 
-- **Frontend:** Single main page; URL state for `q`, `category`, `sort`, `tags`; Convex `useQuery` for categories, tags, sync status, paginated skill list, and search.
-- **Backend:** Convex tables `cachedSkills` and `clawdhubSyncState`. Cron `clawdhub-skill-sync` runs every 15 minutes and pulls from `https://clawdhub.com/api/v1/skills` (paginated); another cron runs logic-based categorization hourly. Public API: `getCategories`, `getTags`, `getSyncStatus`, `listCachedSkillsWithFilters`, `searchCachedSkills` (see [convex/README.md](convex/README.md)).
+- **Frontend:** Main skills page with URL state for `q`, `category`, `sort`, `tags`, `security`; Convex `useQuery` for categories, tags, sync status, paginated skill list, and search. About (learn) section for docs; admin panel for security dashboard, authors, moderation.
+- **Backend:** Convex tables `cachedSkills`, `clawdhubSyncState`, `securityRescanState`, `securityScanLogs`, etc. Skills are synced from Clawdhub; authors are enriched from the OpenClaw GitHub skills tree; skills removed from that tree are auto-hidden. Security scanning (AI + optional VirusTotal) scores each skill 0–100; skills below 50 are auto-hidden. Public Convex API: `getCategories`, `getTags`, `getSyncStatus`, `listCachedSkillsWithFilters`, `searchCachedSkills` (see [convex/README.md](convex/README.md)). Public HTTP API: `/api/v1/skills/search`, `/api/v1/skills/install` (default: exclude high/critical risk; install blocks low-score unless `acknowledge_risk=true`).
 
 ## Analytics
 
