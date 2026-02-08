@@ -254,17 +254,59 @@ export default function AdminSecurityPage() {
         <h2 className="text-xl font-semibold">Security Dashboard</h2>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        <Card className="col-span-2">
+      {/* Overview: Total / Visible / Hidden */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
           <CardContent className="pt-4">
             <div className="text-center">
-              <p className="text-3xl font-bold">{stats?.total ?? "—"}</p>
-              <p className="text-sm text-muted-foreground">Total Skills</p>
+              <p className="text-3xl font-bold">{stats?.totalInDb ?? stats?.total ?? "—"}</p>
+              <p className="text-sm text-muted-foreground">Total in Database</p>
+            </div>
+            <div className="mt-3 flex justify-center gap-4 text-xs text-muted-foreground">
+              <span>Scanned: <span className="font-medium text-foreground">{stats?.scanned ?? "—"}</span></span>
+              <span>Unscanned: <span className="font-medium text-foreground">{stats?.unscanned ?? "—"}</span></span>
             </div>
           </CardContent>
         </Card>
 
+        <Card className="border-green-500/30">
+          <CardContent className="pt-4">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-green-500">
+                {(stats?.visible ?? ((stats?.totalInDb ?? stats?.total ?? 0) - (stats?.hidden ?? 0))) || "—"}
+              </p>
+              <p className="text-sm text-muted-foreground">Visible to Users</p>
+            </div>
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              <div className="flex justify-between"><span className="text-green-500">Safe</span><span className="font-medium text-green-500">{stats?.visibleSafe ?? 0}</span></div>
+              <div className="flex justify-between"><span className="text-green-600">Low</span><span className="font-medium text-green-600">{stats?.visibleLow ?? 0}</span></div>
+              <div className="flex justify-between"><span className="text-yellow-500">Medium</span><span className="font-medium text-yellow-500">{stats?.visibleMedium ?? 0}</span></div>
+              <div className="flex justify-between"><span className="text-orange-500">High</span><span className="font-medium text-orange-500">{stats?.visibleHigh ?? 0}</span></div>
+              <div className="flex justify-between"><span className="text-red-500">Critical</span><span className="font-medium text-red-500">{stats?.visibleCritical ?? 0}</span></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-500/30">
+          <CardContent className="pt-4">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-red-500">{stats?.hidden ?? "—"}</p>
+              <p className="text-sm text-muted-foreground">Hidden / Blocked</p>
+            </div>
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              <div className="flex justify-between"><span>Security auto-blocked</span><span className="font-medium text-foreground">{stats?.hiddenBySecurity ?? 0}</span></div>
+              <div className="flex justify-between"><span>Registry removal</span><span className="font-medium text-foreground">{stats?.hiddenByRegistryRemoval ?? 0}</span></div>
+              <div className="flex justify-between"><span>Moderator action</span><span className="font-medium text-foreground">{stats?.hiddenByModerator ?? 0}</span></div>
+              {(stats?.hiddenByOther ?? 0) > 0 && (
+                <div className="flex justify-between"><span>Other</span><span className="font-medium text-foreground">{stats?.hiddenByOther ?? 0}</span></div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Risk Breakdown (all skills) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card 
           className={cn(
             "cursor-pointer transition-all hover:ring-2 hover:ring-primary/50",
@@ -303,7 +345,7 @@ export default function AdminSecurityPage() {
                     <Icon className="h-4 w-4" />
                     <span className="text-2xl font-bold">{count}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{config.label}</p>
+                  <p className="text-xs text-muted-foreground">{config.label} (all)</p>
                 </div>
               </CardContent>
             </Card>
@@ -560,13 +602,25 @@ export default function AdminSecurityPage() {
                 {skillsQuery.skills.map((skill) => (
                   <div
                     key={skill._id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                    className={cn(
+                      "flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50",
+                      skill.hidden && "opacity-60 border-red-500/30 bg-red-500/5"
+                    )}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{skill.name}</span>
                         <span className="text-xs text-muted-foreground">/{skill.slug}</span>
+                        {skill.hidden && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                            <EyeOff className="h-2.5 w-2.5 mr-0.5" />
+                            Hidden
+                          </Badge>
+                        )}
                       </div>
+                      {skill.hidden && skill.hiddenReason && (
+                        <p className="text-[10px] text-red-400 mt-0.5 truncate">{skill.hiddenReason}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">by {skill.author}</span>
                         {skill.securityScore !== undefined && (

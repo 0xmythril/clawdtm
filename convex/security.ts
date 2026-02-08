@@ -1013,10 +1013,10 @@ export const getSkillsByRiskLevel = query({
     const limit = args.limit ?? 50
     const offset = args.offset ?? 0
     
+    // Admin dashboard: include ALL skills (including hidden) so the full picture is visible
     const skills = await ctx.db
       .query('cachedSkills')
       .withIndex('by_security_risk', (q) => q.eq('securityRisk', args.riskLevel))
-      .filter((q) => q.neq(q.field('hidden'), true))
       .take(500) // Get a batch
     
     const paginated = skills.slice(offset, offset + limit)
@@ -1031,6 +1031,8 @@ export const getSkillsByRiskLevel = query({
         securityRisk: s.securityRisk,
         securityFlags: s.securityFlags ?? [],
         lastSecurityScanAt: s.lastSecurityScanAt,
+        hidden: s.hidden ?? false,
+        hiddenReason: s.hiddenReason,
       })),
       total: skills.length,
       hasMore: offset + limit < skills.length,
@@ -1052,15 +1054,10 @@ export const getSkillsByScoreRange = query({
     const limit = args.limit ?? 50
     const offset = args.offset ?? 0
     
-    // Get all scanned skills and filter by score range
+    // Admin dashboard: include ALL skills (including hidden) for full visibility
     const allSkills = await ctx.db
       .query('cachedSkills')
-      .filter((q) => 
-        q.and(
-          q.neq(q.field('hidden'), true),
-          q.neq(q.field('securityScore'), undefined)
-        )
-      )
+      .filter((q) => q.neq(q.field('securityScore'), undefined))
       .collect()
     
     // Filter by score range
@@ -1085,6 +1082,8 @@ export const getSkillsByScoreRange = query({
         securityRisk: s.securityRisk,
         securityFlags: s.securityFlags ?? [],
         lastSecurityScanAt: s.lastSecurityScanAt,
+        hidden: s.hidden ?? false,
+        hiddenReason: s.hiddenReason,
       })),
       total: filtered.length,
       hasMore: offset + limit < filtered.length,
@@ -1104,30 +1103,65 @@ export const getSecurityStats = query({
       .collect()
     
     const stats = {
-      total: allSkills.length,
+      totalInDb: allSkills.length,
+      visible: 0,
       scanned: 0,
       unscanned: 0,
-      hidden: 0,
+      // Risk breakdown (ALL skills, including hidden)
       safe: 0,
       low: 0,
       medium: 0,
       high: 0,
       critical: 0,
+      // Risk breakdown (visible only)
+      visibleSafe: 0,
+      visibleLow: 0,
+      visibleMedium: 0,
+      visibleHigh: 0,
+      visibleCritical: 0,
+      // Hidden breakdown
+      hidden: 0,
+      hiddenBySecurity: 0,
+      hiddenByModerator: 0,
+      hiddenByRegistryRemoval: 0,
+      hiddenByOther: 0,
     }
     
     for (const skill of allSkills) {
-      if (skill.hidden) stats.hidden++
+      if (skill.hidden) {
+        stats.hidden++
+        // Categorize hidden reason
+        const hiddenBy = (skill.hiddenBy as string) ?? ''
+        if (hiddenBy === 'system:security-scanner') {
+          stats.hiddenBySecurity++
+        } else if (hiddenBy === 'system:registry-removal') {
+          stats.hiddenByRegistryRemoval++
+        } else if (hiddenBy.startsWith('moderator:') || hiddenBy.startsWith('admin:') || hiddenBy.startsWith('user_')) {
+          stats.hiddenByModerator++
+        } else {
+          stats.hiddenByOther++
+        }
+      } else {
+        stats.visible++
+      }
+      
       if (skill.lastSecurityScanAt) {
         stats.scanned++
         if (skill.securityRisk) {
-          stats[skill.securityRisk]++
+          const risk = skill.securityRisk as 'safe' | 'low' | 'medium' | 'high' | 'critical'
+          stats[risk]++
+          if (!skill.hidden) {
+            const visibleKey = `visible${risk.charAt(0).toUpperCase()}${risk.slice(1)}` as keyof typeof stats
+            ;(stats[visibleKey] as number)++
+          }
         }
       } else {
         stats.unscanned++
       }
     }
     
-    return stats
+    // Legacy compat: keep "total" pointing to totalInDb
+    return { ...stats, total: stats.totalInDb }
   },
 })
 
