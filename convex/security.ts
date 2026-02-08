@@ -626,9 +626,17 @@ export const getUnscannedSkills = internalMutation({
       .filter((q) => q.neq(q.field('hidden'), true))
       .take(overFetchLimit)
     
+    // Skip skills with no author AND no description — they'll just get "unverified/medium"
+    // every time, wasting an action call + AI credits
+    const scannable = unscanned.filter(s => {
+      const hasAuthor = s.author && s.author !== 'unknown'
+      const hasDescription = !!(s.description ?? s.summary)
+      return hasAuthor || hasDescription
+    })
+
     // Prioritize skills with known authors (full GitHub scan) over unknown (description-only)
-    const withAuthor = unscanned.filter(s => s.author && s.author !== 'unknown')
-    const withoutAuthor = unscanned.filter(s => !s.author || s.author === 'unknown')
+    const withAuthor = scannable.filter(s => s.author && s.author !== 'unknown')
+    const withoutAuthor = scannable.filter(s => !s.author || s.author === 'unknown')
     const prioritized = [...withAuthor, ...withoutAuthor].slice(0, limit)
     
     return prioritized.map(s => ({
@@ -859,8 +867,8 @@ export const analyzeSkill = internalAction({
 export const scanBatch = internalAction({
   args: {},
   handler: async (ctx): Promise<{ scanned: number; total: number }> => {
-    // Get unscanned skills (larger batch for faster initial scanning)
-    const skills = await ctx.runMutation(internal.security.getUnscannedSkills, { limit: 50 })
+    // Batch of 10 per cycle (reduced from 50 to lower action invocations + API costs)
+    const skills = await ctx.runMutation(internal.security.getUnscannedSkills, { limit: 10 })
     
     if (skills.length === 0) {
       console.log('[Security] No unscanned skills found')
@@ -872,6 +880,9 @@ export const scanBatch = internalAction({
     let successCount = 0
     for (const skill of skills) {
       try {
+        // Inline the analysis instead of spawning a separate action per skill.
+        // This avoids N extra action invocations (saves Convex function calls).
+        const startTime = Date.now()
         let content: string | undefined = undefined
         let comments: string[] = []
 
@@ -887,10 +898,38 @@ export const scanBatch = internalAction({
         } else {
           console.log(`[Security] Scanning ${skill.slug} with description only (author unknown)`)
         }
-        
-        const result = await ctx.runAction(internal.security.analyzeSkill, {
-          skillId: skill._id,
-          slug: skill.slug,
+
+        const hasFullContent = !!(content && content.trim().length > 0)
+        const hasDescription = !!(skill.description && skill.description.trim().length > 0)
+        const dataSources = {
+          skillContent: hasFullContent,
+          userComments: comments.length > 0,
+          virusTotal: false,
+        }
+
+        // If nothing to analyze, mark as unverified without calling AI
+        if (!hasFullContent && !hasDescription) {
+          await ctx.runMutation(internal.security.recordScanResult, {
+            skillId: skill._id,
+            skillSlug: skill.slug,
+            scanType: 'ai' as const,
+            securityScore: 50,
+            riskLevel: 'medium' as const,
+            flags: ['content_unavailable', 'unverified'],
+            summary: 'Could not fetch skill content for analysis - status unverified',
+            reasoning: 'Neither the skill.md content nor a description could be retrieved.',
+            securityChecks: defaultChecks(),
+            dataSources,
+            model: 'content-unavailable',
+            durationMs: Date.now() - startTime,
+            status: 'success' as const,
+          })
+          successCount++
+          continue
+        }
+
+        // Build prompt and call AI
+        const prompt = buildAnalysisPrompt({
           name: skill.name,
           author: skill.author,
           description: skill.description,
@@ -899,16 +938,61 @@ export const scanBatch = internalAction({
           content,
           comments: comments.length > 0 ? comments : undefined,
         })
-        
-        if (result.success) {
-          successCount++
+
+        const aiResult = await analyzeWithAI(prompt, { jsonMode: true, maxTokens: 1000 })
+        const analysis = parseAnalysisResponse(aiResult.content, dataSources)
+        const durationMs = Date.now() - startTime
+
+        // Optional VirusTotal scan for risky skills with URLs
+        const contentToScan = content ?? skill.description ?? ''
+        const urls = extractScannableUrls(contentToScan)
+        let vtResult = null
+        if (urls.length > 0 && (analysis.riskLevel === 'high' || analysis.riskLevel === 'critical' || analysis.flags.includes('external_url'))) {
+          if (isVTConfigured()) {
+            vtResult = await scanUrls(urls)
+            dataSources.virusTotal = true
+            analysis.dataSources.virusTotal = true
+            if (vtResult.hasThreats) {
+              analysis.score = Math.max(0, analysis.score - (vtResult.totalPositives * 5))
+              analysis.riskLevel = scoreToRiskLevel(analysis.score)
+              analysis.flags.push('vt_threats_detected')
+              analysis.summary += ` VirusTotal detected ${vtResult.totalPositives} threats.`
+            }
+          }
         }
+
+        await ctx.runMutation(internal.security.recordScanResult, {
+          skillId: skill._id,
+          skillSlug: skill.slug,
+          scanType: 'ai' as const,
+          securityScore: analysis.score,
+          riskLevel: analysis.riskLevel,
+          flags: analysis.flags,
+          summary: analysis.summary,
+          reasoning: analysis.reasoning,
+          securityChecks: analysis.checks,
+          dataSources: analysis.dataSources,
+          vtPositives: vtResult?.totalPositives,
+          vtTotal: vtResult?.totalScanned,
+          vtPermalink: vtResult?.results[0]?.permalink,
+          vtScannedUrls: vtResult?.scannedUrls,
+          model: aiResult.model,
+          durationMs,
+          status: 'success' as const,
+        })
+        successCount++
       } catch (error) {
         console.error(`[Security] Failed to scan ${skill.slug}:`, error)
       }
     }
 
     console.log(`[Security] Scanned ${successCount}/${skills.length} skills`)
+    
+    // Refresh cached stats so dashboard queries stay current without full table scans
+    if (successCount > 0) {
+      await ctx.runMutation(internal.clawdhubSync.updateCachedCounts, {})
+    }
+    
     return { scanned: successCount, total: skills.length }
   },
 })
@@ -1054,23 +1138,37 @@ export const getSkillsByScoreRange = query({
     const limit = args.limit ?? 50
     const offset = args.offset ?? 0
     
-    // Admin dashboard: include ALL skills (including hidden) for full visibility
-    const allSkills = await ctx.db
-      .query('cachedSkills')
-      .filter((q) => q.neq(q.field('securityScore'), undefined))
-      .collect()
+    // Map score range to risk levels to leverage the by_security_risk index
+    const riskLevels: string[] = []
+    if (args.minScore <= 100) {
+      if (args.maxScore >= 90) riskLevels.push('safe')
+      if (args.maxScore >= 70 && args.minScore <= 89) riskLevels.push('low')
+      if (args.maxScore >= 50 && args.minScore <= 69) riskLevels.push('medium')
+      if (args.maxScore >= 25 && args.minScore <= 49) riskLevels.push('high')
+      if (args.minScore <= 24) riskLevels.push('critical')
+    }
     
-    // Filter by score range
-    const filtered = allSkills.filter(s => 
-      s.securityScore !== undefined && 
-      s.securityScore >= args.minScore && 
-      s.securityScore <= args.maxScore
-    )
+    // Query per risk level using index (much cheaper than full table scan)
+    type Risk = 'safe' | 'low' | 'medium' | 'high' | 'critical'
+    const allMatches = []
+    for (const risk of riskLevels as Risk[]) {
+      const skills = await ctx.db
+        .query('cachedSkills')
+        .withIndex('by_security_risk', (q) => q.eq('securityRisk', risk))
+        .take(500)
+      
+      // Fine-filter by exact score range
+      for (const s of skills) {
+        if (s.securityScore !== undefined && s.securityScore >= args.minScore && s.securityScore <= args.maxScore) {
+          allMatches.push(s)
+        }
+      }
+    }
     
     // Sort by score ascending (worst first)
-    filtered.sort((a, b) => (a.securityScore ?? 0) - (b.securityScore ?? 0))
+    allMatches.sort((a, b) => (a.securityScore ?? 0) - (b.securityScore ?? 0))
     
-    const paginated = filtered.slice(offset, offset + limit)
+    const paginated = allMatches.slice(offset, offset + limit)
     
     return {
       skills: paginated.map(s => ({
@@ -1085,83 +1183,38 @@ export const getSkillsByScoreRange = query({
         hidden: s.hidden ?? false,
         hiddenReason: s.hiddenReason,
       })),
-      total: filtered.length,
-      hasMore: offset + limit < filtered.length,
+      total: allMatches.length,
+      hasMore: offset + limit < allMatches.length,
     }
   },
 })
 
 /**
  * Get security stats for admin dashboard
+ * Reads from cached stats in clawdhubSyncState to avoid full table scan.
+ * Cache is refreshed by updateCachedCounts (runs after sync + can be triggered manually).
  */
 export const getSecurityStats = query({
   args: {},
   handler: async (ctx) => {
-    // Count ALL skills including hidden — admins need the full picture
-    const allSkills = await ctx.db
-      .query('cachedSkills')
-      .collect()
+    const state = await ctx.db
+      .query('clawdhubSyncState')
+      .withIndex('by_key', (q) => q.eq('key', 'skills'))
+      .unique()
     
-    const stats = {
-      totalInDb: allSkills.length,
-      visible: 0,
-      scanned: 0,
-      unscanned: 0,
-      // Risk breakdown (ALL skills, including hidden)
-      safe: 0,
-      low: 0,
-      medium: 0,
-      high: 0,
-      critical: 0,
-      // Risk breakdown (visible only)
-      visibleSafe: 0,
-      visibleLow: 0,
-      visibleMedium: 0,
-      visibleHigh: 0,
-      visibleCritical: 0,
-      // Hidden breakdown
-      hidden: 0,
-      hiddenBySecurity: 0,
-      hiddenByModerator: 0,
-      hiddenByRegistryRemoval: 0,
-      hiddenByOther: 0,
+    if (state?.securityStats) {
+      const s = state.securityStats as Record<string, number>
+      return { ...s, total: s.totalInDb }
     }
     
-    for (const skill of allSkills) {
-      if (skill.hidden) {
-        stats.hidden++
-        // Categorize hidden reason
-        const hiddenBy = (skill.hiddenBy as string) ?? ''
-        if (hiddenBy === 'system:security-scanner') {
-          stats.hiddenBySecurity++
-        } else if (hiddenBy === 'system:registry-removal') {
-          stats.hiddenByRegistryRemoval++
-        } else if (hiddenBy.startsWith('moderator:') || hiddenBy.startsWith('admin:') || hiddenBy.startsWith('user_')) {
-          stats.hiddenByModerator++
-        } else {
-          stats.hiddenByOther++
-        }
-      } else {
-        stats.visible++
-      }
-      
-      if (skill.lastSecurityScanAt) {
-        stats.scanned++
-        if (skill.securityRisk) {
-          const risk = skill.securityRisk as 'safe' | 'low' | 'medium' | 'high' | 'critical'
-          stats[risk]++
-          if (!skill.hidden) {
-            const visibleKey = `visible${risk.charAt(0).toUpperCase()}${risk.slice(1)}` as keyof typeof stats
-            ;(stats[visibleKey] as number)++
-          }
-        }
-      } else {
-        stats.unscanned++
-      }
+    // Fallback: no cache yet — return zeros so dashboard renders
+    return {
+      totalInDb: 0, visible: 0, scanned: 0, unscanned: 0,
+      safe: 0, low: 0, medium: 0, high: 0, critical: 0,
+      visibleSafe: 0, visibleLow: 0, visibleMedium: 0, visibleHigh: 0, visibleCritical: 0,
+      hidden: 0, hiddenBySecurity: 0, hiddenByModerator: 0, hiddenByRegistryRemoval: 0, hiddenByOther: 0,
+      total: 0,
     }
-    
-    // Legacy compat: keep "total" pointing to totalInDb
-    return { ...stats, total: stats.totalInDb }
   },
 })
 

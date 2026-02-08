@@ -512,6 +512,9 @@ const clawdhubSyncState = defineTable({
   categoryCounts: v.optional(v.any()), // { category: count }
   tagCounts: v.optional(v.any()), // [{ tag, count }]
   totalVisible: v.optional(v.number()),
+  totalHidden: v.optional(v.number()),
+  securityStats: v.optional(v.any()), // cached security dashboard stats
+  authorCounts: v.optional(v.any()), // cached author breakdown [{author, total, hidden}]
 }).index('by_key', ['key'])
 
 // Clerk users (synced from Clerk via webhook)

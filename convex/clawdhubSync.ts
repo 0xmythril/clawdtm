@@ -306,11 +306,61 @@ export const updateCachedCounts = internalMutation({
       .withIndex('by_key', (q) => q.eq('key', 'skills'))
       .unique()
     
+    // Build security stats (avoids full table scan in reactive query)
+    const securityStats = {
+      totalInDb: allSkills.length,
+      visible: skills.length,
+      scanned: 0,
+      unscanned: 0,
+      safe: 0, low: 0, medium: 0, high: 0, critical: 0,
+      visibleSafe: 0, visibleLow: 0, visibleMedium: 0, visibleHigh: 0, visibleCritical: 0,
+      hidden: allSkills.length - skills.length,
+      hiddenBySecurity: 0, hiddenByModerator: 0, hiddenByRegistryRemoval: 0, hiddenByOther: 0,
+    }
+    for (const skill of allSkills) {
+      if (skill.hidden) {
+        const hb = (skill.hiddenBy as string) ?? ''
+        if (hb === 'system:security-scanner') securityStats.hiddenBySecurity++
+        else if (hb === 'system:registry-removal') securityStats.hiddenByRegistryRemoval++
+        else if (hb.startsWith('moderator:') || hb.startsWith('admin:') || hb.startsWith('user_')) securityStats.hiddenByModerator++
+        else securityStats.hiddenByOther++
+      }
+      if (skill.lastSecurityScanAt) {
+        securityStats.scanned++
+        const risk = skill.securityRisk as string
+        if (risk && risk in securityStats) {
+          ;(securityStats as Record<string, number>)[risk]++
+          if (!skill.hidden) {
+            const vk = `visible${risk.charAt(0).toUpperCase()}${risk.slice(1)}`
+            ;(securityStats as Record<string, number>)[vk] = ((securityStats as Record<string, number>)[vk] ?? 0) + 1
+          }
+        }
+      } else {
+        securityStats.unscanned++
+      }
+    }
+
+    // Build author counts (avoids full table scan in reactive query)
+    const authorMap = new Map<string, { total: number; hidden: number }>()
+    for (const skill of allSkills) {
+      const author = skill.author ?? 'unknown'
+      const cur = authorMap.get(author) ?? { total: 0, hidden: 0 }
+      cur.total++
+      if (skill.hidden) cur.hidden++
+      authorMap.set(author, cur)
+    }
+    const authorCounts = Array.from(authorMap.entries())
+      .map(([author, counts]) => ({ author, ...counts }))
+      .sort((a, b) => b.total - a.total)
+
     if (state) {
       await ctx.db.patch(state._id, {
         categoryCounts,
         tagCounts: sortedTags,
         totalVisible: skills.length,
+        totalHidden: allSkills.length - skills.length,
+        securityStats,
+        authorCounts,
       })
     }
     
@@ -1030,19 +1080,13 @@ export const getSyncStatus = query({
       .withIndex('by_key', (q) => q.eq('key', 'skills'))
       .unique()
     
-    // Use cached totalVisible if available (avoids full table scan)
+    // Use cached counts if available (avoids full table scan)
     if (state?.totalVisible !== undefined) {
-      // Get hidden count from index (efficient)
-      const hiddenSkills = await ctx.db
-        .query('cachedSkills')
-        .withIndex('by_hidden', (q) => q.eq('hidden', true))
-        .collect()
-      
       return {
         status: state?.status ?? 'idle',
         totalSynced: state?.totalSynced ?? 0,
         totalCached: state.totalVisible,
-        totalHidden: hiddenSkills.length,
+        totalHidden: ((state as Record<string, unknown>).totalHidden as number | undefined) ?? 0,
         lastFullSyncAt: state?.lastFullSyncAt,
         lastError: state?.lastError,
       }
@@ -1689,7 +1733,7 @@ export const listHiddenSkills = query({
     const skills = await ctx.db
       .query('cachedSkills')
       .withIndex('by_hidden', (q) => q.eq('hidden', true))
-      .collect()
+      .take(500)
     
     return skills.map((s) => ({
       slug: s.slug,
