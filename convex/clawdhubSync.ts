@@ -1920,6 +1920,58 @@ export const batchUpdateAuthorsFromGitHub = internalMutation({
   },
 })
 
+// Detect skills removed from GitHub and hide them with "Banned" reason
+export const detectRemovedSkills = internalMutation({
+  args: {
+    gitHubSlugs: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const gitHubSet = new Set(args.gitHubSlugs)
+
+    // Get all non-hidden skills with a known author (GitHub-sourced)
+    const allSkills = await ctx.db
+      .query('cachedSkills')
+      .collect()
+
+    const candidates = allSkills.filter(
+      (s) => !s.hidden && s.author && s.author !== 'unknown'
+    )
+
+    // Find skills in DB but not in GitHub
+    const toHide = candidates.filter((s) => !gitHubSet.has(s.slug))
+
+    // Safety: abort if >20% would be hidden (likely bad data)
+    const threshold = Math.ceil(candidates.length * 0.2)
+    if (toHide.length > threshold) {
+      console.error(
+        `ABORT: detectRemovedSkills would hide ${toHide.length}/${candidates.length} skills (>${threshold} threshold). Likely bad GitHub data.`
+      )
+      return { hiddenCount: 0, aborted: true, wouldHide: toHide.length }
+    }
+
+    const now = Date.now()
+    const hiddenSlugs: string[] = []
+
+    for (const skill of toHide) {
+      await ctx.db.patch(skill._id, {
+        hidden: true,
+        hiddenReason: 'Banned: Removed from OpenClaw skills registry',
+        hiddenAt: now,
+        hiddenBy: 'system:registry-removal',
+      })
+      hiddenSlugs.push(skill.slug)
+    }
+
+    if (hiddenSlugs.length > 0) {
+      console.log(
+        `detectRemovedSkills: hid ${hiddenSlugs.length} skills: ${hiddenSlugs.slice(0, 10).join(', ')}${hiddenSlugs.length > 10 ? '...' : ''}`
+      )
+    }
+
+    return { hiddenCount: hiddenSlugs.length, aborted: false, slugs: hiddenSlugs }
+  },
+})
+
 // Sync authors from GitHub archive (much faster than individual API calls)
 export const syncAuthorsFromGitHub = internalAction({
   args: {},
@@ -1930,6 +1982,7 @@ export const syncAuthorsFromGitHub = internalAction({
     unmatched: number
     updated: number
     notFoundInDb: number
+    removedSkillsHidden: number
   }> => {
     console.log('Fetching skill tree from GitHub archive...')
     
@@ -2001,6 +2054,26 @@ export const syncAuthorsFromGitHub = internalAction({
     
     console.log(`GitHub sync complete: ${totalUpdated} updated, ${totalNotFound} not found in DB, ${unmatched} not in GitHub`)
     
+    // Detect skills removed from GitHub registry
+    let removedSkillsHidden = 0
+    if (data.truncated) {
+      console.warn('GitHub tree was truncated — skipping removed-skill detection to avoid false positives')
+    } else {
+      const allGitHubSlugs = Array.from(slugToOwner.keys())
+      console.log(`Running removed-skill detection against ${allGitHubSlugs.length} GitHub slugs...`)
+      
+      const result = await ctx.runMutation(
+        internal.clawdhubSync.detectRemovedSkills,
+        { gitHubSlugs: allGitHubSlugs }
+      )
+      removedSkillsHidden = result.hiddenCount
+      if (result.aborted) {
+        console.error('Removed-skill detection aborted due to safety threshold')
+      } else if (result.hiddenCount > 0) {
+        console.log(`Hid ${result.hiddenCount} skills removed from OpenClaw registry`)
+      }
+    }
+    
     return {
       gitHubSkillsFound: slugToOwner.size,
       skillsNeedingEnrichment: skillsNeedingEnrichment.length,
@@ -2008,6 +2081,7 @@ export const syncAuthorsFromGitHub = internalAction({
       unmatched,
       updated: totalUpdated,
       notFoundInDb: totalNotFound,
+      removedSkillsHidden,
     }
   },
 })
@@ -2022,6 +2096,7 @@ export const triggerGitHubAuthorSync = action({
     unmatched: number
     updated: number
     notFoundInDb: number
+    removedSkillsHidden: number
   }> => {
     return await ctx.runAction(internal.clawdhubSync.syncAuthorsFromGitHub, {})
   },
