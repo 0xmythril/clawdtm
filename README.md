@@ -1,5 +1,18 @@
 # ClawdTM
 
+> [!IMPORTANT]
+> ## 🗄️ This project is archived
+>
+> **ClawdTM was sunset in August 2026 and is no longer running.** The Convex
+> backend has been decommissioned and the paid plan cancelled, so the catalog
+> sync, security scanner, and public API are all gone. clawdtm.com now serves a
+> static archive notice.
+>
+> The repository is preserved read-only as a reference. The code will not build
+> into a working app without standing up a fresh Convex deployment first — see
+> [Reviving this project](#reviving-this-project) below.
+
+
 **Built by [@0xmythril](https://x.com/0xmythril)** · Based on [OpenClaw](https://openclaw.ai/) · [Clawdhub](https://clawdhub.com)
 
 ---
@@ -77,3 +90,32 @@ Do not commit `.env*`; `.notes/` is gitignored for local/private notes.
 ---
 
 **Author / Credits** — Built by [@0xmythril](https://x.com/0xmythril)
+
+## Reviving this project
+
+Everything needed to bring ClawdTM back is still in this repo. What is *not* in
+the repo is the data — the Convex deployment held ~36 tables of synced skills,
+security scores, votes, and reviews. If a final `npx convex export` zip was
+kept before shutdown, restore from that; otherwise a revived instance starts
+empty and repopulates from the ClawdHub sync.
+
+1. Create a new Convex project and run `npx convex deploy`.
+2. Set `NEXT_PUBLIC_CONVEX_URL` and `CONVEX_DEPLOYMENT` in `.env.local`.
+3. Set `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, and `SECURITY_SCAN_MODEL` in the
+   Convex dashboard (Settings → Environment Variables).
+4. Restore the commented-out jobs in `convex/crons.ts` to resume catalog sync,
+   categorization, and security scanning.
+5. Add Clerk keys if you want voting and reviews.
+6. Restore data with `npx convex import` from the export zip, or let the
+   ClawdHub sync cron repopulate from scratch.
+
+Be aware that the crons are what generate ongoing cost: the security scanner
+calls OpenRouter and the commit checker polls the GitHub API, both on 15-minute
+intervals by default.
+
+## The sunset page
+
+`sunset/` holds the static page now served at clawdtm.com — a single
+`index.html` with no build step and no backend, deployed as its own Vercel
+project so it never rebuilds against the dead Convex deployment.
+
